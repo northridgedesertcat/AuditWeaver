@@ -1,0 +1,16 @@
+[
+  "cmd", "bash", "wget", "curl", "powershell",
+  "sh", "zsh", "ksh", "csh", "tcsh",
+  "python", "perl", "ruby", "php", "java",
+  "node", "npm", "pip", "apt", "yum",
+  "dnf", "pacman", "brew", "choco", "scoop",
+  "git", "svn", "hg", "ftp", "sftp",
+  "scp", "rsync", "ssh", "telnet", "netcat",
+  "nc", "netstat", "ping", "traceroute", "whois",
+  "dig", "nslookup", "host", "arp", "route",
+  "iptables", "firewall", "ufw", "selinux",
+  "chmod", "chown", "sudo", "su", "root",
+  "admin", "administrator", "system", "service",
+  "daemon", "process", "task", "job", "cron",
+  "at", "batch", "init", "systemd", "upstart"
+]

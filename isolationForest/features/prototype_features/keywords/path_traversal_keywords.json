@@ -1,0 +1,10 @@
+[
+  "../", "..\\", "./", ".\\", "~/",
+  "~\\", "/etc/passwd", "/etc/shadow",
+  "/etc/hosts", "/etc/resolv.conf",
+  "/proc/self/environ", "/proc/self/cmdline",
+  "/proc/version", "/proc/mounts",
+  "C:\\Windows\\System32\\", "C:\\Windows\\",
+  "C:\\Program Files\\", "C:\\ProgramData\\",
+  "C:\\Users\\", "C:\\Documents and Settings\\"
+]

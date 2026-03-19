@@ -1,0 +1,15 @@
+[
+  "<script", "alert(", "javascript:",
+  "onerror", "onload", "onclick", "onmouseover",
+  "onmouseout", "onfocus", "onblur", "onchange",
+  "onsubmit", "onreset", "onselect", "onkeydown",
+  "onkeypress", "onkeyup", "document.cookie",
+  "window.location", "location.href", "eval(",
+  "setTimeout(", "setInterval(", "Function(",
+  "innerHTML", "outerHTML", "document.write",
+  "window.open", "iframe", "embed", "object",
+  "applet", "meta", "base", "link", "style",
+  "img", "input", "textarea", "select", "button",
+  "form", "a", "div", "span", "p", "body",
+  "head", "html", "title", "script"
+]
