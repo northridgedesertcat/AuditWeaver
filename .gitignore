@@ -40,7 +40,7 @@ ENV/
 # *.joblib
 
 # Data files (large datasets)
-*.csv
+# *.csv
 *.arff
 *.zip
 *.tar.gz
