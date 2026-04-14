@@ -1,0 +1,1 @@
+# Laucher module for Isolation Forest model inference
