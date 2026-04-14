@@ -35,9 +35,9 @@ ENV/
 *.swp
 *.swo
 
-# Model files
-*.pkl
-*.joblib
+# # Model files
+# *.pkl
+# *.joblib
 
 # Data files (large datasets)
 *.csv
