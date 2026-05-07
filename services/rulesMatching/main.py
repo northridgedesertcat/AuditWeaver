@@ -53,7 +53,7 @@ def analyze_elasticsearch_logs():
     if attack_count == 0:
         print("\n未检测到攻击")
     
-    # 保存检测结果到Elasticsearch
+    # 保存检测结果到Elasticsearch和本地JSON
     print("\n=== 保存检测结果 ===")
     data_saver = DataSaver()
     
@@ -61,9 +61,15 @@ def analyze_elasticsearch_logs():
         print("[ERROR] 无法连接到Elasticsearch，无法保存检测结果")
         return
     
-    print("正在保存检测结果到Elasticsearch...")
-    save_result = data_saver.save_batch(logs, result)
-    print(f"保存完成: 成功 {save_result['saved']} 条, 失败 {save_result['failed']} 条")
+    print("正在处理并保存检测结果...")
+    print("  - 攻击日志将保存到 Elasticsearch attack_logs 索引")
+    print("  - 正常日志将保存到 temporaryDatas 目录（按日期分组）")
+    
+    save_result = data_saver.process_and_save(logs, result)
+    
+    print(f"\n保存结果：")
+    print(f"  攻击日志: {save_result['attack_logs']['saved']}/{save_result['attack_logs']['total']} 条已保存到 Elasticsearch")
+    print(f"  正常日志: {save_result['normal_logs']['saved']}/{save_result['normal_logs']['total']} 条已保存到 JSON 文件")
     
     data_saver.close()
 
