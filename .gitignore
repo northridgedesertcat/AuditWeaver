@@ -52,3 +52,5 @@ Thumbs.db
 #datas
 isolationForest\datas\nginx\*
 document/
+services\rulesMatching\temporaryDatas\*
+services\temporaryDatas\*
