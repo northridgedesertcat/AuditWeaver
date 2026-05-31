@@ -73,6 +73,6 @@ def generate_log():
 
 while True:
     log = generate_log()
-    producer.send('your-topic', log.encode('utf-8'))
+    producer.send('log.raw', log.encode('utf-8'))
     print("sent:", log)
     time.sleep(2)

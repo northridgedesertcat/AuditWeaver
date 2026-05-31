@@ -1,12 +1,13 @@
 version: '3.8'
 
 services:
-
   zookeeper:
-    image: confluentinc/cp-zookeeper:7.4.0
-    container_name: zookeeper
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
+      image: confluentinc/cp-zookeeper:7.4.0
+      container_name: zookeeper
+      environment:
+        - ZOOKEEPER_CLIENT_PORT=2181
+      volumes:
+        - zk_data:/var/lib/zookeeper/data
 
   kafka:
     image: confluentinc/cp-kafka:7.4.0
@@ -24,6 +25,8 @@ services:
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    volumes:
+      - kafka_data:/var/lib/kafka/data
 
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.12.0
@@ -33,7 +36,9 @@ services:
       - xpack.security.enabled=false
       - ES_JAVA_OPTS=-Xms1g -Xmx1g
     ports:
-      - "9200:9200"
+      - "19200:9200"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data 
 
   logstash:
     image: docker.elastic.co/logstash/logstash:8.12.0
@@ -44,11 +49,20 @@ services:
     volumes:
       - ./config/logstash/pipeline:/usr/share/logstash/pipeline
 
-
   kibana:
     image: docker.elastic.co/kibana/kibana:8.12.0
     container_name: kibana
     ports:
       - "5601:5601"
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
     depends_on:
       - elasticsearch
+
+volumes:
+  kafka_data:
+    name: system_audit_kafka_data
+  es_data:
+    name: system_audit_es_data
+  zk_data:
+    name: system_audit_zk_data

@@ -3,7 +3,7 @@ import re
 import json
 import logging
 from datetime import datetime
-from config import DETECTION_CONFIG
+from match_config import DETECTION_CONFIG
 
 # 配置日志
 logging.basicConfig(
@@ -83,10 +83,16 @@ def get_severity(confidence):
 
 def validate_log_entry(log_entry):
     """验证日志条目格式"""
-    required_fields = ['ip', 'timestamp', 'method', 'path', 'status']
+    required_fields = ['ip', 'method', 'path', 'status']
+    
     for field in required_fields:
         if field not in log_entry:
             return False
+    
+    # 检查时间戳字段（支持 @timestamp 和 timestamp 两种格式）
+    if 'timestamp' not in log_entry and '@timestamp' not in log_entry:
+        return False
+    
     return True
 
 def normalize_path(path):

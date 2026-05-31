@@ -1,7 +1,7 @@
 # 规则引擎核心文件
 from .attack_detectors import AttackDetectors
 from utils import validate_log_entry, aggregate_results, filter_results, log_detection, generate_alert_message
-from config import DETECTION_CONFIG
+from match_config import DETECTION_CONFIG
 
 class RuleEngine:
     """规则引擎类"""

@@ -1,5 +1,5 @@
 # 攻击检测器文件
-from config import RULES_CONFIG, ATTACK_TYPES
+from match_config import RULES_CONFIG, ATTACK_TYPES
 from utils import match_patterns, match_keywords, calculate_confidence, format_detection_result
 
 class AttackDetectors:

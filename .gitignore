@@ -50,7 +50,7 @@ ENV/
 Thumbs.db
 
 #datas
-isolationForest\datas\nginx\*
+isolationForest/datas/nginx/*
 document/
-services\rulesMatching\temporaryDatas\*
-services\temporaryDatas\*
+services/rulesMatching/temporaryDatas/*
+services/temporaryDatas/*
