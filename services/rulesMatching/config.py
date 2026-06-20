@@ -5,8 +5,8 @@
 KAFKA_CONFIG = {
     'brokers': 'localhost:29092',           # Kafka broker 地址
     'input_topic': 'log.audit',              # 输入日志的 topic
-    'output_topic': 'log.risk',              # 输出风险数据的 topic
-    'group_id': 'rules_matching_group_test_v0001',   # 消费者组 ID
+    'output_topic': 'log.analysis',              # 输出风险数据的 topic
+    'group_id': 'rules_matching_group_test_v0002',   # 消费者组 ID
     'auto_offset_reset': 'earliest',         # 偏移量重置策略: earliest/latest
     'enable_auto_commit': True,              # 是否自动提交偏移量
     'auto_commit_interval_ms': 5000,         # 自动提交间隔(毫秒)

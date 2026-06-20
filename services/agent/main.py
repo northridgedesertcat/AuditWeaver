@@ -1,167 +1,159 @@
-# 主入口脚本
-import logging
-import signal
+# Agent 模块主程序
 import sys
 import os
+import time
+import logging
 
-# 根据运行方式选择导入方式
-if __name__ == "__main__" and __package__ is None:
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    if current_dir not in sys.path:
-        sys.path.insert(0, current_dir)
-    
-    from config import load_config
-    from es_client import ElasticsearchClient, DataFetcher, DataWriter
-    from message_queue import KafkaProducer
-    from worker import WorkerPool
-    from dify import DifyClient
-    from monitor import MetricsCollector, HealthChecker
-    from models import Task
-else:
-    from .config import load_config
-    from .es_client import ElasticsearchClient, DataFetcher, DataWriter
-    from .message_queue import KafkaProducer
-    from .worker import WorkerPool
-    from .dify import DifyClient
-    from .monitor import MetricsCollector, HealthChecker
-    from .models import Task
+# 添加项目路径
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+from config import KAFKA_CONFIG, DIFY_CONFIG, ELASTICSEARCH_CONFIG, LOG_CONFIG, PROCESS_CONFIG
+from kafka_consumer import LogAnalysisConsumer
+from dify import DifyClient
+from es_client import DataSaver
 
-def setup_logging():
-    """配置日志"""
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        handlers=[
-            logging.StreamHandler(sys.stdout),
-            logging.FileHandler("agent.log")
-        ]
-    )
+logging.basicConfig(
+    level=getattr(logging, LOG_CONFIG['level']),
+    format=LOG_CONFIG['format']
+)
+logger = logging.getLogger('agent_main')
 
+class AgentMain:
+    def __init__(self):
+        self.kafka_consumer = None
+        self.dify_client = None
+        self.data_saver = None
+        self.running = False
 
-def handle_signal(running_flag, worker_pool):
-    """处理信号"""
-    logger = logging.getLogger(__name__)
-    logger.info(f"收到退出信号，正在优雅关闭...")
-    if worker_pool:
-        worker_pool.stop()
-    sys.exit(0)
+    def initialize(self) -> bool:
+        logger.info('Initializing Agent module...')
 
-
-def main():
-    """主函数"""
-    setup_logging()
-    logger = logging.getLogger(__name__)
-
-    logger.info("=== LogSentinel Agent 启动 ===")
-
-    # 加载配置
-    config = load_config()
-    logger.info("配置加载完成")
-
-    # 初始化组件
-    try:
-        # Elasticsearch 客户端
-        es_client = ElasticsearchClient(
-            hosts=config.es.hosts,
-            username=config.es.username,
-            password=config.es.password
+        logger.info('Connecting to Kafka...')
+        self.kafka_consumer = LogAnalysisConsumer(
+            bootstrap_servers=KAFKA_CONFIG['brokers'],
+            topic=KAFKA_CONFIG['input_topic'],
+            group_id=KAFKA_CONFIG['group_id'],
+            auto_offset_reset=KAFKA_CONFIG['auto_offset_reset'],
+            consumer_timeout_ms=KAFKA_CONFIG['consumer_timeout_ms']
         )
-        if not es_client.connect():
-            logger.error("无法连接到 Elasticsearch")
-            return
+        if not self.kafka_consumer.connect():
+            logger.error('Failed to connect to Kafka')
+            return False
+        logger.info('Kafka connected successfully')
 
-        # 数据采集器
-        data_fetcher = DataFetcher(es_client)
-
-        # 数据写入器（Worker 会创建自己的实例）
-        # data_writer = DataWriter(es_client, config.output.index)
-
-        # Kafka 生产者
-        kafka_producer = KafkaProducer(
-            bootstrap_servers=config.kafka.bootstrap_servers,
-            topic=config.kafka.topic
+        logger.info('Connecting to Dify API...')
+        self.dify_client = DifyClient(
+            base_url=DIFY_CONFIG['base_url'],
+            api_key=DIFY_CONFIG['api_key'],
+            timeout=DIFY_CONFIG['timeout'],
+            endpoint=DIFY_CONFIG['endpoint']
         )
-        if not kafka_producer.connect():
-            logger.error("无法连接到 Kafka")
-            return
+        logger.info('Dify client initialized')
 
-        # Dify 客户端（Worker 会创建自己的实例）
-        # dify_client = DifyClient(...)
+        logger.info('Connecting to Elasticsearch...')
+        self.data_saver = DataSaver(
+            es_host=ELASTICSEARCH_CONFIG['host'],
+            es_port=ELASTICSEARCH_CONFIG['port'],
+            es_index=ELASTICSEARCH_CONFIG['index']
+        )
+        if not self.data_saver.connect():
+            logger.error('Failed to connect to Elasticsearch')
+            return False
+        logger.info('Elasticsearch connected successfully')
 
-        # 指标收集器
-        metrics = MetricsCollector()
+        return True
 
-        # 健康检查器
-        health_checker = HealthChecker()
-        health_checker.register_check("elasticsearch", es_client.connect)
-        health_checker.register_check("kafka", kafka_producer.connect)
+    def process_log(self, log_entry: dict) -> bool:
+        if 'log_entry' in log_entry:
+            actual_log = log_entry.get('log_entry', {})
+        else:
+            actual_log = log_entry
 
-        logger.info("所有组件初始化完成")
+        event_id = actual_log.get('event_id', 'unknown')
+        ip = actual_log.get('ip', 'unknown')
+        attack_type = actual_log.get('rule_match', {}).get('attack_type', 'unknown')
 
-        # 启动数据采集（后台线程）
-        import threading
-        running_flag = threading.Event()
-        running_flag.set()
+        logger.info(f'Processing log: event_id={event_id}, ip={ip}, attack_type={attack_type}')
 
-        def data_collection_loop():
-            while running_flag.is_set():
-                try:
-                    logs = data_fetcher.fetch_pending_logs(
-                        config.es.input_index,
-                        minutes=10,
-                        size=config.worker.batch_size
-                    )
-                    if logs:
-                        tasks = [Task.create_from_log(log).to_dict() for log in logs]
-                        kafka_producer.send_batch(tasks)
-                        metrics.increment("kafka_messages_produced")
-                        logger.info(f"已发送 {len(tasks)} 条消息到 Kafka")
-                except Exception as e:
-                    logger.error(f"数据采集异常: {str(e)}")
-                import time
+        try:
+            dify_response = self.dify_client.analyze_log(actual_log)
+
+            if dify_response.get('status') == 'success':
+                doc_id = self.data_saver.save_analysis_report(actual_log, dify_response.get('response', {}))
+                if doc_id:
+                    logger.info(f'Analysis report saved: {doc_id}')
+                    return True
+                else:
+                    logger.error('Failed to save analysis report')
+                    return False
+            else:
+                logger.error(f'Dify analysis failed: {dify_response.get("error")}')
+                return False
+
+        except Exception as e:
+            logger.error(f'Error processing log {event_id}: {str(e)}')
+            return False
+
+    def run(self):
+        logger.info('Agent module started')
+        self.running = True
+
+        batch_size = PROCESS_CONFIG['batch_size']
+        poll_interval = PROCESS_CONFIG['poll_interval_ms'] / 1000.0
+
+        while self.running:
+            try:
+                messages = self.kafka_consumer.consume(max_records=batch_size)
+
+                if messages:
+                    logger.info(f'Received {len(messages)} messages from Kafka')
+
+                    success_count = 0
+                    fail_count = 0
+
+                    for log_entry in messages:
+                        if self.process_log(log_entry):
+                            success_count += 1
+                        else:
+                            fail_count += 1
+
+                    logger.info(f'Processing complete: success={success_count}, failed={fail_count}')
+                else:
+                    logger.debug('No messages received, waiting...')
+
+                time.sleep(poll_interval)
+
+            except KeyboardInterrupt:
+                logger.info('Received interrupt signal, stopping...')
+                self.running = False
+            except Exception as e:
+                logger.error(f'Error in main loop: {str(e)}')
                 time.sleep(5)
 
-        collector_thread = threading.Thread(target=data_collection_loop, daemon=True)
-        collector_thread.start()
-        logger.info("数据采集线程已启动")
+        self.shutdown()
 
-        # 准备 Worker 配置
-        kafka_config = {
-            "bootstrap_servers": config.kafka.bootstrap_servers,
-            "topic": config.kafka.topic,
-            "group_id": config.kafka.consumer_group,
-            "dify_api_key": config.dify.api_key,
-            "dify_api_url": config.dify.api_url,
-        }
+    def shutdown(self):
+        logger.info('Shutting down Agent module...')
+        if self.kafka_consumer:
+            self.kafka_consumer.close()
+        if self.dify_client:
+            self.dify_client.close()
+        if self.data_saver:
+            self.data_saver.close()
+        logger.info('Agent module stopped')
 
-        # 启动 Worker 池（每个 Worker 有自己的 KafkaConsumer）
-        worker_pool = WorkerPool(
-            worker_count=config.worker.worker_count,
-            kafka_config=kafka_config,
-            output_index=config.output.index
-        )
+def main():
+    agent = AgentMain()
 
-        # 注册信号处理
-        signal.signal(signal.SIGINT, lambda s, f: handle_signal(running_flag, worker_pool))
-        signal.signal(signal.SIGTERM, lambda s, f: handle_signal(running_flag, worker_pool))
+    if not agent.initialize():
+        logger.error('Failed to initialize Agent module')
+        sys.exit(1)
 
-        worker_pool.start()
-        logger.info(f"Worker 池已启动 ({config.worker.worker_count} 个 Worker)")
-
-        # 保持运行
-        import time
-        while running_flag.is_set():
-            time.sleep(1)
-            if not worker_pool.is_running():
-                logger.warning("所有 Worker 已停止，退出程序")
-                break
-
+    try:
+        agent.run()
     except Exception as e:
-        logger.error(f"启动失败: {str(e)}", exc_info=True)
-    finally:
-        logger.info("Agent 已关闭")
+        logger.error(f'Fatal error: {str(e)}')
+        sys.exit(1)
 
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

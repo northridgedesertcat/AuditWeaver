@@ -1,86 +1,117 @@
 # Dify API 客户端
 import requests
-from typing import Dict, Optional
-from time import sleep
+import json
 import logging
+import sys
+import os
 
-logger = logging.getLogger(__name__)
+# 添加项目路径
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from typing import Dict, Any, Optional
+from config import (
+    build_dify_payload,
+    extract_log_fields,
+)
+
+logger = logging.getLogger('dify_client')
 
 class DifyClient:
-    """Dify API 客户端"""
-    
-    def __init__(
-        self,
-        api_key: str,
-        api_url: str = "https://api.dify.ai/v1",
-        timeout: int = 60,
-        max_retries: int = 3,
-        retry_delay: float = 1.0
-    ):
+    def __init__(self, base_url: str, api_key: str, timeout: int = 60, endpoint: str = 'chat-messages'):
+        self.base_url = base_url.rstrip('/')
         self.api_key = api_key
-        self.api_url = api_url.rstrip("/")
         self.timeout = timeout
-        self.max_retries = max_retries
-        self.retry_delay = retry_delay
-    
-    def process(self, data: Dict) -> Dict:
-        """调用 Dify API 处理数据"""
-        url = f"{self.api_url}/workflows/run"
-        
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
-        }
-        
+        self.endpoint = endpoint.lstrip('/')
+        self.session = requests.Session()
+        self.session.headers.update({
+            'Authorization': f'Bearer {api_key}',
+            'Content-Type': 'application/json'
+        })
+
+    def send_message(self, query: str, conversation_id: Optional[str] = None,
+                     user: str = 'agent_client', inputs: Optional[Dict[str, Any]] = None,
+                     response_mode: Optional[str] = None) -> Dict[str, Any]:
         payload = {
-            "inputs": {
-                "log_entry": data
-            },
-            "response_mode": "blocking"
+            'query': query,
+            'inputs': inputs or {},
+            'response_mode': response_mode or RESPONSE_MODE,
+            'user': user
         }
-        
-        for attempt in range(self.max_retries):
-            try:
-                response = requests.post(
-                    url,
-                    headers=headers,
-                    json=payload,
-                    timeout=self.timeout
-                )
+
+        if conversation_id:
+            payload['conversation_id'] = conversation_id
+
+        endpoint_url = f'{self.base_url}/{self.endpoint}'
+
+        try:
+            logger.info(f'Sending request to Dify API: {endpoint_url}')
+            logger.debug(f'Request payload: {json.dumps(payload, ensure_ascii=False)}')
+            response = self.session.post(
+                endpoint_url,
+                json=payload,
+                timeout=self.timeout
+            )
+
+            if response.status_code != 200:
+                logger.error(f'Dify API error response: {response.status_code}')
+                logger.error(f'Response body: {response.text}')
                 response.raise_for_status()
-                return response.json()
-            except requests.exceptions.RequestException as e:
-                logger.warning(f"Dify API 调用失败 (尝试 {attempt + 1}/{self.max_retries}): {str(e)}")
-                if attempt < self.max_retries - 1:
-                    sleep(self.retry_delay * (2 ** attempt))
-        
-        logger.error("Dify API 调用失败，已达到最大重试次数")
-        return {"error": "max_retries_exceeded", "message": "无法连接到 Dify API"}
-    
-    def get_status(self, task_id: str) -> Optional[Dict]:
-        """获取任务状态"""
-        url = f"{self.api_url}/workflows/tasks/{task_id}"
-        
-        headers = {
-            "Authorization": f"Bearer {self.api_key}"
-        }
-        
-        try:
-            response = requests.get(url, headers=headers, timeout=self.timeout)
-            response.raise_for_status()
-            return response.json()
+
+            result = response.json()
+            logger.info('Dify API response received successfully')
+            return result
+
+        except requests.exceptions.Timeout:
+            logger.error('Dify API request timeout')
+            raise
         except requests.exceptions.RequestException as e:
-            logger.error(f"获取任务状态失败: {str(e)}")
-            return None
-    
-    def health_check(self) -> bool:
-        """检查 Dify API 健康状态"""
-        url = f"{self.api_url}/health"
-        
+            logger.error(f'Dify API request failed: {str(e)}')
+            raise
+
+    def analyze_log(self, log_data: Dict[str, Any]) -> Dict[str, Any]:
+        # 使用配置文件构建 payload (Workflow 模式)
         try:
-            response = requests.get(url, timeout=self.timeout)
-            return response.status_code == 200
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Dify API 健康检查失败: {str(e)}")
-            return False
+            payload = build_dify_payload(log_data)
+            log_id = extract_log_fields(log_data).get('log_id', 'unknown')
+            
+            endpoint_url = f'{self.base_url}/{self.endpoint}'
+            
+            logger.info(f'Sending request to Dify Workflow API: {endpoint_url}')
+            logger.debug(f'Request payload: {json.dumps(payload, ensure_ascii=False)}')
+            
+            response = self.session.post(
+                endpoint_url,
+                json=payload,
+                timeout=self.timeout
+            )
+            
+            if response.status_code != 200:
+                logger.error(f'Dify API error response: {response.status_code}')
+                logger.error(f'Response body: {response.text}')
+                response.raise_for_status()
+            
+            result = response.json()
+            logger.info('Dify Workflow API response received successfully')
+            
+            return {
+                'status': 'success',
+                'log_id': log_id,
+                'response': result
+            }
+        except Exception as e:
+            log_id = 'unknown'
+            try:
+                log_id = extract_log_fields(log_data).get('log_id', 'unknown')
+            except:
+                pass
+                
+            logger.error(f'Failed to analyze log {log_id}: {str(e)}')
+            return {
+                'status': 'failed',
+                'log_id': log_id,
+                'error': str(e)
+            }
+
+    def close(self):
+        self.session.close()
+        logger.info('Dify client closed')

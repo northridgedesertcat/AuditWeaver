@@ -1,88 +1,105 @@
-# Elasticsearch 客户端封装
-from elasticsearch import Elasticsearch, AsyncElasticsearch
-from elasticsearch.exceptions import ConnectionError, RequestError
-from typing import Optional, Dict, Any
+# Elasticsearch 客户端模块
 import logging
+from typing import Dict, Any, Optional
+from elasticsearch import Elasticsearch
+from elasticsearch.exceptions import NotFoundError, ConnectionError as ESConnectionError
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('elasticsearch_client')
 
+class ESClient:
+    def __init__(self, host: str = 'localhost', port: int = 19200):
+        self.host = host
+        self.port = port
+        self.url = f'http://{host}:{port}'
+        self.client: Optional[Elasticsearch] = None
+        self.index_name = 'log_analysis_reports'
 
-class ElasticsearchClient:
-    """Elasticsearch 客户端类"""
-    
-    def __init__(
-        self,
-        hosts: str = "http://localhost:19200",
-        username: Optional[str] = None,
-        password: Optional[str] = None,
-        timeout: int = 30
-    ):
-        self.hosts = hosts
-        self.username = username
-        self.password = password
-        self.timeout = timeout
-        self.client = None
-    
     def connect(self) -> bool:
-        """建立同步连接"""
         try:
-            auth = (self.username, self.password) if self.username else None
-            self.client = Elasticsearch(
-                hosts=self.hosts,
-                http_auth=auth,
-                timeout=self.timeout,
-                max_retries=3,
-                retry_on_timeout=True
-            )
+            self.client = Elasticsearch([self.url])
             if self.client.ping():
-                logger.info(f"成功连接到 Elasticsearch: {self.hosts}")
+                logger.info(f'Connected to Elasticsearch: {self.url}')
+                self._ensure_index_exists()
                 return True
-            logger.error(f"无法连接到 Elasticsearch: {self.hosts}")
+            else:
+                logger.error('Elasticsearch ping failed')
+                return False
+        except ESConnectionError as e:
+            logger.error(f'Failed to connect to Elasticsearch: {str(e)}')
             return False
-        except Exception as e:
-            logger.error(f"Elasticsearch 连接失败: {str(e)}")
-            return False
-    
-    def disconnect(self):
-        """断开连接"""
-        if self.client:
+
+    def _ensure_index_exists(self):
+        if not self.client:
+            return
+
+        # 添加项目路径导入新的 mapping 配置
+        import sys
+        import os
+        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        
+        from config.elastic_mapping_config import ELASTICSEARCH_MAPPING
+
+        if not self.client.indices.exists(index=self.index_name):
             try:
-                self.client.close()
+                self.client.indices.create(index=self.index_name, body=ELASTICSEARCH_MAPPING)
+                logger.info(f'Created index: {self.index_name} with new mapping')
             except Exception as e:
-                logger.error(f"关闭连接失败: {str(e)}")
-    
-    def search(self, query: Dict[str, Any], index: str, size: int = 1000) -> Optional[Dict]:
-        """执行搜索查询"""
-        try:
-            return self.client.search(index=index, body=query, size=size)
-        except Exception as e:
-            logger.error(f"搜索失败: {str(e)}")
+                logger.error(f'Failed to create index: {str(e)}')
+        else:
+            logger.info(f'Index {self.index_name} already exists')
+
+    def index_document(self, document: Dict[str, Any], refresh: bool = True) -> Optional[str]:
+        if not self.client:
+            logger.error('Elasticsearch client not connected')
             return None
-    
-    def index(self, index: str, body: Dict[str, Any], doc_id: Optional[str] = None) -> Optional[Dict]:
-        """写入文档"""
+
         try:
-            return self.client.index(index=index, body=body, id=doc_id)
+            response = self.client.index(
+                index=self.index_name,
+                document=document,
+                refresh=refresh
+            )
+            doc_id = response.get('_id')
+            logger.info(f'Document indexed: {self.index_name}/{doc_id}')
+            return doc_id
         except Exception as e:
-            logger.error(f"写入失败: {str(e)}")
+            logger.error(f'Failed to index document: {str(e)}')
             return None
-    
-    def bulk(self, actions: list) -> Optional[Dict]:
-        """批量操作"""
+
+    def get_document(self, doc_id: str) -> Optional[Dict[str, Any]]:
+        if not self.client:
+            return None
+
         try:
-            return self.client.bulk(body=actions)
-        except Exception as e:
-            logger.error(f"批量操作失败: {str(e)}")
+            response = self.client.get(index=self.index_name, id=doc_id)
+            return response.get('_source')
+        except NotFoundError:
+            logger.warning(f'Document not found: {self.index_name}/{doc_id}')
             return None
-    
-    def update(self, index: str, doc_id: str, body: Dict[str, Any]) -> Optional[Dict]:
-        """更新文档"""
+        except Exception as e:
+            logger.error(f'Failed to get document: {str(e)}')
+            return None
+
+    def search(self, query: Dict[str, Any], size: int = 10) -> list:
+        if not self.client:
+            return []
+
         try:
-            return self.client.update(index=index, id=doc_id, body=body)
+            response = self.client.search(index=self.index_name, query=query, size=size)
+            return response.get('hits', {}).get('hits', [])
         except Exception as e:
-            logger.error(f"更新失败: {str(e)}")
-            return None
-    
-    def indices(self):
-        """获取索引操作对象"""
-        return self.client.indices
+            logger.error(f'Failed to search: {str(e)}')
+            return []
+
+    def is_connected(self) -> bool:
+        if not self.client:
+            return False
+        try:
+            return self.client.ping()
+        except:
+            return False
+
+    def close(self):
+        if self.client:
+            self.client.close()
+            logger.info('Elasticsearch client closed')
