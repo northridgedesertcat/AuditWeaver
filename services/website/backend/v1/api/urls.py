@@ -18,6 +18,9 @@ from .views import (
     AIModelsView,
     RecentAnalysesView,
     RecentAlertsView,
+    ReportStatsView,
+    ReportListView,
+    ReportDetailView,
 )
 
 urlpatterns = [
@@ -47,4 +50,7 @@ urlpatterns = [
     path('ai/analyses/', RecentAnalysesView.as_view(), name='recent_analyses'),
     
     path('dashboard/recent-alerts/', RecentAlertsView.as_view(), name='recent_alerts'),
+    path('reports/stats/', ReportStatsView.as_view(), name='report_stats'),
+    path('reports/list/', ReportListView.as_view(), name='report_list'),
+    path('reports/<str:report_id>/', ReportDetailView.as_view(), name='report_detail'),
 ]

@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils"
 import {
   FileText,
   AlertTriangle,
+  AlertCircle,
   Shield,
   Activity,
   Zap,
@@ -28,6 +29,7 @@ import {
 const iconMap = {
   "file-text": FileText,
   "alert-triangle": AlertTriangle,
+  "alert-circle": AlertCircle,
   shield: Shield,
   activity: Activity,
   zap: Zap,

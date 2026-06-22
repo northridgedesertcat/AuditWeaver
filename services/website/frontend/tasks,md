@@ -1,0 +1,15 @@
+前端报告详细页面任务
+
+services\website\frontend\v1\components\dashboard\report-detail-modal.tsx
+目前是假数据。我需要你进行数据对接。对接真实数据。
+
+任务列表
+1.后端创建合适的api，前端调用api，后端从elastic中获取数据。
+2.对接顶部表头数据。风险等级对应elastic的中log_analysis_reports索引的risk_level字段。
+攻击类型对应attack_type字段。AI可信度对应confidence字段。
+3.对接AI Analysis卡面的内容。攻击行为描述改成分析总结，数据对应summary字段。
+攻击意图分析改为原因分析，数据对应reasoning字段。
+4.AI处置建议卡面。内容对应recommendations字段。之前这个卡面是分为了立即措施和长期建议。这里合并为一个即可。
+5.风险评估的内容对应risk_level字段作为风险等级，risk_score作为风险分数。
+影响分析改为原始风险数据，用于展示原始风险日志的内容。包括event_id，ip，log_timestamp，user_agent，status，path这些内容
+

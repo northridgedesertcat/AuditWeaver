@@ -20,6 +20,7 @@ import {
   ChevronRight,
   Search,
   Sparkles,
+  BarChart3,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -43,6 +44,12 @@ const navItems = [
     href: "/logs",
     icon: FileText,
     badge: "2.3M",
+  },
+  {
+    title: "日志报告",
+    href: "/reports",
+    icon: BarChart3,
+    badge: null,
   },
   {
     title: "AI 分析中心",
@@ -99,7 +106,7 @@ export function Sidebar() {
   const pathname = usePathname()
 
   return (
-    <TooltipProvider delayDuration={0}>
+    <TooltipProvider>
       <aside
         className={cn(
           "flex h-screen flex-col border-r border-sidebar-border bg-sidebar transition-all duration-300",
@@ -181,7 +188,7 @@ export function Sidebar() {
                 <li key={item.href}>
                   {collapsed ? (
                     <Tooltip>
-                      <TooltipTrigger asChild>{navLink}</TooltipTrigger>
+                      <TooltipTrigger>{navLink}</TooltipTrigger>
                       <TooltipContent side="right" className="flex items-center gap-2">
                         {item.title}
                         {item.badge && (
