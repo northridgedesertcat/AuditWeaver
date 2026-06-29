@@ -30,6 +30,7 @@ interface OriginalRiskData {
   user_agent: string
   status: number
   path: string
+  original_log: string
 }
 
 interface ReportDetail {
@@ -94,7 +95,7 @@ export function ReportDetailModal({ reportId, isOpen, onClose }: ReportDetailMod
     setDetail(null)
     const apiBase = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000'
     try {
-      const response = await fetch(`${apiBase}/api/v1/reports/${reportId}/`)
+      const response = await fetch(`http://localhost:8000/api/v1/reports/${reportId}/`)
       if (response.ok) {
         const data = await response.json()
         setDetail(data)
@@ -332,6 +333,14 @@ export function ReportDetailModal({ reportId, isOpen, onClose }: ReportDetailMod
                       <span className="text-xs text-muted-foreground">请求路径</span>
                     </div>
                     <p className="font-mono text-sm truncate">{detail.originalRiskData.path || "-"}</p>
+                  </div>
+                </div>
+                <div className="mt-4">
+                  <h4 className="text-sm font-medium text-foreground mb-2">原始日志</h4>
+                  <div className="rounded-lg border border-border p-4 bg-muted/50">
+                    <pre className="font-mono text-xs text-muted-foreground whitespace-pre-wrap break-all">
+                      {detail.originalRiskData.original_log || "暂无原始日志"}
+                    </pre>
                   </div>
                 </div>
               </CardContent>

@@ -45,7 +45,7 @@ def test_es_save():
     for res in result['results']:
         if res.get('detections'):
             attack_found = True
-            print("   检测到攻击:", res['detections'][0]['attack_type'])
+            print("   检测到攻击:", res['detections'][0]['matched_type'])
             break
     
     if not attack_found:
@@ -88,7 +88,7 @@ def test_es_save():
             print("   SUCCESS: 在Elasticsearch中找到数据")
             print("   文档ID:", hits[0]['_id'])
             print("   IP:", hits[0]['_source'].get('ip'))
-            print("   攻击类型:", hits[0]['_source'].get('rule_match', {}).get('attack_type'))
+            print("   攻击类型:", hits[0]['_source'].get('rule_match', {}).get('matched_type'))
             print("   置信度:", hits[0]['_source'].get('rule_match', {}).get('confidence'))
         else:
             print("   FAILED: 未在Elasticsearch中找到数据")

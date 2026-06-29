@@ -106,7 +106,7 @@ def process_logs(logs):
                 if detections:
                     logger.debug(f"[DETECTION] 日志 {i+1}: IP={log['ip']}, 检测到 {len(detections)} 种攻击")
                     for det in detections:
-                        logger.debug(f"            - 攻击类型: {det['attack_type']}, 置信度: {det['confidence']*100:.1f}%")
+                        logger.debug(f"            - 攻击类型: {det['matched_type']}, 置信度: {det['confidence']*100:.1f}%")
                 else:
                     logger.debug(f"[DETECTION] 日志 {i+1}: IP={log['ip']}, 未检测到攻击")
     

@@ -61,17 +61,17 @@ class RuleEngine:
         summary = {
             'total_logs': len(results),
             'total_detections': 0,
-            'attack_types': {}
+            'matched_types': {}
         }
         
         for result in results:
             if 'detections' in result:
                 summary['total_detections'] += len(result['detections'])
                 for detection in result['detections']:
-                    attack_type = detection['attack_type']
-                    if attack_type not in summary['attack_types']:
-                        summary['attack_types'][attack_type] = 0
-                    summary['attack_types'][attack_type] += 1
+                    matched_type = detection['matched_type']
+                    if matched_type not in summary['matched_types']:
+                        summary['matched_types'][matched_type] = 0
+                    summary['matched_types'][matched_type] += 1
         
         return summary
     

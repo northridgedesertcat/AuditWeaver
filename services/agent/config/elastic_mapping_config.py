@@ -39,10 +39,10 @@ ELASTICSEARCH_MAPPING = {
                 'fields': {'keyword': {'type': 'keyword', 'ignore_above': 256}}
             },
             
-            # ========== 时间戳字段 ==========
-            'log_timestamp': {'type': 'date', 'format': 'yyyy-MM-dd HH:mm:ss||yyyy-MM-dd||epoch_millis'},
-            'analysis_timestamp': {'type': 'date', 'format': 'yyyy-MM-dd HH:mm:ss||yyyy-MM-dd||epoch_millis'},
-            'ingestion_time': {'type': 'date', 'format': 'yyyy-MM-dd HH:mm:ss||yyyy-MM-dd||epoch_millis'},
+            # ========== 时间戳字段（使用 epoch_millis 格式避免 text 映射问题） ==========
+            'log_timestamp': {'type': 'date', 'format': 'epoch_millis'},
+            'analysis_timestamp': {'type': 'date', 'format': 'epoch_millis'},
+            'ingestion_time': {'type': 'date', 'format': 'epoch_millis'},
             
             # ========== 原始数据（用于调试，不参与搜索） ==========
             'dify_response': {'type': 'object', 'enabled': False},  # 完整Dify响应
@@ -74,18 +74,18 @@ DIFY_EXTRACTION_RULES = {
     'recommendations': (['recommendations', 'suggestions', 'mitigation_steps'], []),
 }
 
-def normalize_datetime(date_str: str) -> str:
+def normalize_datetime(date_str: str) -> int:
     """
-    将日期字符串转换为符合 Elasticsearch mapping 的格式 (yyyy-MM-dd HH:mm:ss)
+    将日期字符串转换为 epoch_millis 格式
     
     Args:
         date_str: 日期字符串，可以是 ISO8601 格式或其他格式
         
     Returns:
-        规范化后的日期字符串 (yyyy-MM-dd HH:mm:ss)
+        epoch_millis 时间戳（整数）
     """
     if not date_str:
-        return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        return int(datetime.now().timestamp() * 1000)
     
     # 尝试匹配 ISO8601 格式: 2026-06-11T13:25:19.353700 或 2026-06-11T13:25:19Z
     # 特别处理带 Z 后缀的 UTC 时间
@@ -97,29 +97,32 @@ def normalize_datetime(date_str: str) -> str:
         time_part = match.group(2)
         is_utc = match.group(4) == 'Z'
         
-        if is_utc:
-            # 如果是 UTC 时间，转换为本地时间
-            try:
-                utc_dt = datetime.strptime(f"{date_part} {time_part}", '%Y-%m-%d %H:%M:%S')
-                # 添加时区信息
+        try:
+            if is_utc:
+                # 如果是 UTC 时间
                 from datetime import timezone
+                utc_dt = datetime.strptime(f"{date_part} {time_part}", '%Y-%m-%d %H:%M:%S')
                 utc_dt = utc_dt.replace(tzinfo=timezone.utc)
-                local_dt = utc_dt.astimezone()
-                return local_dt.strftime('%Y-%m-%d %H:%M:%S')
-            except:
-                return f"{date_part} {time_part}"
-        else:
-            return f"{date_part} {time_part}"
+                return int(utc_dt.timestamp() * 1000)
+            else:
+                dt = datetime.strptime(f"{date_part} {time_part}", '%Y-%m-%d %H:%M:%S')
+                return int(dt.timestamp() * 1000)
+        except:
+            return int(datetime.now().timestamp() * 1000)
     
     # 尝试匹配 yyyy-MM-dd HH:mm:ss 格式
     standard_pattern = r'(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})'
     match = re.match(standard_pattern, date_str)
     
     if match:
-        return date_str
+        try:
+            dt = datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S')
+            return int(dt.timestamp() * 1000)
+        except:
+            return int(datetime.now().timestamp() * 1000)
     
     # 如果都不匹配，返回当前时间
-    return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    return int(datetime.now().timestamp() * 1000)
 
 def extract_dify_fields(dify_response: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -183,6 +186,30 @@ def extract_dify_fields(dify_response: Dict[str, Any]) -> Dict[str, Any]:
     
     return result
 
+def to_epoch_millis(ts):
+    """将时间戳转换为 epoch_millis 格式"""
+    if ts is None:
+        return int(datetime.now().timestamp() * 1000)
+    if isinstance(ts, (int, float)):
+        # 如果已经是数字（秒或毫秒），转换为毫秒
+        if ts > 1e12:  # 已经是毫秒
+            return int(ts)
+        else:  # 是秒
+            return int(ts * 1000)
+    if isinstance(ts, str):
+        try:
+            # 尝试解析 ISO 格式
+            dt = datetime.fromisoformat(ts.replace('Z', '+00:00'))
+            return int(dt.timestamp() * 1000)
+        except:
+            try:
+                # 尝试解析标准格式
+                dt = datetime.strptime(ts, '%Y-%m-%d %H:%M:%S')
+                return int(dt.timestamp() * 1000)
+            except:
+                return int(datetime.now().timestamp() * 1000)
+    return int(datetime.now().timestamp() * 1000)
+
 def build_elastic_document(log_data: Dict[str, Any], dify_response: Dict[str, Any]) -> Dict[str, Any]:
     """
     构建完整的 Elasticsearch 文档
@@ -217,7 +244,7 @@ def build_elastic_document(log_data: Dict[str, Any], dify_response: Dict[str, An
         'method': actual_log.get('method', ''),
         'status': actual_log.get('status', 0),
         'user_agent': actual_log.get('user_agent', ''),
-        'attack_type': rule_match.get('attack_type', ''),
+        'attack_type': rule_match.get('matched_type', ''),
         'confidence': rule_match.get('confidence', 0.0),
         'severity': rule_match.get('severity', ''),
         
@@ -229,10 +256,10 @@ def build_elastic_document(log_data: Dict[str, Any], dify_response: Dict[str, An
         'reasoning': dify_fields.get('reasoning', []),
         'recommendations': dify_fields.get('recommendations', []),
         
-        # 时间戳（使用符合 mapping 的格式）
-        'log_timestamp': normalize_datetime(log_ts),
-        'analysis_timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-        'ingestion_time': normalize_datetime(actual_log.get('ingestion_time')),
+        # 时间戳（使用 epoch_millis 格式以确保正确的 date 类型映射）
+        'log_timestamp': to_epoch_millis(log_ts),
+        'analysis_timestamp': int(datetime.utcnow().timestamp() * 1000),
+        'ingestion_time': to_epoch_millis(actual_log.get('ingestion_time')),
         
         # 原始数据（用于调试，不参与搜索）
         'dify_response': dify_response,

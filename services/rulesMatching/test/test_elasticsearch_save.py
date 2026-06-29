@@ -34,7 +34,7 @@ def test_es_connection():
                 "ip": "192.168.1.100",
                 "path": "/test",
                 "@timestamp": "2024-01-01T00:00:00Z",
-                "rule_match": {"is_matched": True, "attack_type": "TEST"}
+                "rule_match": {"is_matched": True, "matched_type": "TEST"}
             }
             
             response = es.index(index='matched_logs', body=test_data)

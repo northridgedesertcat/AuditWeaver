@@ -34,7 +34,7 @@ try:
         print("Message received:")
         print("  event_id:", data.get('event_id', 'N/A'))
         print("  ip:", data.get('ip', 'N/A'))
-        print("  attack_type:", data.get('rule_match', {}).get('attack_type', 'N/A'))
+        print("  matched_type:", data.get('rule_match', {}).get('matched_type', 'N/A'))
         count += 1
         if count >= 3:
             break

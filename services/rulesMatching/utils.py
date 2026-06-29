@@ -58,12 +58,12 @@ def calculate_confidence(matched_count, total_patterns):
         return 0.0
     return min(1.0, matched_count / total_patterns)
 
-def format_detection_result(log_entry, attack_type, confidence, matched_items):
+def format_detection_result(log_entry, matched_type, confidence, matched_items):
     """格式化检测结果"""
     result = {
-        'timestamp': datetime.now().isoformat(),
+        'timestamp': datetime.utcnow().isoformat(),
         'original_log': log_entry,
-        'attack_type': attack_type,
+        'matched_type': matched_type,
         'confidence': round(confidence, 2),
         'matched_items': matched_items,
         'severity': get_severity(confidence)
@@ -121,9 +121,9 @@ def aggregate_results(results):
     """聚合检测结果"""
     aggregated = {}
     for result in results:
-        attack_type = result['attack_type']
-        if attack_type not in aggregated or result['confidence'] > aggregated[attack_type]['confidence']:
-            aggregated[attack_type] = result
+        matched_type = result['matched_type']
+        if matched_type not in aggregated or result['confidence'] > aggregated[matched_type]['confidence']:
+            aggregated[matched_type] = result
     return list(aggregated.values())
 
 def filter_results(results, min_confidence):
@@ -132,10 +132,10 @@ def filter_results(results, min_confidence):
 
 def generate_alert_message(result):
     """生成告警消息"""
-    attack_type = result['attack_type']
+    matched_type = result['matched_type']
     confidence = result['confidence']
     ip = result['original_log'].get('ip', 'Unknown')
     path = result['original_log'].get('path', 'Unknown')
     
-    message = f"[ALERT] {attack_type.upper()} detected from {ip} with {confidence*100:.1f}% confidence. Path: {path}"
+    message = f"[ALERT] {matched_type.upper()} detected from {ip} with {confidence*100:.1f}% confidence. Path: {path}"
     return message

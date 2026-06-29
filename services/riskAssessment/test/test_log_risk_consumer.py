@@ -48,7 +48,7 @@ def test_kafka_risk_consumer():
             event_id = log_entry.get('event_id', 'N/A')
             ip = log_entry.get('ip', 'N/A')
             rule_match = log_entry.get('rule_match', {})
-            attack_type = rule_match.get('attack_type', 'N/A')
+            attack_type = rule_match.get('matched_type', 'N/A')
             confidence = rule_match.get('confidence', 0) * 100
             ingestion_time = log_entry.get('ingestion_time', 'N/A')
             

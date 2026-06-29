@@ -39,7 +39,7 @@ def test_kafka_fallback():
     for i, result in enumerate(detection_result['results']):
         detections = result.get('detections', [])
         if detections:
-            print(f"  检测到攻击: {detections[0]['attack_type']} (置信度: {detections[0]['confidence']*100:.1f}%)")
+            print(f"  检测到攻击: {detections[0]['matched_type']} (置信度: {detections[0]['confidence']*100:.1f}%)")
         else:
             print(f"  未检测到攻击")
     
@@ -83,7 +83,7 @@ def test_kafka_fallback():
                 print(f"✓ 成功在Elasticsearch中找到测试数据")
                 print(f"  ID: {hits[0]['_id']}")
                 print(f"  IP: {hits[0]['_source'].get('ip')}")
-                print(f"  攻击类型: {hits[0]['_source'].get('rule_match', {}).get('attack_type')}")
+                print(f"  攻击类型: {hits[0]['_source'].get('rule_match', {}).get('matched_type')}")
             else:
                 print("✗ 未在Elasticsearch中找到测试数据")
         

@@ -111,7 +111,7 @@ def test_debug_mode():
             print(f"    原始路径: {log['path']}")
             print(f"    检测到 {len(detections)} 种攻击:")
             for det in detections:
-                print(f"      - 攻击类型: {det['attack_type']}")
+                print(f"      - 攻击类型: {det['matched_type']}")
                 print(f"        置信度: {det['confidence']*100:.2f}%")
                 print(f"        严重程度: {det.get('severity', 'low')}")
                 if det.get('matched_items'):
@@ -185,7 +185,7 @@ def test_debug_mode():
                 rule_match = source.get('rule_match', {})
                 if rule_match.get('is_matched'):
                     print(f"    攻击检测: DETECTED")
-                    print(f"      攻击类型: {rule_match.get('attack_type')}")
+                    print(f"      攻击类型: {rule_match.get('matched_type')}")
                     print(f"      置信度: {rule_match.get('confidence')*100:.2f}%")
                     print(f"      规则ID: {rule_match.get('rule_id')}")
                 else:

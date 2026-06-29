@@ -74,7 +74,7 @@ def test_full_pipeline():
             print(f"    路径: {log_entry['path']}")
             print(f"    检测到攻击:")
             for det in detections:
-                print(f"      - {det['attack_type']}: 置信度 {det['confidence']*100:.1f}%")
+                print(f"      - {det['matched_type']}: 置信度 {det['confidence']*100:.1f}%")
         else:
             print(f"\n  日志 #{i+1} (IP: {log_entry['ip']}): 正常")
     
@@ -121,7 +121,7 @@ def test_full_pipeline():
                 print(f"\n  ID: {hit['_id']}")
                 print(f"    IP: {source.get('ip', 'Unknown')}")
                 print(f"    路径: {source.get('path', 'Unknown')}")
-                print(f"    攻击类型: {source.get('rule_match', {}).get('attack_type', 'Unknown')}")
+                print(f"    攻击类型: {source.get('rule_match', {}).get('matched_type', 'Unknown')}")
                 print(f"    置信度: {source.get('rule_match', {}).get('confidence', 0)*100:.1f}%")
         except Exception as e:
             print(f"搜索Elasticsearch失败: {str(e)}")

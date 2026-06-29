@@ -114,7 +114,7 @@ class KafkaConsumerTest:
             
             rule_match = log_entry.get('rule_match', {})
             is_matched = rule_match.get('is_matched', False)
-            attack_type = rule_match.get('attack_type', '未知')
+            attack_type = rule_match.get('matched_type', '未知')
             confidence = rule_match.get('confidence', 0.0)
             
             total_detections = detection_result.get('total_detections', 0)

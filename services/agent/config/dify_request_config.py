@@ -13,7 +13,7 @@ LOG_FIELD_MAPPING = {
     'method': lambda data: data.get('method', 'unknown'),
     'status': lambda data: data.get('status', 'unknown'),
     'user_agent': lambda data: data.get('user_agent', 'unknown'),
-    'attack_type': lambda data: data.get('rule_match', {}).get('attack_type', 'unknown'),
+    'matched_type': lambda data: data.get('rule_match', {}).get('matched_type', 'unknown'),
     'confidence': lambda data: data.get('rule_match', {}).get('confidence', 0),
     'severity': lambda data: data.get('rule_match', {}).get('severity', 'unknown'),
 }
@@ -32,7 +32,7 @@ INPUTS_FIELDS = [
     'method',
     'status',
     'user_agent',
-    'attack_type',
+    'matched_type',
     'confidence',
     'severity',
 ]

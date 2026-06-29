@@ -88,7 +88,7 @@ if data_saver.is_es_connected():
             ingestion_time = source.get('ingestion_time', 'N/A')
             if ingestion_time != 'N/A':
                 ingestion_time = ingestion_time[:19]  # 只显示时间部分
-            print(f"    - IP: {source.get('ip')}, attack_type: {source.get('rule_match', {}).get('attack_type', 'N/A')}, ingestion_time: {ingestion_time}")
+            print(f"    - IP: {source.get('ip')}, matched_type: {source.get('rule_match', {}).get('matched_type', 'N/A')}, ingestion_time: {ingestion_time}")
     except Exception as e:
         print(f"  查询失败: {str(e)}")
 else:

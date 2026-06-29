@@ -90,13 +90,14 @@ class ThreatDistributionView(APIView):
                         today_start = datetime.utcnow().replace(
                             hour=0, minute=0, second=0, microsecond=0
                         )
-                        today_start_str = today_start.strftime("%Y-%m-%dT%H:%M:%S.000Z")
-                        now_str = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.000Z")
+                        # log_analysis_reports 使用毫秒时间戳
+                        today_start_ms = int(today_start.timestamp() * 1000)
+                        now_ms = int(datetime.utcnow().timestamp() * 1000)
                         must_clauses.append({
                             "range": {
                                 "analysis_timestamp": {
-                                    "gte": today_start_str,
-                                    "lte": now_str
+                                    "gte": today_start_ms,
+                                    "lte": now_ms
                                 }
                             }
                         })
@@ -111,10 +112,8 @@ class ThreatDistributionView(APIView):
                         "aggs": {
                             "risk_levels": {
                                 "terms": {
-                                    "field": "risk_level",
-                                    "size": 10,
-                                    # 包含全部五种等级
-                                    "include": all_levels
+                                    "field": "risk_level.keyword",
+                                    "size": 10
                                 }
                             }
                         }
@@ -122,12 +121,29 @@ class ThreatDistributionView(APIView):
 
                     result = es.search(index="log_analysis_reports", body=agg_body)
                     buckets = result.get('aggregations', {}).get('risk_levels', {}).get('buckets', [])
+                    
+                    # 调试日志
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.info(f"ThreatDistribution ES buckets: {buckets}")
 
                     for bucket in buckets:
                         level = bucket['key']
                         count = bucket['doc_count']
-                        if level in distribution:
-                            distribution[level]['value'] = count
+                        # 支持大小写不敏感匹配
+                        if level:
+                            level_lower = level.lower()
+                            level_mapping = {
+                                'critical': 'Critical',
+                                'high': 'High',
+                                'medium': 'Medium',
+                                'low': 'Low',
+                                'informational': 'Informational',
+                                'unknown': 'Low'
+                            }
+                            level_key = level_mapping.get(level_lower, level.capitalize())
+                            if level_key in distribution:
+                                distribution[level_key]['value'] = count
 
                     total = sum(item['value'] for item in distribution.values())
                     return Response({
@@ -164,10 +180,14 @@ class DashboardStatsView(APIView):
                 if es:
                     now = datetime.utcnow()
                     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+                    # nginx-log-raw 使用 ISO8601 格式
                     today_start_str = today_start.strftime("%Y-%m-%dT%H:%M:%S.000Z")
                     now_str = now.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+                    # log_analysis_reports 使用毫秒时间戳
+                    today_start_ms = int(today_start.timestamp() * 1000)
+                    now_ms = int(now.timestamp() * 1000)
                     
-                    # 1. 今日日志量 - nginx-log-raw
+                    # 1. 今日日志量 - nginx-log-raw (ISO8601 格式)
                     nginx_today_query = {
                         "query": {
                             "range": {
@@ -192,31 +212,36 @@ class DashboardStatsView(APIView):
                     total_result = es.count(index="nginx-log-raw")
                     stats['totalLogs'] = total_result.get('count', 0)
                     
-                    # 3. 今日攻击日志数 - log_analysis_reports
-                    today_date = today_start.strftime("%Y-%m-%d")
+                    # 3. 今日攻击日志数 - log_analysis_reports (毫秒时间戳)
                     attack_today_query = {
                         "query": {
-                            "match": {
-                                "analysis_timestamp": today_date
+                            "range": {
+                                "analysis_timestamp": {
+                                    "gte": today_start_ms,
+                                    "lte": now_ms
+                                }
                             }
                         }
                     }
                     attack_result = es.count(index="log_analysis_reports", body=attack_today_query)
                     stats['attackLogs'] = attack_result.get('count', 0)
                     
-                    # 4. 今日高危告警数 - log_analysis_reports, risk_level 为 Critical 或 High
+                    # 4. 今日高危告警数 - log_analysis_reports (毫秒时间戳)
                     high_severity_query = {
                         "query": {
                             "bool": {
                                 "must": [
                                     {
-                                        "match": {
-                                            "analysis_timestamp": today_date
+                                        "range": {
+                                            "analysis_timestamp": {
+                                                "gte": today_start_ms,
+                                                "lte": now_ms
+                                            }
                                         }
                                     },
                                     {
                                         "terms": {
-                                            "dify_response.data.outputs.structured_output.risk_level.keyword": ["Critical", "High"]
+                                            "risk_level": ["Critical", "High"]
                                         }
                                     }
                                 ]
@@ -554,14 +579,17 @@ class LogTrendView(APIView):
                 if es:
                     now = datetime.utcnow()
                     start_time = now - timedelta(hours=24)
+                    # nginx-log-raw 使用 ISO8601 格式
+                    start_time_str = start_time.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+                    now_str = now.strftime("%Y-%m-%dT%H:%M:%S.000Z")
                     
                     query = {
                         "size": 0,
                         "query": {
                             "range": {
                                 "@timestamp": {
-                                    "gte": start_time.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
-                                    "lte": now.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+                                    "gte": start_time_str,
+                                    "lte": now_str
                                 }
                             }
                         },
@@ -572,8 +600,8 @@ class LogTrendView(APIView):
                                     "calendar_interval": "hour",
                                     "min_doc_count": 0,
                                     "extended_bounds": {
-                                        "min": start_time.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
-                                        "max": now.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+                                        "min": start_time_str,
+                                        "max": now_str
                                     }
                                 }
                             }
@@ -691,8 +719,8 @@ class ReportStatsView(APIView):
                     # 4. 今日新增
                     now = datetime.utcnow()
                     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-                    today_start_str = today_start.strftime("%Y-%m-%dT%H:%M:%S.000Z")
-                    now_str = now.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+                    today_start_ms = int(today_start.timestamp() * 1000)
+                    now_ms = int(now.timestamp() * 1000)
                     
                     today_search = {
                         "size": 0,
@@ -700,8 +728,8 @@ class ReportStatsView(APIView):
                         "query": {
                             "range": {
                                 "analysis_timestamp": {
-                                    "gte": today_start_str,
-                                    "lte": now_str
+                                    "gte": today_start_ms,
+                                    "lte": now_ms
                                 }
                             }
                         }
@@ -733,7 +761,7 @@ class ReportDetailView(APIView):
     - summary: summary（分析总结）
     - reasoning: reasoning（原因分析，数组）
     - recommendations: recommendations（处置建议，数组）
-    - originalRiskData: 原始风险数据（包含event_id, ip, log_timestamp, user_agent, status, path）
+    - originalRiskData: 原始风险数据（包含event_id, ip, log_timestamp, user_agent, status, path, original_log）
     """
     def get(self, request, report_id):
         report = None
@@ -755,15 +783,38 @@ class ReportDetailView(APIView):
                     reasoning = source.get('reasoning', [])
                     recommendations = source.get('recommendations', [])
                     
-                    # 原始风险数据
+                    # 获取event_id
                     original_log = source.get('original_log', {})
+                    event_id = source.get('event_id', original_log.get('event_id', ''))
+                    
+                    # 查询原始日志
+                    original_log_content = ""
+                    if event_id:
+                        try:
+                            log_query = {
+                                "query": {
+                                    "match": {
+                                        "event_id": event_id
+                                    }
+                                },
+                                "size": 1
+                            }
+                            log_result = es.search(index="nginx-log-raw", body=log_query)
+                            if log_result['hits']['hits']:
+                                log_source = log_result['hits']['hits'][0]['_source']
+                                original_log_content = log_source.get('event', {}).get('original', '')
+                        except Exception:
+                            pass
+                    
+                    # 原始风险数据
                     original_risk_data = {
-                        "event_id": source.get('event_id', original_log.get('event_id', '')),
+                        "event_id": event_id,
                         "ip": source.get('ip', original_log.get('ip', '')),
-                        "log_timestamp": source.get('log_timestamp', original_log.get('@timestamp', '')),
+                        "log_timestamp": self.format_timestamp(source.get('log_timestamp', original_log.get('@timestamp', ''))),
                         "user_agent": source.get('user_agent', original_log.get('user_agent', '')),
                         "status": source.get('status', original_log.get('status', 0)),
-                        "path": source.get('path', original_log.get('path', ''))
+                        "path": source.get('path', original_log.get('path', '')),
+                        "original_log": original_log_content
                     }
                     
                     # 转换风险等级为小写
@@ -804,24 +855,31 @@ class ReportDetailView(APIView):
         return Response({"error": "Report not found"}, status=status.HTTP_404_NOT_FOUND)
     
     def format_timestamp(self, timestamp):
-        """格式化时间戳"""
+        """格式化时间戳（UTC转本地时间）"""
         if not timestamp:
             return "未知时间"
         
         try:
-            from datetime import datetime
+            from datetime import datetime, timezone
             
             if isinstance(timestamp, str):
                 for fmt in ["%Y-%m-%dT%H:%M:%S.%fZ", "%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"]:
                     try:
                         dt = datetime.strptime(timestamp.replace('+00:00', 'Z').rstrip('Z'), fmt.replace('Z', '').replace('+00:00', ''))
-                        return dt.strftime("%Y-%m-%d %H:%M:%S")
+                        # 如果没有时区信息，假设是 UTC
+                        if dt.tzinfo is None:
+                            dt = dt.replace(tzinfo=timezone.utc)
+                        # 转换为本地时间
+                        local_dt = dt.astimezone()
+                        return local_dt.strftime("%Y-%m-%d %H:%M:%S")
                     except:
                         continue
                 return timestamp
             elif isinstance(timestamp, (int, float)):
-                dt = datetime.fromtimestamp(timestamp / 1000)
-                return dt.strftime("%Y-%m-%d %H:%M:%S")
+                # UTC 时间戳转为本地时间
+                dt = datetime.fromtimestamp(timestamp / 1000, tz=timezone.utc)
+                local_dt = dt.astimezone()
+                return local_dt.strftime("%Y-%m-%d %H:%M:%S")
             else:
                 return str(timestamp)
         except:
@@ -953,12 +1011,12 @@ class ReportListView(APIView):
         })
     
     def format_timestamp(self, timestamp):
-        """格式化时间戳"""
+        """格式化时间戳（UTC转本地时间）"""
         if not timestamp:
             return "未知时间"
         
         try:
-            from datetime import datetime
+            from datetime import datetime, timezone
             
             # 处理不同格式的时间戳
             if isinstance(timestamp, str):
@@ -966,14 +1024,20 @@ class ReportListView(APIView):
                 for fmt in ["%Y-%m-%dT%H:%M:%S.%fZ", "%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"]:
                     try:
                         dt = datetime.strptime(timestamp.replace('+00:00', 'Z').rstrip('Z'), fmt.replace('Z', '').replace('+00:00', ''))
-                        return dt.strftime("%Y-%m-%d %H:%M:%S")
+                        # 如果没有时区信息，假设是 UTC
+                        if dt.tzinfo is None:
+                            dt = dt.replace(tzinfo=timezone.utc)
+                        # 转换为本地时间
+                        local_dt = dt.astimezone()
+                        return local_dt.strftime("%Y-%m-%d %H:%M:%S")
                     except:
                         continue
                 return timestamp
             elif isinstance(timestamp, (int, float)):
-                # Unix时间戳（毫秒）
-                dt = datetime.fromtimestamp(timestamp / 1000)
-                return dt.strftime("%Y-%m-%d %H:%M:%S")
+                # UTC 时间戳转为本地时间
+                dt = datetime.fromtimestamp(timestamp / 1000, tz=timezone.utc)
+                local_dt = dt.astimezone()
+                return local_dt.strftime("%Y-%m-%d %H:%M:%S")
             else:
                 return str(timestamp)
         except:

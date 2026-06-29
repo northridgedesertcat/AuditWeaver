@@ -100,8 +100,8 @@ class DataSaver:
     
     def _get_date_folder(self):
         """获取当前日期和小时的文件夹路径 (格式: YYYY-MM-DD/HH)"""
-        date_str = datetime.now().strftime('%Y-%m-%d')
-        hour_str = datetime.now().strftime('%H')
+        date_str = datetime.utcnow().strftime('%Y-%m-%d')
+        hour_str = datetime.utcnow().strftime('%H')
         date_folder = os.path.join(self.normal_data_path, date_str, hour_str)
         if not os.path.exists(date_folder):
             os.makedirs(date_folder)
@@ -202,7 +202,7 @@ class DataSaver:
         rule_match_field = {
             "is_matched": False,
             "rule_id": None,
-            "attack_type": None,
+            "matched_type": None,
             "confidence": 0.0,
             "severity": None,
             "matched_items": {}
@@ -215,8 +215,8 @@ class DataSaver:
             
             rule_match_field = {
                 "is_matched": True,
-                "rule_id": self._generate_rule_id(top_detection['attack_type']),
-                "attack_type": top_detection['attack_type'],
+                "rule_id": self._generate_rule_id(top_detection['matched_type']),
+                "matched_type": top_detection['matched_type'],
                 "confidence": top_detection['confidence'],
                 "severity": top_detection.get('severity', 'low'),
                 "matched_items": top_detection.get('matched_items', {})
@@ -313,7 +313,7 @@ class DataSaver:
                                 "properties": {
                                     "is_matched": {"type": "boolean"},
                                     "rule_id": {"type": "keyword"},
-                                    "attack_type": {"type": "keyword"},
+                                    "matched_type": {"type": "keyword"},
                                     "confidence": {"type": "float"},
                                     "severity": {"type": "keyword"},
                                     "matched_items": {"type": "object"}
@@ -364,7 +364,7 @@ class DataSaver:
             enriched_log = self._enrich_log_with_detection(log_entry, detection_result)
             
             kafka_message = {
-                'timestamp': datetime.now().isoformat(),
+                'timestamp': datetime.utcnow().isoformat(),
                 'log_entry': enriched_log,
                 'detection_result': detection_result
             }
