@@ -1,3 +1,7 @@
+import time
+
+_now = int(time.time() * 1000)
+
 MOCK_ALERTS = [
     {
         "id": "alert-001",
@@ -6,7 +10,7 @@ MOCK_ALERTS = [
         "severity": "critical",
         "status": "active",
         "source": "Web Application Firewall",
-        "timestamp": "2024-01-15 14:32:18",
+        "timestamp": _now - 1000 * 60 * 30,
         "count": 12,
     },
     {
@@ -16,7 +20,7 @@ MOCK_ALERTS = [
         "severity": "high",
         "status": "active",
         "source": "Authentication Service",
-        "timestamp": "2024-01-15 14:28:45",
+        "timestamp": _now - 1000 * 60 * 35,
         "count": 1,
     },
     {
@@ -26,7 +30,7 @@ MOCK_ALERTS = [
         "severity": "high",
         "status": "investigating",
         "source": "Network IDS",
-        "timestamp": "2024-01-15 14:15:22",
+        "timestamp": _now - 1000 * 60 * 50,
         "count": 1024,
     },
     {
@@ -36,7 +40,7 @@ MOCK_ALERTS = [
         "severity": "medium",
         "status": "active",
         "source": "Certificate Monitor",
-        "timestamp": "2024-01-15 09:00:00",
+        "timestamp": _now - 1000 * 60 * 60 * 6,
         "count": 1,
     },
     {
@@ -46,7 +50,7 @@ MOCK_ALERTS = [
         "severity": "low",
         "status": "resolved",
         "source": "API Gateway",
-        "timestamp": "2024-01-15 08:45:33",
+        "timestamp": _now - 1000 * 60 * 60 * 6.5,
         "count": 15000,
     },
     {
@@ -56,7 +60,7 @@ MOCK_ALERTS = [
         "severity": "medium",
         "status": "active",
         "source": "Infrastructure Monitor",
-        "timestamp": "2024-01-15 07:30:00",
+        "timestamp": _now - 1000 * 60 * 60 * 8,
         "count": 1,
     },
     {
@@ -66,7 +70,7 @@ MOCK_ALERTS = [
         "severity": "high",
         "status": "resolved",
         "source": "Antivirus Scanner",
-        "timestamp": "2024-01-14 23:15:45",
+        "timestamp": _now - 1000 * 60 * 60 * 16,
         "count": 3,
     },
     {
@@ -76,7 +80,7 @@ MOCK_ALERTS = [
         "severity": "medium",
         "status": "resolved",
         "source": "Database Monitor",
-        "timestamp": "2024-01-14 20:00:00",
+        "timestamp": _now - 1000 * 60 * 60 * 19,
         "count": 1,
     },
 ]
@@ -98,16 +102,16 @@ MOCK_INCIDENTS = [
         "severity": "critical",
         "status": "investigating",
         "assignee": "张安全",
-        "createdAt": "2024-01-15 10:23:45",
-        "updatedAt": "2024-01-15 14:32:18",
+        "createdAt": _now - 1000 * 60 * 60 * 5,
+        "updatedAt": _now - 1000 * 60 * 30,
         "progress": 45,
         "affectedSystems": ["web-server-01", "db-primary", "api-gateway"],
         "timeline": [
-            {"time": "10:23:45", "action": "事件创建", "user": "AI 系统"},
-            {"time": "10:30:12", "action": "分配给 张安全", "user": "系统管理员"},
-            {"time": "11:15:33", "action": "开始调查", "user": "张安全"},
-            {"time": "13:45:22", "action": "隔离受影响系统", "user": "张安全"},
-            {"time": "14:32:18", "action": "更新调查进展", "user": "张安全"},
+            {"time": _now - 1000 * 60 * 60 * 5, "action": "事件创建", "user": "AI 系统"},
+            {"time": _now - 1000 * 60 * 60 * 4.5, "action": "分配给 张安全", "user": "系统管理员"},
+            {"time": _now - 1000 * 60 * 60 * 4, "action": "开始调查", "user": "张安全"},
+            {"time": _now - 1000 * 60 * 60 * 1.5, "action": "隔离受影响系统", "user": "张安全"},
+            {"time": _now - 1000 * 60 * 30, "action": "更新调查进展", "user": "张安全"},
         ],
     },
     {
@@ -117,15 +121,15 @@ MOCK_INCIDENTS = [
         "severity": "high",
         "status": "in_progress",
         "assignee": "李响应",
-        "createdAt": "2024-01-14 16:45:12",
-        "updatedAt": "2024-01-15 09:18:33",
+        "createdAt": _now - 1000 * 60 * 60 * 23,
+        "updatedAt": _now - 1000 * 60 * 60 * 6,
         "progress": 70,
         "affectedSystems": ["db-replica-02", "backup-server"],
         "timeline": [
-            {"time": "16:45:12", "action": "事件创建", "user": "DLP 系统"},
-            {"time": "17:00:00", "action": "分配给 李响应", "user": "值班经理"},
-            {"time": "18:30:45", "action": "确认数据范围", "user": "李响应"},
-            {"time": "09:18:33", "action": "通知相关部门", "user": "李响应"},
+            {"time": _now - 1000 * 60 * 60 * 23, "action": "事件创建", "user": "DLP 系统"},
+            {"time": _now - 1000 * 60 * 60 * 22.5, "action": "分配给 李响应", "user": "值班经理"},
+            {"time": _now - 1000 * 60 * 60 * 21, "action": "确认数据范围", "user": "李响应"},
+            {"time": _now - 1000 * 60 * 60 * 6, "action": "通知相关部门", "user": "李响应"},
         ],
     },
     {
@@ -135,16 +139,16 @@ MOCK_INCIDENTS = [
         "severity": "high",
         "status": "resolved",
         "assignee": "王防护",
-        "createdAt": "2024-01-13 08:12:33",
-        "updatedAt": "2024-01-13 12:45:18",
+        "createdAt": _now - 1000 * 60 * 60 * 53,
+        "updatedAt": _now - 1000 * 60 * 60 * 49,
         "progress": 100,
         "affectedSystems": ["load-balancer", "cdn-edge"],
         "timeline": [
-            {"time": "08:12:33", "action": "攻击检测", "user": "WAF 系统"},
-            {"time": "08:15:00", "action": "启动应急响应", "user": "王防护"},
-            {"time": "08:30:22", "action": "启用 DDoS 防护", "user": "王防护"},
-            {"time": "10:15:45", "action": "攻击流量下降", "user": "系统"},
-            {"time": "12:45:18", "action": "事件关闭", "user": "王防护"},
+            {"time": _now - 1000 * 60 * 60 * 53, "action": "攻击检测", "user": "WAF 系统"},
+            {"time": _now - 1000 * 60 * 60 * 52.5, "action": "启动应急响应", "user": "王防护"},
+            {"time": _now - 1000 * 60 * 60 * 52, "action": "启用 DDoS 防护", "user": "王防护"},
+            {"time": _now - 1000 * 60 * 60 * 50, "action": "攻击流量下降", "user": "系统"},
+            {"time": _now - 1000 * 60 * 60 * 49, "action": "事件关闭", "user": "王防护"},
         ],
     },
     {
@@ -154,12 +158,12 @@ MOCK_INCIDENTS = [
         "severity": "medium",
         "status": "pending",
         "assignee": None,
-        "createdAt": "2024-01-15 13:22:11",
-        "updatedAt": "2024-01-15 13:22:11",
+        "createdAt": _now - 1000 * 60 * 60 * 2,
+        "updatedAt": _now - 1000 * 60 * 60 * 2,
         "progress": 0,
         "affectedSystems": ["hr-system"],
         "timeline": [
-            {"time": "13:22:11", "action": "事件创建", "user": "UEBA 系统"},
+            {"time": _now - 1000 * 60 * 60 * 2, "action": "事件创建", "user": "UEBA 系统"},
         ],
     },
 ]
@@ -172,15 +176,13 @@ MOCK_ANOMALIES = [
         "description": "用户 admin_zhang 从未知 IP 地址登录，与历史行为模式不符",
         "severity": "high",
         "score": 92,
-        "timestamp": "2024-01-15 14:32:18",
+        "timestamp": _now - 1000 * 60 * 30,
         "source": "Authentication Service",
         "details": {
             "user": "admin_zhang",
             "ip": "185.234.12.45",
             "location": "俄罗斯, 莫斯科",
             "normalLocation": "中国, 北京",
-            "loginTime": "14:32 UTC+8",
-            "normalLoginTime": "09:00-18:00 UTC+8",
         },
         "status": "open",
     },
@@ -191,7 +193,7 @@ MOCK_ANOMALIES = [
         "description": "检测到异常大量数据查询和导出操作",
         "severity": "critical",
         "score": 98,
-        "timestamp": "2024-01-15 14:28:45",
+        "timestamp": _now - 1000 * 60 * 35,
         "source": "Database Monitor",
         "details": {
             "user": "service_account_01",
@@ -209,7 +211,7 @@ MOCK_ANOMALIES = [
         "description": "检测到来自内部 IP 的大规模端口扫描活动",
         "severity": "medium",
         "score": 75,
-        "timestamp": "2024-01-15 14:15:22",
+        "timestamp": _now - 1000 * 60 * 50,
         "source": "Network IDS",
         "details": {
             "sourceIp": "10.0.1.45",
@@ -226,7 +228,7 @@ MOCK_ANOMALIES = [
         "description": "检测到可能的权限提升攻击尝试",
         "severity": "high",
         "score": 88,
-        "timestamp": "2024-01-15 13:58:11",
+        "timestamp": _now - 1000 * 60 * 60 * 1.5,
         "source": "HIDS",
         "details": {
             "user": "developer_li",
@@ -243,7 +245,7 @@ MOCK_ANOMALIES = [
         "description": "检测到 API 调用频率异常升高",
         "severity": "low",
         "score": 62,
-        "timestamp": "2024-01-15 13:45:33",
+        "timestamp": _now - 1000 * 60 * 60 * 2,
         "source": "API Gateway",
         "details": {
             "apiKey": "ak_prod_xxx",
@@ -275,8 +277,8 @@ MOCK_THREATS = [
         "category": "C2 服务器",
         "severity": "critical",
         "source": "AlienVault OTX",
-        "firstSeen": "2024-01-15 10:00",
-        "lastSeen": "2024-01-15 14:32",
+        "firstSeen": _now - 1000 * 60 * 60 * 5,
+        "lastSeen": _now - 1000 * 60 * 30,
         "country": "俄罗斯",
         "tags": ["APT", "恶意软件"],
     },
@@ -287,8 +289,8 @@ MOCK_THREATS = [
         "category": "恶意软件分发",
         "severity": "high",
         "source": "VirusTotal",
-        "firstSeen": "2024-01-14 08:00",
-        "lastSeen": "2024-01-15 12:00",
+        "firstSeen": _now - 1000 * 60 * 60 * 30,
+        "lastSeen": _now - 1000 * 60 * 60 * 3,
         "country": "乌克兰",
         "tags": ["恶意软件", "下载器"],
     },
@@ -299,8 +301,8 @@ MOCK_THREATS = [
         "category": "钓鱼网站",
         "severity": "high",
         "source": "PhishTank",
-        "firstSeen": "2024-01-15 06:00",
-        "lastSeen": "2024-01-15 14:00",
+        "firstSeen": _now - 1000 * 60 * 60 * 9,
+        "lastSeen": _now - 1000 * 60 * 60 * 1,
         "country": "美国",
         "tags": ["钓鱼", "金融"],
     },
@@ -311,8 +313,8 @@ MOCK_THREATS = [
         "category": "勒索软件",
         "severity": "critical",
         "source": "VirusTotal",
-        "firstSeen": "2024-01-13 12:00",
-        "lastSeen": "2024-01-15 08:00",
+        "firstSeen": _now - 1000 * 60 * 60 * 53,
+        "lastSeen": _now - 1000 * 60 * 60 * 7,
         "country": "未知",
         "tags": ["勒索软件", "加密"],
     },
@@ -323,34 +325,34 @@ MOCK_THREATS = [
         "category": "内部威胁",
         "severity": "medium",
         "source": "内部威胁情报",
-        "firstSeen": "2024-01-15 13:00",
-        "lastSeen": "2024-01-15 14:15",
+        "firstSeen": _now - 1000 * 60 * 60 * 2,
+        "lastSeen": _now - 1000 * 60 * 60 * 1,
         "country": "内部网络",
         "tags": ["端口扫描", "侦察"],
     },
 ]
 
 MOCK_AI_MODELS = [
-    {"id": "model-001", "name": "威胁检测模型 v3.2", "type": "分类模型", "status": "running", "accuracy": 95.3, "latency": "45ms", "lastTrained": "2024-01-14", "tasksProcessed": 12847},
-    {"id": "model-002", "name": "异常行为分析器", "type": "异常检测", "status": "running", "accuracy": 92.8, "latency": "78ms", "lastTrained": "2024-01-13", "tasksProcessed": 8956},
-    {"id": "model-003", "name": "用户行为画像", "type": "聚类模型", "status": "training", "accuracy": 89.5, "latency": "120ms", "lastTrained": "2024-01-12", "tasksProcessed": 5623},
-    {"id": "model-004", "name": "日志模式识别", "type": "序列模型", "status": "running", "accuracy": 94.1, "latency": "35ms", "lastTrained": "2024-01-14", "tasksProcessed": 23456},
+    {"id": "model-001", "name": "威胁检测模型 v3.2", "type": "分类模型", "status": "running", "accuracy": 95.3, "latency": "45ms", "lastTrained": _now - 1000 * 60 * 60 * 24, "tasksProcessed": 12847},
+    {"id": "model-002", "name": "异常行为分析器", "type": "异常检测", "status": "running", "accuracy": 92.8, "latency": "78ms", "lastTrained": _now - 1000 * 60 * 60 * 48, "tasksProcessed": 8956},
+    {"id": "model-003", "name": "用户行为画像", "type": "聚类模型", "status": "training", "accuracy": 89.5, "latency": "120ms", "lastTrained": _now - 1000 * 60 * 60 * 72, "tasksProcessed": 5623},
+    {"id": "model-004", "name": "日志模式识别", "type": "序列模型", "status": "running", "accuracy": 94.1, "latency": "35ms", "lastTrained": _now - 1000 * 60 * 60 * 24, "tasksProcessed": 23456},
 ]
 
 MOCK_RECENT_ANALYSES = [
-    {"id": 1, "type": "威胁检测", "input": "可疑 SQL 注入请求", "result": "高风险攻击", "confidence": 96.5, "status": "completed", "time": "2 分钟前"},
-    {"id": 2, "type": "行为分析", "input": "用户 admin 异常登录模式", "result": "账户可能被盗", "confidence": 88.2, "status": "completed", "time": "5 分钟前"},
-    {"id": 3, "type": "异常检测", "input": "服务器流量模式", "result": "DDoS 攻击前兆", "confidence": 75.8, "status": "completed", "time": "8 分钟前"},
-    {"id": 4, "type": "模式识别", "input": "防火墙日志批量分析", "result": "处理中...", "confidence": 0, "status": "processing", "time": "进行中"},
-    {"id": 5, "type": "风险评估", "input": "新部署服务安全评估", "result": "中等风险", "confidence": 82.3, "status": "completed", "time": "15 分钟前"},
+    {"id": 1, "type": "威胁检测", "input": "可疑 SQL 注入请求", "result": "高风险攻击", "confidence": 96.5, "status": "completed", "time": _now - 1000 * 60 * 2},
+    {"id": 2, "type": "行为分析", "input": "用户 admin 异常登录模式", "result": "账户可能被盗", "confidence": 88.2, "status": "completed", "time": _now - 1000 * 60 * 5},
+    {"id": 3, "type": "异常检测", "input": "服务器流量模式", "result": "DDoS 攻击前兆", "confidence": 75.8, "status": "completed", "time": _now - 1000 * 60 * 8},
+    {"id": 4, "type": "模式识别", "input": "防火墙日志批量分析", "result": "处理中...", "confidence": 0, "status": "processing", "time": _now},
+    {"id": 5, "type": "风险评估", "input": "新部署服务安全评估", "result": "中等风险", "confidence": 82.3, "status": "completed", "time": _now - 1000 * 60 * 15},
 ]
 
 MOCK_THREAT_FEEDS = [
-    {"id": "feed-001", "name": "AlienVault OTX", "type": "开源情报", "status": "active", "lastUpdate": "5 分钟前", "indicators": 125847},
-    {"id": "feed-002", "name": "VirusTotal", "type": "恶意软件", "status": "active", "lastUpdate": "10 分钟前", "indicators": 89456},
-    {"id": "feed-003", "name": "AbuseIPDB", "type": "恶意 IP", "status": "active", "lastUpdate": "15 分钟前", "indicators": 456789},
-    {"id": "feed-004", "name": "PhishTank", "type": "钓鱼网站", "status": "active", "lastUpdate": "30 分钟前", "indicators": 34567},
-    {"id": "feed-005", "name": "内部威胁情报", "type": "自定义", "status": "active", "lastUpdate": "1 小时前", "indicators": 1234},
+    {"id": "feed-001", "name": "AlienVault OTX", "type": "开源情报", "status": "active", "lastUpdate": _now - 1000 * 60 * 5, "indicators": 125847},
+    {"id": "feed-002", "name": "VirusTotal", "type": "恶意软件", "status": "active", "lastUpdate": _now - 1000 * 60 * 10, "indicators": 89456},
+    {"id": "feed-003", "name": "AbuseIPDB", "type": "恶意 IP", "status": "active", "lastUpdate": _now - 1000 * 60 * 15, "indicators": 456789},
+    {"id": "feed-004", "name": "PhishTank", "type": "钓鱼网站", "status": "active", "lastUpdate": _now - 1000 * 60 * 30, "indicators": 34567},
+    {"id": "feed-005", "name": "内部威胁情报", "type": "自定义", "status": "active", "lastUpdate": _now - 1000 * 60 * 60, "indicators": 1234},
 ]
 
 DASHBOARD_STATS = {

@@ -33,6 +33,7 @@ import {
   XCircle,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { formatRelative } from "@/lib/time"
 
 interface Report {
   id: string
@@ -41,7 +42,7 @@ interface Report {
   attackType: string
   sourceIp: string
   targetPath: string
-  generatedAt: string
+  generatedAt: number
   aiConfidence: number
   status: "pending" | "processing" | "resolved"
 }
@@ -142,7 +143,7 @@ const mockReports: Report[] = [
     attackType: "SQL注入",
     sourceIp: "192.168.1.105",
     targetPath: "/api/users?id=1",
-    generatedAt: "2024-01-15 14:32:18",
+    generatedAt: Date.now() - 1000 * 60 * 30,
     aiConfidence: 98,
     status: "pending",
   },
@@ -153,7 +154,7 @@ const mockReports: Report[] = [
     attackType: "暴力破解",
     sourceIp: "10.0.0.45",
     targetPath: "/auth/login",
-    generatedAt: "2024-01-15 13:45:22",
+    generatedAt: Date.now() - 1000 * 60 * 60 * 1,
     aiConfidence: 92,
     status: "processing",
   },
@@ -164,7 +165,7 @@ const mockReports: Report[] = [
     attackType: "XSS攻击",
     sourceIp: "172.16.0.88",
     targetPath: "/search?q=test",
-    generatedAt: "2024-01-15 12:18:45",
+    generatedAt: Date.now() - 1000 * 60 * 60 * 3,
     aiConfidence: 87,
     status: "pending",
   },
@@ -175,7 +176,7 @@ const mockReports: Report[] = [
     attackType: "未授权访问",
     sourceIp: "192.168.2.201",
     targetPath: "/admin/config",
-    generatedAt: "2024-01-15 11:22:33",
+    generatedAt: Date.now() - 1000 * 60 * 60 * 4,
     aiConfidence: 75,
     status: "resolved",
   },
@@ -186,7 +187,7 @@ const mockReports: Report[] = [
     attackType: "DDoS攻击",
     sourceIp: "203.0.113.0/24",
     targetPath: "/api/endpoint",
-    generatedAt: "2024-01-15 10:15:42",
+    generatedAt: Date.now() - 1000 * 60 * 60 * 5,
     aiConfidence: 95,
     status: "processing",
   },
@@ -197,7 +198,7 @@ const mockReports: Report[] = [
     attackType: "恶意软件",
     sourceIp: "198.51.100.23",
     targetPath: "/api/callback",
-    generatedAt: "2024-01-15 09:45:12",
+    generatedAt: Date.now() - 1000 * 60 * 60 * 6,
     aiConfidence: 91,
     status: "pending",
   },
@@ -208,7 +209,7 @@ const mockReports: Report[] = [
     attackType: "钓鱼攻击",
     sourceIp: "192.168.1.78",
     targetPath: "/redirect?url=...",
-    generatedAt: "2024-01-15 08:32:55",
+    generatedAt: Date.now() - 1000 * 60 * 60 * 7,
     aiConfidence: 82,
     status: "resolved",
   },
@@ -219,7 +220,7 @@ const mockReports: Report[] = [
     attackType: "数据泄露",
     sourceIp: "10.0.1.15",
     targetPath: "/export?format=csv",
-    generatedAt: "2024-01-14 23:18:40",
+    generatedAt: Date.now() - 1000 * 60 * 60 * 16,
     aiConfidence: 88,
     status: "pending",
   },
@@ -230,7 +231,7 @@ const mockReports: Report[] = [
     attackType: "未授权访问",
     sourceIp: "172.16.0.100",
     targetPath: "Multiple Ports",
-    generatedAt: "2024-01-14 22:45:18",
+    generatedAt: Date.now() - 1000 * 60 * 60 * 17,
     aiConfidence: 79,
     status: "processing",
   },
@@ -241,7 +242,7 @@ const mockReports: Report[] = [
     attackType: "未授权访问",
     sourceIp: "192.168.3.45",
     targetPath: "/api/v1/data",
-    generatedAt: "2024-01-14 21:12:33",
+    generatedAt: Date.now() - 1000 * 60 * 60 * 18,
     aiConfidence: 68,
     status: "resolved",
   },
@@ -568,7 +569,7 @@ export default function ReportsPage() {
                           {/* 生成时间 */}
                           <div className="flex items-center gap-2 text-xs text-muted-foreground">
                             <Clock className="h-3.5 w-3.5" />
-                            <span>生成时间: {report.generatedAt}</span>
+                            <span>生成时间: {formatRelative(report.generatedAt)}</span>
                           </div>
                         </div>
 

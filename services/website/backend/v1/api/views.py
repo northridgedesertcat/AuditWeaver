@@ -30,7 +30,14 @@ from .mock_data import (
     AI_STATS,
 )
 from .es_client import is_es_available, get_es_client
-from datetime import datetime, timedelta, timezone
+import sys
+import os
+# 添加 services 目录到路径，以便导入 common 模块
+_services_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+if _services_path not in sys.path:
+    sys.path.insert(0, _services_path)
+from common.time_utils import now_utc, epoch_millis_now
+from datetime import timedelta
 
 class HealthCheckView(APIView):
     def get(self, request):
@@ -87,12 +94,11 @@ class ThreatDistributionView(APIView):
                     # 构建查询条件
                     must_clauses = []
                     if time_range == 'today':
-                        today_start = datetime.utcnow().replace(
+                        today_start = now_utc().replace(
                             hour=0, minute=0, second=0, microsecond=0
                         )
-                        # log_analysis_reports 使用毫秒时间戳
                         today_start_ms = int(today_start.timestamp() * 1000)
-                        now_ms = int(datetime.utcnow().timestamp() * 1000)
+                        now_ms = epoch_millis_now()
                         must_clauses.append({
                             "range": {
                                 "analysis_timestamp": {
@@ -178,22 +184,18 @@ class DashboardStatsView(APIView):
             try:
                 es = get_es_client()
                 if es:
-                    now = datetime.utcnow()
+                    now = now_utc()
                     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-                    # nginx-log-raw 使用 ISO8601 格式
-                    today_start_str = today_start.strftime("%Y-%m-%dT%H:%M:%S.000Z")
-                    now_str = now.strftime("%Y-%m-%dT%H:%M:%S.000Z")
-                    # log_analysis_reports 使用毫秒时间戳
                     today_start_ms = int(today_start.timestamp() * 1000)
-                    now_ms = int(now.timestamp() * 1000)
+                    now_ms = epoch_millis_now()
                     
-                    # 1. 今日日志量 - nginx-log-raw (ISO8601 格式)
+                    # 1. 今日日志量 - nginx-log-raw (epoch_millis 格式)
                     nginx_today_query = {
                         "query": {
                             "range": {
                                 "@timestamp": {
-                                    "gte": today_start_str,
-                                    "lte": now_str
+                                    "gte": today_start_ms,
+                                    "lte": now_ms
                                 }
                             }
                         }
@@ -324,8 +326,10 @@ class LogStatsView(APIView):
             try:
                 es = get_es_client()
                 if es:
-                    now = datetime.utcnow()
+                    now = now_utc()
                     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+                    today_start_ms = int(today_start.timestamp() * 1000)
+                    now_ms = epoch_millis_now()
                     
                     total_result = es.count(index="nginx-log-raw")
                     stats['total'] = total_result.get('count', 0)
@@ -334,8 +338,8 @@ class LogStatsView(APIView):
                         "query": {
                             "range": {
                                 "@timestamp": {
-                                    "gte": today_start.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
-                                    "lte": now.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+                                    "gte": today_start_ms,
+                                    "lte": now_ms
                                 }
                             }
                         }
@@ -530,7 +534,7 @@ class RecentAlertsView(APIView):
                             "severity": risk_level.lower(),
                             "message": f"检测到可疑{attack_type}",
                             "source": "AI Security Analyzer",
-                            "time": self.format_time(ingestion_time),
+                            "time": ingestion_time,
                             "ip": ip
                         }
                         alerts.append(alert)
@@ -538,36 +542,6 @@ class RecentAlertsView(APIView):
                 pass
         
         return Response({"data": alerts})
-    
-    def format_time(self, timestamp):
-        if not timestamp:
-            return "未知时间"
-        
-        try:
-            from datetime import datetime, timezone, timedelta
-            
-            if isinstance(timestamp, str):
-                if timestamp.endswith('Z'):
-                    timestamp = timestamp[:-1] + '+00:00'
-                dt = datetime.fromisoformat(timestamp)
-            else:
-                dt = datetime.fromtimestamp(timestamp / 1000)
-            
-            now = datetime.now(timezone.utc)
-            diff = now - dt.replace(tzinfo=timezone.utc)
-            
-            if diff.days > 0:
-                return f"{diff.days} 天前"
-            elif diff.seconds >= 3600:
-                hours = diff.seconds // 3600
-                return f"{hours} 小时前"
-            elif diff.seconds >= 60:
-                minutes = diff.seconds // 60
-                return f"{minutes} 分钟前"
-            else:
-                return "刚刚"
-        except:
-            return "未知时间"
 
 class LogTrendView(APIView):
     def get(self, request):
@@ -577,19 +551,18 @@ class LogTrendView(APIView):
             try:
                 es = get_es_client()
                 if es:
-                    now = datetime.utcnow()
+                    now = now_utc()
                     start_time = now - timedelta(hours=24)
-                    # nginx-log-raw 使用 ISO8601 格式
-                    start_time_str = start_time.strftime("%Y-%m-%dT%H:%M:%S.000Z")
-                    now_str = now.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+                    start_time_ms = int(start_time.timestamp() * 1000)
+                    now_ms = epoch_millis_now()
                     
                     query = {
                         "size": 0,
                         "query": {
                             "range": {
                                 "@timestamp": {
-                                    "gte": start_time_str,
-                                    "lte": now_str
+                                    "gte": start_time_ms,
+                                    "lte": now_ms
                                 }
                             }
                         },
@@ -600,8 +573,8 @@ class LogTrendView(APIView):
                                     "calendar_interval": "hour",
                                     "min_doc_count": 0,
                                     "extended_bounds": {
-                                        "min": start_time_str,
-                                        "max": now_str
+                                        "min": start_time_ms,
+                                        "max": now_ms
                                     }
                                 }
                             }
@@ -612,17 +585,9 @@ class LogTrendView(APIView):
                     buckets = result['aggregations']['hourly']['buckets']
                     
                     trend_data = []
-                    china_tz = timezone(timedelta(hours=8))
                     for bucket in buckets:
-                        key_str = bucket['key_as_string']
-                        if 'T' in key_str:
-                            utc_dt = datetime.fromisoformat(key_str.replace('Z', '+00:00'))
-                            china_dt = utc_dt.astimezone(china_tz)
-                            time_part = china_dt.strftime("%H:%M")
-                        else:
-                            time_part = key_str
                         trend_data.append({
-                            "time": time_part,
+                            "time": bucket['key'],
                             "logs": bucket['doc_count']
                         })
             except Exception as e:
@@ -630,13 +595,11 @@ class LogTrendView(APIView):
         
         if not trend_data:
             trend_data = []
-            now_utc = datetime.now(timezone.utc)
-            china_tz = timezone(timedelta(hours=8))
-            now_china = now_utc.astimezone(china_tz)
+            current = now_utc()
             for i in range(24):
-                hour_time = now_china - timedelta(hours=23 - i)
+                hour_time = current - timedelta(hours=23 - i)
                 trend_data.append({
-                    "time": hour_time.strftime("%H:%M"),
+                    "time": int(hour_time.replace(minute=0, second=0, microsecond=0).timestamp() * 1000),
                     "logs": 0
                 })
         
@@ -717,10 +680,10 @@ class ReportStatsView(APIView):
                     logger.info(f"ReportStatsView: mediumRisk = {stats['mediumRisk']}")
                     
                     # 4. 今日新增
-                    now = datetime.utcnow()
+                    now = now_utc()
                     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
                     today_start_ms = int(today_start.timestamp() * 1000)
-                    now_ms = int(now.timestamp() * 1000)
+                    now_ms = epoch_millis_now()
                     
                     today_search = {
                         "size": 0,

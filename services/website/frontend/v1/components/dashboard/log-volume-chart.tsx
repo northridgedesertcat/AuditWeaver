@@ -11,41 +11,15 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts"
+import { formatTimeOnly } from "@/lib/time"
 
 interface TrendData {
-  time: string
+  time: number
   logs: number
 }
 
-const defaultData = [
-  { time: "00:00", logs: 0 },
-  { time: "02:00", logs: 0 },
-  { time: "04:00", logs: 0 },
-  { time: "06:00", logs: 0 },
-  { time: "08:00", logs: 0 },
-  { time: "10:00", logs: 0 },
-  { time: "12:00", logs: 0 },
-  { time: "14:00", logs: 0 },
-  { time: "16:00", logs: 0 },
-  { time: "18:00", logs: 0 },
-  { time: "20:00", logs: 0 },
-  { time: "22:00", logs: 0 },
-]
-
-function generateTimeLabels(): string[] {
-  const labels: string[] = []
-  const now = new Date()
-  for (let i = 23; i >= 0; i--) {
-    const hourAgo = new Date(now.getTime() - i * 60 * 60 * 1000)
-    const hours = hourAgo.getHours().toString().padStart(2, '0')
-    const minutes = hourAgo.getMinutes().toString().padStart(2, '0')
-    labels.push(`${hours}:${minutes}`)
-  }
-  return labels
-}
-
 export function LogVolumeChart() {
-  const [data, setData] = useState<TrendData[]>(defaultData)
+  const [data, setData] = useState<TrendData[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -55,20 +29,13 @@ export function LogVolumeChart() {
         const result = await response.json()
         
         if (result.data && result.data.length > 0) {
-          const timeLabels = generateTimeLabels()
-          const mappedData: TrendData[] = result.data.map((item: TrendData, index: number) => ({
-            time: timeLabels[index] || item.time,
-            logs: item.logs
-          }))
-          setData(mappedData)
+          setData(result.data)
         } else {
-          const timeLabels = generateTimeLabels()
-          setData(timeLabels.map(time => ({ time, logs: 0 })))
+          setData([])
         }
       } catch (error) {
         console.error("Failed to fetch log trend:", error)
-        const timeLabels = generateTimeLabels()
-        setData(timeLabels.map(time => ({ time, logs: 0 })))
+        setData([])
       } finally {
         setLoading(false)
       }
@@ -76,18 +43,6 @@ export function LogVolumeChart() {
 
     fetchTrend()
     const interval = setInterval(fetchTrend, 30000)
-
-    return () => clearInterval(interval)
-  }, [])
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const timeLabels = generateTimeLabels()
-      setData(prevData => prevData.map((item, index) => ({
-        ...item,
-        time: timeLabels[index] || item.time
-      })))
-    }, 60000)
 
     return () => clearInterval(interval)
   }, [])
@@ -122,6 +77,7 @@ export function LogVolumeChart() {
                   tickLine={false}
                   axisLine={false}
                   interval={2}
+                  tickFormatter={(value) => formatTimeOnly(value as number)}
                 />
                 <YAxis
                   stroke="oklch(0.65 0.02 260)"
@@ -146,6 +102,7 @@ export function LogVolumeChart() {
                     color: "oklch(0.95 0.01 260)",
                   }}
                   labelStyle={{ color: "oklch(0.65 0.02 260)" }}
+                  labelFormatter={(value) => formatTimeOnly(value as number)}
                 />
                 <Area
                   type="monotone"

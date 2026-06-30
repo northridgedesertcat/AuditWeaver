@@ -77,7 +77,7 @@ def get_nginx_log_raw_mapping():
     return {
         "mappings": {
             "properties": {
-                "@timestamp": {"type": "date", "format": "strict_date_optional_time||yyyy-MM-dd HH:mm:ss"},
+                "@timestamp": {"type": "date", "format": "epoch_millis||strict_date_optional_time||yyyy-MM-dd HH:mm:ss"},
                 "@version": {"type": "keyword"},
                 "bytes": {"type": "long"},
                 "event": {
@@ -136,7 +136,7 @@ def get_matched_logs_mapping():
     return {
         "mappings": {
             "properties": {
-                "@timestamp": {"type": "date", "format": "strict_date_optional_time||yyyy-MM-dd HH:mm:ss"},
+                "@timestamp": {"type": "date", "format": "epoch_millis||strict_date_optional_time||yyyy-MM-dd HH:mm:ss"},
                 "@version": {"type": "keyword"},
                 "event": {
                     "properties": {
@@ -167,7 +167,7 @@ def get_matched_logs_mapping():
                     }
                 },
                 
-                "ingestion_time": {"type": "date", "format": "strict_date_optional_time||yyyy-MM-dd HH:mm:ss"},
+                "ingestion_time": {"type": "date", "format": "epoch_millis"},
                 
                 "pipeline": {
                     "properties": {

@@ -2,7 +2,10 @@
 import re
 import json
 import logging
-from datetime import datetime
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from common.time_utils import epoch_millis_now
 from match_config import DETECTION_CONFIG
 
 # 配置日志
@@ -61,7 +64,7 @@ def calculate_confidence(matched_count, total_patterns):
 def format_detection_result(log_entry, matched_type, confidence, matched_items):
     """格式化检测结果"""
     result = {
-        'timestamp': datetime.utcnow().isoformat(),
+        'timestamp': epoch_millis_now(),
         'original_log': log_entry,
         'matched_type': matched_type,
         'confidence': round(confidence, 2),

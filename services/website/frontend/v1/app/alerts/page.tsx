@@ -32,6 +32,7 @@ import {
   ChevronRight,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { formatRelative } from "@/lib/time"
 
 const alerts = [
   {
@@ -41,7 +42,7 @@ const alerts = [
     severity: "critical",
     status: "active",
     source: "Web Application Firewall",
-    timestamp: "2024-01-15 14:32:18",
+    timestamp: Date.now() - 1000 * 60 * 30,
     count: 12,
   },
   {
@@ -51,7 +52,7 @@ const alerts = [
     severity: "high",
     status: "active",
     source: "Authentication Service",
-    timestamp: "2024-01-15 14:28:45",
+    timestamp: Date.now() - 1000 * 60 * 35,
     count: 1,
   },
   {
@@ -61,7 +62,7 @@ const alerts = [
     severity: "high",
     status: "investigating",
     source: "Network IDS",
-    timestamp: "2024-01-15 14:15:22",
+    timestamp: Date.now() - 1000 * 60 * 50,
     count: 1024,
   },
   {
@@ -71,7 +72,7 @@ const alerts = [
     severity: "medium",
     status: "active",
     source: "Certificate Monitor",
-    timestamp: "2024-01-15 09:00:00",
+    timestamp: Date.now() - 1000 * 60 * 60 * 6,
     count: 1,
   },
   {
@@ -81,7 +82,7 @@ const alerts = [
     severity: "low",
     status: "resolved",
     source: "API Gateway",
-    timestamp: "2024-01-15 08:45:33",
+    timestamp: Date.now() - 1000 * 60 * 60 * 6.5,
     count: 15000,
   },
   {
@@ -91,7 +92,7 @@ const alerts = [
     severity: "medium",
     status: "active",
     source: "Infrastructure Monitor",
-    timestamp: "2024-01-15 07:30:00",
+    timestamp: Date.now() - 1000 * 60 * 60 * 8,
     count: 1,
   },
   {
@@ -101,7 +102,7 @@ const alerts = [
     severity: "high",
     status: "resolved",
     source: "Antivirus Scanner",
-    timestamp: "2024-01-14 23:15:45",
+    timestamp: Date.now() - 1000 * 60 * 60 * 16,
     count: 3,
   },
   {
@@ -111,7 +112,7 @@ const alerts = [
     severity: "medium",
     status: "resolved",
     source: "Database Monitor",
-    timestamp: "2024-01-14 20:00:00",
+    timestamp: Date.now() - 1000 * 60 * 60 * 19,
     count: 1,
   },
 ]
@@ -281,7 +282,7 @@ export default function AlertsPage() {
                               {statConfig.label}
                             </Badge>
                             <span className="text-xs text-muted-foreground">
-                              {alert.timestamp}
+                              {formatRelative(alert.timestamp)}
                             </span>
                           </div>
                           <h4 className="mt-1 font-medium">{alert.title}</h4>

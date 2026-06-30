@@ -8,10 +8,13 @@ import os
 import json
 import logging
 import time
-from datetime import datetime
 
-# 添加项目路径
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# 添加 services 目录到路径，以便导入 common 模块
+_services_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _services_path not in sys.path:
+    sys.path.insert(0, _services_path)
+
+from common.time_utils import now_utc
 
 # 导入配置和模块
 from config import KAFKA_CONFIG, ELASTICSEARCH_CONFIG, LOG_CONFIG, DEBUG_CONFIG
@@ -176,7 +179,7 @@ def main():
     logger.info("="*70)
     logger.info("    规则匹配引擎启动")
     logger.info("="*70)
-    logger.info(f"启动时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    logger.info(f"启动时间: {now_utc().strftime('%Y-%m-%d %H:%M:%S UTC')}")
     logger.info(f"Kafka Broker: {KAFKA_CONFIG['brokers']}")
     logger.info(f"输入Topic: {KAFKA_CONFIG['input_topic']}")
     logger.info(f"输出Topic: {KAFKA_CONFIG['output_topic']}")

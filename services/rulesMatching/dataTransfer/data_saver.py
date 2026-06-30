@@ -2,7 +2,10 @@
 import os
 import json
 import logging
-from datetime import datetime
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from common.time_utils import epoch_millis_now, format_for_filename, format_for_directory
 from elasticsearch import Elasticsearch
 from elasticsearch.exceptions import RequestError, ConnectionError
 
@@ -100,8 +103,7 @@ class DataSaver:
     
     def _get_date_folder(self):
         """获取当前日期和小时的文件夹路径 (格式: YYYY-MM-DD/HH)"""
-        date_str = datetime.utcnow().strftime('%Y-%m-%d')
-        hour_str = datetime.utcnow().strftime('%H')
+        date_str, hour_str = format_for_directory()
         date_folder = os.path.join(self.normal_data_path, date_str, hour_str)
         if not os.path.exists(date_folder):
             os.makedirs(date_folder)
@@ -112,7 +114,7 @@ class DataSaver:
         """保存正常日志到JSON文件"""
         try:
             date_folder = self._get_date_folder()
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_%f')
+            timestamp = format_for_filename()
             filename = f"normal_log_{timestamp}.json"
             filepath = os.path.join(date_folder, filename)
             
@@ -125,7 +127,7 @@ class DataSaver:
                 }
             
             log_data = {
-                'timestamp': datetime.now().isoformat(),
+                'timestamp': epoch_millis_now(),
                 'log_entry': log_entry,
                 'detection_result': clean_detection_result
             }
@@ -226,7 +228,7 @@ class DataSaver:
         enriched_log['rule_match'] = rule_match_field
         
         # 添加 ingestion_time 字段，记录写入 Elasticsearch 的时间
-        enriched_log['ingestion_time'] = datetime.now().isoformat()
+        enriched_log['ingestion_time'] = epoch_millis_now()
         
         # 设置 pipeline.rule_matching.status 为 completed（因为已经完成规则匹配）
         enriched_log['pipeline'] = {
@@ -364,7 +366,7 @@ class DataSaver:
             enriched_log = self._enrich_log_with_detection(log_entry, detection_result)
             
             kafka_message = {
-                'timestamp': datetime.utcnow().isoformat(),
+                'timestamp': epoch_millis_now(),
                 'log_entry': enriched_log,
                 'detection_result': detection_result
             }

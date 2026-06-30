@@ -28,12 +28,13 @@ import {
   Globe,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { formatRelative } from "@/lib/time"
 
 interface Message {
   id: string
   role: "user" | "assistant"
   content: string
-  timestamp: Date
+  timestamp: number
   isLoading?: boolean
   actions?: { label: string; action: string }[]
   data?: {
@@ -47,7 +48,7 @@ const initialMessages: Message[] = [
     id: "1",
     role: "assistant",
     content: "你好！我是 LogSentinel AI 安全助手。我可以帮助你分析日志、检测威胁、调查安全事件，或回答任何与安全运营相关的问题。你想了解什么？",
-    timestamp: new Date(Date.now() - 60000),
+    timestamp: Date.now() - 60000,
     actions: [
       { label: "分析最近的威胁", action: "analyze_threats" },
       { label: "查看异常日志", action: "view_anomalies" },
@@ -101,7 +102,7 @@ export default function AgentPage() {
       id: Date.now().toString(),
       role: "user",
       content: input,
-      timestamp: new Date(),
+      timestamp: Date.now(),
     }
 
     setMessages((prev) => [...prev, userMessage])
@@ -113,7 +114,7 @@ export default function AgentPage() {
       id: (Date.now() + 1).toString(),
       role: "assistant",
       content: "",
-      timestamp: new Date(),
+      timestamp: Date.now(),
       isLoading: true,
     }
     setMessages((prev) => [...prev, loadingMessage])
