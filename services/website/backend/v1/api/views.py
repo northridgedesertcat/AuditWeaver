@@ -112,7 +112,7 @@ class ThreatDistributionView(APIView):
                         "aggs": {
                             "risk_levels": {
                                 "terms": {
-                                    "field": "risk_level.keyword",
+                                    "field": "risk_level",
                                     "size": 10
                                 }
                             }

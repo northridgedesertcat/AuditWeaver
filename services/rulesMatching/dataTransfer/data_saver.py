@@ -163,7 +163,7 @@ class DataSaver:
             query = {
                 "query": {
                     "term": {
-                        "event_id.keyword": event_id
+                        "event_id": event_id
                     }
                 }
             }
