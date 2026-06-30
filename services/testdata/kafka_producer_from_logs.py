@@ -3,7 +3,7 @@ from kafka.errors import KafkaError
 import time
 import random
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 print("[DEBUG] 开始初始化 KafkaProducer...")
@@ -28,10 +28,15 @@ def load_logs(file_path):
     return [log.strip() for log in logs if log.strip()]
 
 
+MONTH_ABBREV = {1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'Jun',
+                7: 'Jul', 8: 'Aug', 9: 'Sep', 10: 'Oct', 11: 'Nov', 12: 'Dec'}
+
 def replace_log_date(log_line):
-    today = datetime.now()
-    today_str = today.strftime("%d/%b/%Y")
-    return re.sub(r"\[\d{2}/\w{3}/\d{4}:", f"[{today_str}:", log_line)
+    local_now = datetime.now()
+    utc_now = local_now.astimezone(timezone.utc)
+    month_abbr = MONTH_ABBREV[utc_now.month]
+    utc_timestamp = f"{utc_now.day:02d}/{month_abbr}/{utc_now.year}:{utc_now.hour:02d}:{utc_now.minute:02d}:{utc_now.second:02d}"
+    return re.sub(r"\[\d{2}/\w{3}/\d{4}:\d{2}:\d{2}:\d{2}", f"[{utc_timestamp}", log_line)
 
 
 def send_log_to_kafka(log):
