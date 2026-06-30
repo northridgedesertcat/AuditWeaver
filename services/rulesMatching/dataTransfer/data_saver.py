@@ -242,106 +242,6 @@ class DataSaver:
         
         return enriched_log
     
-    def _ensure_attack_index_exists(self):
-        """确保攻击日志索引存在"""
-        try:
-            if not self.es_client.indices.exists(index=self.attack_index):
-                index_mapping = {
-                    "mappings": {
-                        "properties": {
-                            "@timestamp": {"type": "date"},
-                            "@version": {
-                                "type": "text",
-                                "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}
-                            },
-                            "bytes": {"type": "long"},
-                            "event": {
-                                "properties": {
-                                    "original": {
-                                        "type": "text",
-                                        "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}
-                                    }
-                                }
-                            },
-                            "event_id": {
-                                "type": "text",
-                                "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}
-                            },
-                            "http_version": {
-                                "type": "text",
-                                "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}
-                            },
-                            "ip": {
-                                "type": "text",
-                                "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}
-                            },
-                            "message": {
-                                "type": "text",
-                                "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}
-                            },
-                            "method": {
-                                "type": "text",
-                                "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}
-                            },
-                            "path": {
-                                "type": "text",
-                                "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}
-                            },
-                            "pipeline": {
-                                "properties": {
-                                    "rule_matching": {
-                                        "properties": {
-                                            "status": {
-                                                "type": "text",
-                                                "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}
-                                            }
-                                        }
-                                    },
-                                    "agent_analysis": {
-                                        "properties": {
-                                            "status": {
-                                                "type": "text",
-                                                "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}
-                                            }
-                                        }
-                                    }
-                                }
-                            },
-                            "referrer": {
-                                "type": "text",
-                                "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}
-                            },
-                            "rule_match": {
-                                "properties": {
-                                    "is_matched": {"type": "boolean"},
-                                    "rule_id": {"type": "keyword"},
-                                    "matched_type": {"type": "keyword"},
-                                    "confidence": {"type": "float"},
-                                    "severity": {"type": "keyword"},
-                                    "matched_items": {"type": "object"}
-                                }
-                            },
-                            "status": {"type": "long"},
-                            "timestamp": {
-                                "type": "text",
-                                "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}
-                            },
-                            "user_agent": {
-                                "type": "text",
-                                "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}
-                            }
-                        }
-                    },
-                    "settings": {
-                        "number_of_shards": 1,
-                        "number_of_replicas": 0
-                    }
-                }
-                self.es_client.indices.create(index=self.attack_index, body=index_mapping)
-                logger.info(f"创建攻击日志索引: {self.attack_index}")
-        except Exception as e:
-            logger.error(f"创建攻击日志索引失败: {str(e)}")
-    
     def _verify_elasticsearch_write(self, doc_id):
         """验证数据是否成功写入Elasticsearch"""
         try:
@@ -394,8 +294,6 @@ class DataSaver:
             return None
         
         try:
-            self._ensure_attack_index_exists()
-            
             enriched_log = self._enrich_log_with_detection(log_entry, detection_result)
             
             response = self.es_client.index(

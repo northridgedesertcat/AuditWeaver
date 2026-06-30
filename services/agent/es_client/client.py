@@ -19,7 +19,6 @@ class ESClient:
             self.client = Elasticsearch([self.url])
             if self.client.ping():
                 logger.info(f'Connected to Elasticsearch: {self.url}')
-                self._ensure_index_exists()
                 return True
             else:
                 logger.error('Elasticsearch ping failed')
@@ -27,26 +26,6 @@ class ESClient:
         except ESConnectionError as e:
             logger.error(f'Failed to connect to Elasticsearch: {str(e)}')
             return False
-
-    def _ensure_index_exists(self):
-        if not self.client:
-            return
-
-        # 添加项目路径导入新的 mapping 配置
-        import sys
-        import os
-        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        
-        from config.elastic_mapping_config import ELASTICSEARCH_MAPPING
-
-        if not self.client.indices.exists(index=self.index_name):
-            try:
-                self.client.indices.create(index=self.index_name, body=ELASTICSEARCH_MAPPING)
-                logger.info(f'Created index: {self.index_name} with new mapping')
-            except Exception as e:
-                logger.error(f'Failed to create index: {str(e)}')
-        else:
-            logger.info(f'Index {self.index_name} already exists')
 
     def index_document(self, document: Dict[str, Any], refresh: bool = True) -> Optional[str]:
         if not self.client:
