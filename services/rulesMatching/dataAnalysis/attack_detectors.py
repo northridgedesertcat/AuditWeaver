@@ -119,30 +119,7 @@ class AttackDetectors:
             return format_detection_result(log_entry, ATTACK_TYPES['CSRF'], confidence, matched_items)
         
         return None
-    
-    @staticmethod
-    def detect_bot(log_entry):
-        """检测Bot访问"""
-        config = RULES_CONFIG[ATTACK_TYPES['BOT']]
-        features = AttackDetectors._extract_relevant_features(log_entry)
-        user_agent = features.get('user_agent', '')
-        
-        matched_keywords = match_keywords(user_agent, config['keywords'])
-        matched_patterns = match_patterns(user_agent, config['patterns'])
-        
-        matched_count = len(matched_keywords) + len(matched_patterns)
-        total_patterns = len(config['keywords']) + len(config['patterns'])
-        confidence = calculate_confidence(matched_count, total_patterns)
-        
-        if matched_count >= config['threshold']:
-            matched_items = {
-                'keywords': matched_keywords,
-                'patterns': matched_patterns
-            }
-            return format_detection_result(log_entry, ATTACK_TYPES['BOT'], confidence, matched_items)
-        
-        return None
-    
+
     @staticmethod
     def detect_sensitive_access(log_entry):
         """检测敏感访问"""
@@ -185,7 +162,6 @@ class AttackDetectors:
             AttackDetectors.detect_command_injection,
             AttackDetectors.detect_path_traversal,
             AttackDetectors.detect_csrf,
-            AttackDetectors.detect_bot,
             AttackDetectors.detect_sensitive_access
         ]
         

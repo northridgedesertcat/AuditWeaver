@@ -6,7 +6,6 @@ from keywords.xss import XSS_KEYWORDS, XSS_PATTERNS
 from keywords.command_injection import COMMAND_INJECTION_KEYWORDS, COMMAND_INJECTION_PATTERNS
 from keywords.path_traversal import PATH_TRAVERSAL_KEYWORDS, PATH_TRAVERSAL_PATTERNS
 from keywords.csrf import CSRF_KEYWORDS, CSRF_PATTERNS
-from keywords.bot import BOT_KEYWORDS, BOT_PATTERNS
 from keywords.sensitive_access import SENSITIVE_ACCESS_KEYWORDS, SENSITIVE_ACCESS_PATTERNS
 
 # 攻击类型定义
@@ -16,7 +15,6 @@ ATTACK_TYPES = {
     'COMMAND_INJECTION': 'command_injection',
     'PATH_TRAVERSAL': 'path_traversal',
     'CSRF': 'csrf',
-    'BOT': 'bot',
     'DDoS': 'ddos',
     'SENSITIVE_ACCESS': 'sensitive_access'
 }
@@ -56,13 +54,6 @@ CSRF_RULES = {
     'threshold': 1
 }
 
-# Bot检测规则
-BOT_RULES = {
-    'keywords': BOT_KEYWORDS,
-    'patterns': BOT_PATTERNS,
-    'threshold': 1
-}
-
 # DDoS检测规则
 DDOS_RULES = {
     'rate_threshold': 100,  # 每分钟请求数阈值
@@ -83,7 +74,6 @@ RULES_CONFIG = {
     ATTACK_TYPES['COMMAND_INJECTION']: COMMAND_INJECTION_RULES,
     ATTACK_TYPES['PATH_TRAVERSAL']: PATH_TRAVERSAL_RULES,
     ATTACK_TYPES['CSRF']: CSRF_RULES,
-    ATTACK_TYPES['BOT']: BOT_RULES,
     ATTACK_TYPES['SENSITIVE_ACCESS']: SENSITIVE_ACCESS_RULES
 }
 
