@@ -4,7 +4,7 @@
 PATH_TRAVERSAL_KEYWORDS = [
     '../', '..\\', '..%2f', '..%5c',
     '/etc/', '/var/', '/proc/', '/sys/',
-    'C:\\', 'D:\\', 'Windows\\', 'System32\\',
+    'C:\\', 'D:\\', 'windows\\', 'System32\\',
     'passwd', 'shadow', 'hosts', 'httpd.conf'
 ]
 
@@ -16,6 +16,6 @@ PATH_TRAVERSAL_PATTERNS = [
     r'\.\.%5c',
     r'/etc/passwd',
     r'/etc/shadow',
-    r'C:\\Windows\\',
+    r'C:\\windows\\',
     r'C:\\System32\\'
 ]

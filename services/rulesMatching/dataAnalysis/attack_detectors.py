@@ -9,11 +9,10 @@ class AttackDetectors:
     def detect_sql_injection(log_entry):
         """检测SQL注入攻击"""
         config = RULES_CONFIG[ATTACK_TYPES['SQL_INJECTION']]
-        features = AttackDetectors._extract_relevant_features(log_entry)
-        text = ' '.join(features.values())
-        
-        matched_keywords = match_keywords(text, config['keywords'])
-        matched_patterns = match_patterns(text, config['patterns'])
+        path = log_entry.get('path', '')
+
+        matched_keywords = match_keywords(path, config['keywords'])
+        matched_patterns = match_patterns(path, config['patterns'])
         
         matched_count = len(matched_keywords) + len(matched_patterns)
         total_patterns = len(config['keywords']) + len(config['patterns'])
@@ -32,11 +31,10 @@ class AttackDetectors:
     def detect_xss(log_entry):
         """检测XSS攻击"""
         config = RULES_CONFIG[ATTACK_TYPES['XSS']]
-        features = AttackDetectors._extract_relevant_features(log_entry)
-        text = ' '.join(features.values())
-        
-        matched_keywords = match_keywords(text, config['keywords'])
-        matched_patterns = match_patterns(text, config['patterns'])
+        path = log_entry.get('path', '')
+
+        matched_keywords = match_keywords(path, config['keywords'])
+        matched_patterns = match_patterns(path, config['patterns'])
         
         matched_count = len(matched_keywords) + len(matched_patterns)
         total_patterns = len(config['keywords']) + len(config['patterns'])
@@ -55,11 +53,10 @@ class AttackDetectors:
     def detect_command_injection(log_entry):
         """检测命令注入攻击"""
         config = RULES_CONFIG[ATTACK_TYPES['COMMAND_INJECTION']]
-        features = AttackDetectors._extract_relevant_features(log_entry)
-        text = ' '.join(features.values())
-        
-        matched_keywords = match_keywords(text, config['keywords'])
-        matched_patterns = match_patterns(text, config['patterns'])
+        path = log_entry.get('path', '')
+
+        matched_keywords = match_keywords(path, config['keywords'])
+        matched_patterns = match_patterns(path, config['patterns'])
         
         matched_count = len(matched_keywords) + len(matched_patterns)
         total_patterns = len(config['keywords']) + len(config['patterns'])
@@ -78,11 +75,10 @@ class AttackDetectors:
     def detect_path_traversal(log_entry):
         """检测路径遍历攻击"""
         config = RULES_CONFIG[ATTACK_TYPES['PATH_TRAVERSAL']]
-        features = AttackDetectors._extract_relevant_features(log_entry)
-        text = ' '.join(features.values())
-        
-        matched_keywords = match_keywords(text, config['keywords'])
-        matched_patterns = match_patterns(text, config['patterns'])
+        path = log_entry.get('path', '')
+
+        matched_keywords = match_keywords(path, config['keywords'])
+        matched_patterns = match_patterns(path, config['patterns'])
         
         matched_count = len(matched_keywords) + len(matched_patterns)
         total_patterns = len(config['keywords']) + len(config['patterns'])
@@ -101,11 +97,10 @@ class AttackDetectors:
     def detect_csrf(log_entry):
         """检测CSRF攻击"""
         config = RULES_CONFIG[ATTACK_TYPES['CSRF']]
-        features = AttackDetectors._extract_relevant_features(log_entry)
-        text = ' '.join(features.values())
-        
-        matched_keywords = match_keywords(text, config['keywords'])
-        matched_patterns = match_patterns(text, config['patterns'])
+        path = log_entry.get('path', '')
+
+        matched_keywords = match_keywords(path, config['keywords'])
+        matched_patterns = match_patterns(path, config['patterns'])
         
         matched_count = len(matched_keywords) + len(matched_patterns)
         total_patterns = len(config['keywords']) + len(config['patterns'])
@@ -124,9 +119,8 @@ class AttackDetectors:
     def detect_sensitive_access(log_entry):
         """检测敏感访问"""
         config = RULES_CONFIG[ATTACK_TYPES['SENSITIVE_ACCESS']]
-        features = AttackDetectors._extract_relevant_features(log_entry)
-        path = features.get('path', '')
-        
+        path = log_entry.get('path', '')
+
         matched_keywords = match_keywords(path, config['keywords'])
         matched_patterns = match_patterns(path, config['patterns'])
         
