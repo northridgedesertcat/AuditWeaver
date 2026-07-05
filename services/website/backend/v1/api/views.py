@@ -33,7 +33,7 @@ from .es_client import is_es_available, get_es_client
 import sys
 import os
 # 添加 services 目录到路径，以便导入 common 模块
-_services_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+_services_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))))
 if _services_path not in sys.path:
     sys.path.insert(0, _services_path)
 from common.time_utils import now_utc, epoch_millis_now

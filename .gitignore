@@ -49,6 +49,9 @@ ENV/
 .DS_Store
 Thumbs.db
 
+# Environment variables
+.env
+
 #datas
 isolationForest/datas/nginx/*
 document/

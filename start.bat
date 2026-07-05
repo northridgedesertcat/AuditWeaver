@@ -39,8 +39,8 @@ if errorlevel 1 (
     echo          WARNING: Kafka may not be fully ready, continuing anyway...
 ) else (
     echo          Kafka is ready!
-    echo          Waiting extra 8 seconds for Kafka topics to initialize...
-    timeout /t 8 /nobreak >nul
+    echo          Waiting extra 4 seconds for Kafka topics to initialize...
+    timeout /t 4 /nobreak >nul
 )
 
 echo [STEP 4/7] Creating Elasticsearch Indexes...
@@ -116,8 +116,8 @@ exit /b 1
 
 :WaitForKafka
 set "HOST_PORT=%~1"
-set "MAX_RETRIES=20"
-set "RETRY_DELAY=5"
+set "MAX_RETRIES=10"
+set "RETRY_DELAY=3"
 
 for /l %%i in (1,1,%MAX_RETRIES%) do (
     powershell -NoProfile -Command "try { $c = New-Object System.Net.Sockets.TCPClient; $c.Connect('%HOST_PORT%'); $c.Close(); exit 0 } catch { exit 1 }" >nul 2>&1

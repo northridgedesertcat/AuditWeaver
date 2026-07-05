@@ -4,7 +4,7 @@
 from typing import Dict, Any, List, Optional
 import sys
 import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 from common.time_utils import epoch_millis_now, to_epoch_millis
 import re
 

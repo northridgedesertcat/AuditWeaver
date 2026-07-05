@@ -10,17 +10,28 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import sys
 from pathlib import Path
-import os
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+sys.path.append(str(BASE_DIR.parent.parent.parent.parent))
 
-SECRET_KEY = 'django-insecure-hq$p(#=brenfs*as=^c!809%x&vri@6fy@hwq%98%ngre*zgi)'
+from common.env import (
+    DJANGO_SECRET_KEY,
+    DJANGO_DEBUG,
+    DJANGO_ALLOWED_HOSTS,
+    ES_HOST,
+    ES_PORT,
+    ES_USER,
+    ES_PASSWORD,
+)
 
-DEBUG = True
+SECRET_KEY = DJANGO_SECRET_KEY
 
-ALLOWED_HOSTS = ['*']
+DEBUG = DJANGO_DEBUG
+
+ALLOWED_HOSTS = DJANGO_ALLOWED_HOSTS.split(',')
 
 
 INSTALLED_APPS = [
@@ -113,7 +124,7 @@ REST_FRAMEWORK = {
     'PAGE_SIZE': 20,
 }
 
-ELASTICSEARCH_HOST = os.environ.get('ELASTICSEARCH_HOST', 'localhost')
-ELASTICSEARCH_PORT = int(os.environ.get('ELASTICSEARCH_PORT', 19200))
-ELASTICSEARCH_USER = os.environ.get('ELASTICSEARCH_USER', 'elastic')
-ELASTICSEARCH_PASSWORD = os.environ.get('ELASTICSEARCH_PASSWORD', 'password')
+ELASTICSEARCH_HOST = ES_HOST
+ELASTICSEARCH_PORT = ES_PORT
+ELASTICSEARCH_USER = ES_USER
+ELASTICSEARCH_PASSWORD = ES_PASSWORD

@@ -130,7 +130,10 @@ def get_matched_logs_mapping():
     字段说明:
     - 继承 nginx-log-raw 的所有字段
     - rule_match: 规则匹配结果
-    - ingestion_time: 写入时间
+    - detection_result: 检测结果
+    - matched_rules: 匹配规则
+    - log_timestamp: 日志时间戳 (epoch_millis)
+    - ingestion_time: 写入时间 (epoch_millis)
     - pipeline: 更新后的流水线状态
     """
     return {
@@ -167,6 +170,34 @@ def get_matched_logs_mapping():
                     }
                 },
                 
+                "detection_result": {
+                    "properties": {
+                        "event_id": {"type": "keyword"},
+                        "attack_type": {"type": "text", "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}},
+                        "confidence": {"type": "long"},
+                        "severity": {"type": "text", "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}},
+                        "matched_rules": {
+                            "properties": {
+                                "keywords": {"type": "text", "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}},
+                                "patterns": {"type": "text", "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}}
+                            }
+                        },
+                        "detection_time": {"type": "long"},
+                        "is_attack": {"type": "boolean"}
+                    }
+                },
+                
+                "matched_rules": {
+                    "properties": {
+                        "keywords": {"type": "text", "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}},
+                        "patterns": {"type": "text", "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}}
+                    }
+                },
+                
+                "severity": {"type": "text", "fields": {"keyword": {"type": "keyword", "ignore_above": 256}}},
+                "confidence": {"type": "long"},
+                
+                "log_timestamp": {"type": "date", "format": "epoch_millis"},
                 "ingestion_time": {"type": "date", "format": "epoch_millis"},
                 
                 "pipeline": {

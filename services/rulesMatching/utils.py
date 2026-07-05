@@ -1,144 +1,81 @@
-# 工具函数文件
 import re
 import json
 import logging
 import sys
 import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from common.time_utils import epoch_millis_now
 from match_config import DETECTION_CONFIG
 
-# 配置日志
 logging.basicConfig(
     filename=DETECTION_CONFIG['log_file'],
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
-# 日志记录器
-logger = logging.getLogger('rules_matching')
-
-def log_detection(result):
-    """记录检测结果到日志"""
-    try:
-        logger.info(json.dumps(result, ensure_ascii=False))
-    except Exception as e:
-        logger.error(f"记录检测结果失败: {str(e)}")
-
-def extract_features(log_entry):
-    """从日志条目中提取特征"""
-    features = {
-        'ip': log_entry.get('ip', ''),
-        'method': log_entry.get('method', '').lower(),
-        'path': log_entry.get('path', ''),
-        'user_agent': log_entry.get('user_agent', '').lower(),
-        'referrer': log_entry.get('referrer', ''),
-        'status': log_entry.get('status', 0),
-        'bytes': log_entry.get('bytes', 0)
-    }
-    return features
 
 def match_patterns(text, patterns):
-    """匹配正则表达式模式"""
-    matches = []
+    matched = []
     for pattern in patterns:
-        if re.search(pattern, text, re.IGNORECASE):
-            matches.append(pattern)
-    return matches
+        try:
+            if re.search(pattern, text, re.IGNORECASE):
+                matched.append(pattern)
+        except re.error:
+            continue
+    return matched
+
 
 def match_keywords(text, keywords):
-    """匹配关键词"""
-    matched_keywords = []
-    text_lower = text.lower()
+    matched = []
     for keyword in keywords:
-        if keyword.lower() in text_lower:
-            matched_keywords.append(keyword)
-    return matched_keywords
+        if keyword.lower() in text.lower():
+            matched.append(keyword)
+    return matched
+
 
 def calculate_confidence(matched_count, total_patterns):
-    """计算置信度"""
     if total_patterns == 0:
-        return 0.0
-    return min(1.0, matched_count / total_patterns)
+        return 0
+    return min(int((matched_count / total_patterns) * 100), 100)
 
-def format_detection_result(log_entry, matched_type, confidence, matched_items):
-    """格式化检测结果"""
-    result = {
-        'timestamp': epoch_millis_now(),
-        'original_log': log_entry,
-        'matched_type': matched_type,
-        'confidence': round(confidence, 2),
-        'matched_items': matched_items,
-        'severity': get_severity(confidence)
+
+def format_detection_result(log_entry, attack_type, confidence, matched_items):
+    return {
+        'event_id': log_entry.get('event_id', ''),
+        'attack_type': attack_type,
+        'confidence': confidence,
+        'severity': 'high' if confidence >= 70 else 'medium' if confidence >= 40 else 'low',
+        'matched_rules': {
+            'keywords': matched_items.get('keywords', []),
+            'patterns': matched_items.get('patterns', [])
+        },
+        'detection_time': epoch_millis_now(),
+        'is_attack': True
     }
-    return result
 
-def get_severity(confidence):
-    """根据置信度获取严重程度"""
-    if confidence >= 0.9:
-        return 'critical'
-    elif confidence >= 0.7:
-        return 'high'
-    elif confidence >= 0.5:
-        return 'medium'
-    else:
-        return 'low'
 
 def validate_log_entry(log_entry):
-    """验证日志条目格式"""
-    required_fields = ['ip', 'method', 'path', 'status']
-    
+    if not isinstance(log_entry, dict):
+        return False
+    required_fields = ['ip', 'path', 'method', 'status']
     for field in required_fields:
         if field not in log_entry:
             return False
-    
-    # 检查时间戳字段（支持 @timestamp 和 timestamp 两种格式）
-    if 'timestamp' not in log_entry and '@timestamp' not in log_entry:
-        return False
-    
     return True
 
-def normalize_path(path):
-    """标准化路径"""
-    # 移除查询参数
-    if '?' in path:
-        path = path.split('?')[0]
-    # 移除末尾斜杠
-    if path.endswith('/'):
-        path = path[:-1]
-    return path
-
-def parse_timestamp(timestamp):
-    """解析时间戳"""
-    try:
-        # 尝试解析nginx日志格式的时间戳
-        return datetime.strptime(timestamp, '%d/%b/%Y:%H:%M:%S %z')
-    except Exception:
-        try:
-            # 尝试解析ISO格式的时间戳
-            return datetime.fromisoformat(timestamp)
-        except Exception:
-            return None
-
-def aggregate_results(results):
-    """聚合检测结果"""
-    aggregated = {}
-    for result in results:
-        matched_type = result['matched_type']
-        if matched_type not in aggregated or result['confidence'] > aggregated[matched_type]['confidence']:
-            aggregated[matched_type] = result
-    return list(aggregated.values())
 
 def filter_results(results, min_confidence):
-    """过滤低置信度结果"""
-    return [result for result in results if result['confidence'] >= min_confidence]
+    return [r for r in results if r.get('confidence', 0) >= min_confidence]
+
+
+def aggregate_results(results):
+    return results
+
+
+def log_detection(result):
+    logger = logging.getLogger('detection')
+    logger.warning(f"检测到攻击: {result.get('attack_type')}, 置信度: {result.get('confidence')}%, IP: {result.get('event_id')}")
+
 
 def generate_alert_message(result):
-    """生成告警消息"""
-    matched_type = result['matched_type']
-    confidence = result['confidence']
-    ip = result['original_log'].get('ip', 'Unknown')
-    path = result['original_log'].get('path', 'Unknown')
-    
-    message = f"[ALERT] {matched_type.upper()} detected from {ip} with {confidence*100:.1f}% confidence. Path: {path}"
-    return message
+    return f"[告警] 检测到{result.get('attack_type')}攻击, 置信度: {result.get('confidence')}%, 严重程度: {result.get('severity')}"
