@@ -57,3 +57,6 @@ isolationForest/datas/nginx/*
 document/
 services/rulesMatching/temporaryDatas/*
 services/temporaryDatas/*
+
+#test script
+services/test/*
