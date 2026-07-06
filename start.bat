@@ -57,27 +57,27 @@ echo [STEP 5/7] Starting Rules Matching Engine...
 echo          Path: %PROJECT_DIR%services\rulesMatching
 cd /d "%PROJECT_DIR%services\rulesMatching"
 start "RulesMatching" cmd /k "%PYTHON_CMD% main.py"
-echo          Started -> Window: RulesMatching
+echo          Started -^> Window: RulesMatching
 timeout /t 5 /nobreak >nul
 
 echo [STEP 6/7] Starting Agent Module...
 echo          Path: %PROJECT_DIR%services\agent
 cd /d "%PROJECT_DIR%services\agent"
 start "AgentModule" cmd /k "%PYTHON_CMD% main.py"
-echo          Started -> Window: AgentModule
+echo          Started -^> Window: AgentModule
 timeout /t 3 /nobreak >nul
 
 echo [STEP 7/7] Starting Django Backend and Next.js Frontend...
 echo          Starting Django Backend...
 cd /d "%PROJECT_DIR%services\website\backend\v1"
 start "DjangoBackend" cmd /k "%PYTHON_CMD% manage.py runserver 0.0.0.0:8000"
-echo          Started -> Window: DjangoBackend (Port: 8000)
+echo          Started -^> Window: DjangoBackend (Port: 8000)
 timeout /t 3 /nobreak >nul
 
 echo          Starting Next.js Frontend...
 cd /d "%PROJECT_DIR%services\website\frontend\v1"
 start "NextJSFrontend" cmd /k "npm run dev"
-echo          Started -> Window: NextJSFrontend (Port: 3000)
+echo          Started -^> Window: NextJSFrontend (Port: 3000)
 
 echo.
 echo ============================================
