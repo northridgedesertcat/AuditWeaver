@@ -3,19 +3,24 @@ from kafka.errors import KafkaError
 import time
 import random
 import re
+import sys
+import os
 from datetime import datetime, timezone
 from pathlib import Path
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from common.env import KAFKA_BROKERS
 
 print("[DEBUG] 开始初始化 KafkaProducer...")
 
 producer = KafkaProducer(
-    bootstrap_servers='localhost:29092',
+    bootstrap_servers=KAFKA_BROKERS,
     api_version=(2, 8, 0),
     request_timeout_ms=10000,
     retry_backoff_ms=500
 )
 
-print(f"[DEBUG] KafkaProducer 初始化完成，连接到: localhost:29092")
+print(f"[DEBUG] KafkaProducer 初始化完成，连接到: {KAFKA_BROKERS}")
 
 TOPIC = "log.raw"
 

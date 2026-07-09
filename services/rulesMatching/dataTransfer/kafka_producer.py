@@ -3,13 +3,18 @@ from kafka import KafkaProducer
 from kafka.errors import KafkaError, NoBrokersAvailable
 import json
 import logging
+import sys
+import os
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+from common.env import KAFKA_BROKERS
 
 logger = logging.getLogger('kafka_producer')
 
 class KafkaProducerClient:
     """Kafka生产者客户端类，负责将数据发送到Kafka消息队列"""
     
-    def __init__(self, bootstrap_servers='localhost:29092', topic='log.risk'):
+    def __init__(self, bootstrap_servers=KAFKA_BROKERS, topic='log.risk'):
         """初始化Kafka生产者"""
         self.bootstrap_servers = bootstrap_servers
         self.topic = topic

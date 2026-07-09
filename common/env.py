@@ -68,7 +68,8 @@ ES_USER = get_env('ES_USER', 'elastic')
 ES_PASSWORD = get_env('ES_PASSWORD', 'password')
 ES_SCHEME = get_env('ES_SCHEME', 'http')
 
-KAFKA_BROKERS = get_env('KAFKA_BROKERS', 'localhost:29092')
+KAFKA_PORT = get_env_int('KAFKA_PORT', 29092)
+KAFKA_BROKERS = get_env('KAFKA_BROKERS', f'localhost:{KAFKA_PORT}')
 
 DIFY_BASE_URL = get_env('DIFY_BASE_URL', 'http://localhost/v1')
 DIFY_API_KEY = get_env('DIFY_API_KEY', '')
