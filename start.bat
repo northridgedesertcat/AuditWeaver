@@ -10,8 +10,14 @@ echo.
 set "PROJECT_DIR=%~dp0"
 set "PYTHON_CMD=python"
 set "DOCKER_COMPOSE_FILE=%PROJECT_DIR%docker\docker-compose.yml"
-set "ES_PORT=19200"
-set "KAFKA_PORT=29092"
+
+for /f "tokens=1,2 delims==" %%a in ('type "%PROJECT_DIR%.env" ^| findstr /v "^#"') do (
+    if "%%a"=="ES_PORT" set "ES_PORT=%%b"
+    if "%%a"=="KAFKA_PORT" set "KAFKA_PORT=%%b"
+)
+
+if not defined ES_PORT set "ES_PORT=19200"
+if not defined KAFKA_PORT set "KAFKA_PORT=29092"
 
 echo [STEP 1/7] Starting Docker Compose services...
 echo          This may take a few minutes...
