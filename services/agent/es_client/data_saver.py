@@ -6,14 +6,15 @@ from .client import ESClient
 # 添加项目路径
 import sys
 import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 
+from common.env import ES_HOST, ES_PORT
 from config.elastic_mapping_config import build_elastic_document
 
 logger = logging.getLogger('data_saver')
 
 class DataSaver:
-    def __init__(self, es_host: str = 'localhost', es_port: int = 19200, es_index: str = 'log_analysis_reports'):
+    def __init__(self, es_host: str = ES_HOST, es_port: int = ES_PORT, es_index: str = 'log_analysis_reports'):
         self.es_client = ESClient(host=es_host, port=es_port)
         self.es_index = es_index
         self.es_client.index_name = es_index

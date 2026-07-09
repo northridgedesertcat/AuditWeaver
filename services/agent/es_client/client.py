@@ -1,13 +1,18 @@
 # Elasticsearch 客户端模块
 import logging
+import os
+import sys
 from typing import Dict, Any, Optional
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+from common.env import ES_HOST, ES_PORT
 from elasticsearch import Elasticsearch
 from elasticsearch.exceptions import NotFoundError, ConnectionError as ESConnectionError
 
 logger = logging.getLogger('elasticsearch_client')
 
 class ESClient:
-    def __init__(self, host: str = 'localhost', port: int = 19200):
+    def __init__(self, host: str = ES_HOST, port: int = ES_PORT):
         self.host = host
         self.port = port
         self.url = f'http://{host}:{port}'

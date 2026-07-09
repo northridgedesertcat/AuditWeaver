@@ -60,3 +60,4 @@ services/temporaryDatas/*
 
 #test script
 services/test/*
+services/rulesMatching/test/

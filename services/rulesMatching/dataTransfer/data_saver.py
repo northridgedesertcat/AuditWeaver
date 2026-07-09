@@ -4,14 +4,15 @@ import logging
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 from common.time_utils import epoch_millis_now, format_for_filename, format_for_directory
+from common.env import ES_HOST, ES_PORT, KAFKA_BROKERS
 from elasticsearch import Elasticsearch
 from elasticsearch.exceptions import RequestError, ConnectionError
 
 logger = logging.getLogger('data_saver')
 
 class DataSaver:
-    def __init__(self, es_host='localhost', es_port=19200, es_index='matched_logs',
-                 kafka_enabled=True, kafka_brokers='localhost:9092', kafka_topic='log.risk'):
+    def __init__(self, es_host=ES_HOST, es_port=ES_PORT, es_index='matched_logs',
+                 kafka_enabled=True, kafka_brokers=KAFKA_BROKERS, kafka_topic='log.risk'):
         self.es_host = es_host
         self.es_port = es_port
         self.es_index = es_index

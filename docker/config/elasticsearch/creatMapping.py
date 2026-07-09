@@ -10,8 +10,12 @@
 from elasticsearch import Elasticsearch
 from elasticsearch.exceptions import RequestError
 import sys
+import os
 
-def get_es_client(host='localhost', port=19200, user='elastic', password='password'):
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+from common.env import ES_HOST, ES_PORT, ES_USER, ES_PASSWORD
+
+def get_es_client(host=ES_HOST, port=ES_PORT, user=ES_USER, password=ES_PASSWORD):
     """获取 Elasticsearch 客户端"""
     try:
         es = Elasticsearch(
@@ -293,10 +297,10 @@ def main():
     
     import argparse
     parser = argparse.ArgumentParser(description='创建 Elasticsearch 索引 Mapping')
-    parser.add_argument('--host', default='localhost', help='Elasticsearch 主机')
-    parser.add_argument('--port', type=int, default=19200, help='Elasticsearch 端口')
-    parser.add_argument('--user', default='elastic', help='Elasticsearch 用户名')
-    parser.add_argument('--password', default='password', help='Elasticsearch 密码')
+    parser.add_argument('--host', default=ES_HOST, help='Elasticsearch 主机')
+    parser.add_argument('--port', type=int, default=ES_PORT, help='Elasticsearch 端口')
+    parser.add_argument('--user', default=ES_USER, help='Elasticsearch 用户名')
+    parser.add_argument('--password', default=ES_PASSWORD, help='Elasticsearch 密码')
     parser.add_argument('--force', action='store_true', help='强制重新创建索引')
     args = parser.parse_args()
     
