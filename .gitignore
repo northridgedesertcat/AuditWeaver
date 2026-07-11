@@ -35,12 +35,12 @@ ENV/
 *.swp
 *.swo
 
-# Model files
-*.pkl
-*.joblib
+# # Model files
+# *.pkl
+# *.joblib
 
 # Data files (large datasets)
-*.csv
+# *.csv
 *.arff
 *.zip
 *.tar.gz
@@ -48,3 +48,16 @@ ENV/
 # OS
 .DS_Store
 Thumbs.db
+
+# Environment variables
+.env
+
+#datas
+isolationForest/datas/nginx/*
+document/
+services/rulesMatching/temporaryDatas/*
+services/temporaryDatas/*
+
+#test script
+services/test/*
+services/rulesMatching/test/
