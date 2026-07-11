@@ -32,10 +32,10 @@ LogSentinel is an AI-powered log analysis system designed for distributed cluste
 ## 🏗 Architecture
 
 current architecture:
-![Architecture](docs\images\current.png "Architecture")
+![Architecture](docs/images/current.png "Architecture")
 
 version 1.0.0 architecture:
-![Architecture](docs\images\version.png "Architecture")
+![Architecture](docs/images/version.png "Architecture")
 
 
 
@@ -45,7 +45,7 @@ version 1.0.0 architecture:
 | :------------ | :------------ |
 | Backend       | Django        |
 | Frontend      | Next.js       |
-| AI            | Dify          |
+| AI            | Dify / Ollama |
 | Queue         | Kafka         |
 | Search        | Elasticsearch |
 | Visualization | Kibana        |
@@ -72,25 +72,33 @@ logsentinel/
 
 ## 🚀 Quick Start
 
-### 1. Clone the repository
+### 1.server dependencies
+before you start, please ensure that you have the following dependencies installed:
+- Python 3.11+
+- Docker
+- ollama
+- dify platform
+
+
+### 2. Clone the repository
 
 ```bash
 git clone https://github.com/yourname/project.git
 cd logsentinel
 ```
 
-### 2. Install dependencies
+### 3. Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. config dify platform
+### 4. config dify platform
 add workflow file into dify platform
-resources\dify\logs analysis.yml
+resources/dify/logs analysis.yml
 
 
-### 4. Create environment variables
+### 5. Create environment variables
 
 ```bash
 cp .env.example .env
@@ -99,7 +107,7 @@ cp .env.example .env
 Edit the `.env` file.
 
 
-### 5. Start services
+### 6. Start services
 
 windows users:
 
@@ -141,20 +149,9 @@ Dashboard
 
 Analysis Report
 
-![Report](docs/images/report.png "Report")
+![Report](docs/images/report1.png "Report")
+![Report](docs/images/report2.png "Report")
 
-***
-
-## 📊 Roadmap
-
-- Basic log collection
-- Rule matching
-- AI log analysis
-- Docker deployment
-- RAG enhancement
-- Multi-agent collaboration
-- Real-time monitoring
-- Kubernetes deployment
 
 ***
 
