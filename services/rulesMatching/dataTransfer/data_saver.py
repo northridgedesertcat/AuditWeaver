@@ -2,7 +2,9 @@ import os
 import json
 import logging
 import sys
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent.parent))
 from common.time_utils import epoch_millis_now, format_for_filename, format_for_directory
 from common.env import ES_HOST, ES_PORT, KAFKA_BROKERS
 from elasticsearch import Elasticsearch
@@ -152,7 +154,7 @@ class DataSaver:
         try:
             date_str, hour_str = format_for_directory()
             log_dir = os.path.join(
-                'd:\\tools\\ProgrammeTools\\python\\正规项目\\LogSentinel\\services\\rulesMatching\\temporaryDatas\\unmatchDatas',
+                str(Path(__file__).resolve().parent.parent / 'temporaryDatas' / 'unmatchDatas'),
                 date_str,
                 hour_str
             )

@@ -1,3 +1,6 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+## v0.1.0 (2026-07-12)
+- Initial release.
+- rename the project to AuditWeaver
+- fixed some absolute path issues

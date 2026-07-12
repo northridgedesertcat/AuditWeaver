@@ -1,4 +1,4 @@
-# LogSentinel
+# AuditWeaver
 
 > 一个基于 AI 和 Dify 的日志分析平台。
 
@@ -12,7 +12,7 @@
 
 ## 📖 概述
 
-LogSentinel 是一个基于 AI 的日志分析系统，专为分布式集群环境设计。它从多个服务器收集日志数据，并通过规则匹配、异常检测和大型语言模型（LLM）分析智能处理日志。该系统能够识别潜在的安全风险、攻击活动、攻击过程和攻击意图，帮助安全分析师快速定位安全事件。通过自动化日志分析和安全监控，LogSentinel 提高了安全运营效率，增强了分布式系统的整体防护能力。
+AuditWeaver 是一个基于 AI 的日志分析系统，专为分布式集群环境设计。它从多个服务器收集日志数据，并通过规则匹配、异常检测和大型语言模型（LLM）分析智能处理日志。该系统能够识别潜在的安全风险、攻击活动、攻击过程和攻击意图，帮助安全分析师快速定位安全事件。通过自动化日志分析和安全监控，AuditWeaver 提高了安全运营效率，增强了分布式系统的整体防护能力。
 
 ***
 
@@ -52,7 +52,7 @@ LogSentinel 是一个基于 AI 的日志分析系统，专为分布式集群环�
 ## 📂 项目结构
 
 ```text
-logsentinel/
+AuditWeaver/
 ├── common/     # 公共代码和资源
 ├── docker/     # Docker 配置
 ├── resources/  # 依赖资源
@@ -80,7 +80,7 @@ logsentinel/
 
 ```bash
 git clone https://github.com/yourname/project.git
-cd logsentinel
+cd AuditWeaver
 ```
 
 ### 3. 安装依赖

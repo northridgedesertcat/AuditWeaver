@@ -3,7 +3,7 @@ setlocal enabledelayedexpansion
 chcp 65001 >nul
 echo.
 echo ============================================
-echo    LogSentinel - One-click Startup
+echo    AuditWeaver - One-click Startup
 echo ============================================
 echo.
 

@@ -2,7 +2,7 @@
 chcp 65001 >nul
 echo.
 echo ============================================
-echo    LogSentinel - Stop All Services
+echo    AuditWeaver - Stop All Services
 echo ============================================
 echo.
 
