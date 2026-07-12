@@ -40,7 +40,7 @@ LOG_CONFIG = {
     'level': LOG_LEVEL,
     'format': '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     'date_format': '%Y-%m-%d %H:%M:%S',
-    'file_path': 'd:\\tools\\ProgrammeTools\\python\\正规项目\\LogSentinel\\services\\rulesMatching\\rules_matching.log',
+    'file_path': str(Path(__file__).resolve().parent / 'rules_matching.log'),
     'max_file_size': 10 * 1024 * 1024,
     'backup_count': 5
 }
@@ -48,7 +48,7 @@ LOG_CONFIG = {
 PROCESSING_CONFIG = {
     'batch_size': 100,
     'max_concurrent_requests': 10,
-    'normal_log_dir': 'd:\\tools\\ProgrammeTools\\python\\正规项目\\LogSentinel\\services\\rulesMatching\\temporaryDatas\\unmatchDatas',
+    'normal_log_dir': str(Path(__file__).resolve().parent / 'temporaryDatas' / 'unmatchDatas'),
     'save_normal_logs': True
 }
 

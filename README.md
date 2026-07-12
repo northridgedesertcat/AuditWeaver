@@ -1,4 +1,4 @@
-# Logsentinel
+# AuditWeaver
 
 > A log analysis platform based on AI and Dify.
 
@@ -12,7 +12,7 @@ English | [简体中文](README.zh-CN.md)
 
 ## 📖 Overview
 
-LogSentinel is an AI-powered log analysis system designed for distributed cluster environments. It collects log data from multiple servers and processes the logs intelligently through rule matching, anomaly detection, and large language model (LLM) analysis. The system identifies potential security risks, attack activities, attack processes, and attack intent, helping security analysts quickly locate security incidents. By automating log analysis and security monitoring, LogSentinel improves the efficiency of security operations and enhances the overall protection of distributed systems.
+AuditWeaver is an AI-powered log analysis system designed for distributed cluster environments. It collects log data from multiple servers and processes the logs intelligently through rule matching, anomaly detection, and large language model (LLM) analysis. The system identifies potential security risks, attack activities, attack processes, and attack intent, helping security analysts quickly locate security incidents. By automating log analysis and security monitoring, AuditWeaver improves the efficiency of security operations and enhances the overall protection of distributed systems.
 
 ***
 
@@ -56,7 +56,7 @@ version 1.0.0 architecture:
 ## 📂 Project Structure
 
 ```text
-logsentinel/
+AuditWeaver/
 ├── common/     # Common code and resources
 ├── docker/     # Docker configuration 
 ├── resources/  # dependent resources
@@ -84,7 +84,7 @@ before you start, please ensure that you have the following dependencies install
 
 ```bash
 git clone https://github.com/yourname/project.git
-cd logsentinel
+cd AuditWeaver
 ```
 
 ### 3. Install dependencies

@@ -47,7 +47,7 @@ const initialMessages: Message[] = [
   {
     id: "1",
     role: "assistant",
-    content: "你好！我是 LogSentinel AI 安全助手。我可以帮助你分析日志、检测威胁、调查安全事件，或回答任何与安全运营相关的问题。你想了解什么？",
+    content: "你好！我是 AuditWeaver AI 安全助手。我可以帮助你分析日志、检测威胁、调查安全事件，或回答任何与安全运营相关的问题。你想了解什么？",
     timestamp: Date.now() - 60000,
     actions: [
       { label: "分析最近的威胁", action: "analyze_threats" },
@@ -328,7 +328,7 @@ export default function AgentPage() {
                   <Brain className="h-5 w-5 text-primary" />
                 </div>
                 <div>
-                  <CardTitle className="text-base font-medium">LogSentinel AI</CardTitle>
+                  <CardTitle className="text-base font-medium">AuditWeaver AI</CardTitle>
                   <p className="text-xs text-muted-foreground flex items-center gap-1">
                     <span className="h-2 w-2 rounded-full bg-success" />
                     在线 | 模型版本 v3.2

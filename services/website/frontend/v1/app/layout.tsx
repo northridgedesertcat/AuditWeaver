@@ -14,7 +14,7 @@ const jetbrainsMono = JetBrains_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'LogSentinel AI - 智能安全运营平台',
+  title: 'AuditWeaver AI - 智能安全运营平台',
   description: '企业级 AI 驱动的日志分析与安全运营平台',
   generator: 'v0.app',
   icons: {

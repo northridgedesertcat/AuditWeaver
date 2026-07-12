@@ -1,4 +1,5 @@
 # 规则匹配配置文件 - 检测规则相关配置
+from pathlib import Path
 
 # 导入外部关键词文件
 from keywords.sql_injection import SQL_INJECTION_KEYWORDS, SQL_INJECTION_PATTERNS
@@ -94,5 +95,5 @@ LOG_FIELDS = {
 DETECTION_CONFIG = {
     'max_matches': 5,  # 每个日志最多检测出的攻击类型数
     'min_confidence': 0.1,  # 最小置信度
-    'log_file': 'd:\\tools\\ProgrammeTools\\python\\正规项目\\LogSentinel\\services\\rulesMatching\\detections.log'  # 检测结果日志文件
+    'log_file': str(Path(__file__).resolve().parent / 'detections.log')  # 检测结果日志文件
 }
