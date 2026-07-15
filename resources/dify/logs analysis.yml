@@ -10,7 +10,7 @@ dependencies:
 - current_identifier: null
   type: marketplace
   value:
-    marketplace_plugin_unique_identifier: langgenius/ollama:0.1.3@66e156c4f612964c131c49168882e78c2cdfe366879506b97ad855b23c5d6d98
+    marketplace_plugin_unique_identifier: langgenius/ollama:1.0.0@ae50a2db261bffa7289677f2b0a60e60762ceb187b602113b72425ccbe772dc3
     version: null
 kind: app
 version: 0.6.0
@@ -68,23 +68,34 @@ workflow:
     edges:
     - data:
         isInLoop: false
-        sourceType: start
-        targetType: llm
-      id: 1780588558254-source-1780588640326-target
-      source: '1780588558254'
-      sourceHandle: source
-      target: '1780588640326'
-      targetHandle: target
-      type: custom
-      zIndex: 0
-    - data:
-        isInLoop: false
         sourceType: llm
         targetType: end
       id: 1780588640326-source-1780588677082-target
       source: '1780588640326'
       sourceHandle: source
       target: '1780588677082'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: start
+        targetType: knowledge-retrieval
+      id: 1780588558254-source-1784028498564-target
+      source: '1780588558254'
+      sourceHandle: source
+      target: '1784028498564'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: knowledge-retrieval
+        targetType: llm
+      id: 1784028498564-source-1780588640326-target
+      source: '1784028498564'
+      sourceHandle: source
+      target: '1780588640326'
       targetHandle: target
       type: custom
       zIndex: 0
@@ -106,10 +117,10 @@ workflow:
       height: 108
       id: '1780588558254'
       position:
-        x: 64
+        x: -365.96349107500066
         y: 273
       positionAbsolute:
-        x: 64
+        x: -365.96349107500066
         y: 273
       selected: false
       sourcePosition: right
@@ -118,8 +129,10 @@ workflow:
       width: 242
     - data:
         context:
-          enabled: false
-          variable_selector: []
+          enabled: true
+          variable_selector:
+          - '1784028498564'
+          - result
         model:
           completion_params:
             temperature: 0.6
@@ -129,130 +142,19 @@ workflow:
         prompt_template:
         - id: b11ac6a3-6382-4937-8c1a-66a6c32f3c4e
           role: system
-          text: '这里有一份安全事件数据：
-
-            {{#1780588558254.logDatas#}}
-
-            你是一名网络安全风险分析助手，请根据输入的单条安全事件进行分析。
-
-
-            分析原则
-
-            只能依据输入数据分析，不允许编造不存在的信息。
-
-            即使攻击成功无法确认，只要事件存在明显攻击特征，也可以评定为 High。
-
-            matched_type、confidence、severity 是仅仅是一套准确度较低的系统匹配到的内容，暂时不用做推理参考。
-
-            仅仅是规则匹配到某些关键词或者误报，请合理的根据整体进行判断。
-
-            另外返回的内容统一用中文，不要用其他语言。
-
-
-            风险等级判定
-
-            Critical
-
-            仅当输入数据明确证明攻击已经成功时使用，例如：
-
-            WebShell 上传成功
-
-            远程命令执行成功
-
-            获得管理员权限
-
-            敏感数据泄露
-
-            数据库导出成功
-
-            服务遭到破坏
-
-            评分范围：90~100
-
-
-            High
-
-            满足以下任意条件即可：
-
-            请求包含明显攻击载荷
-
-            请求访问敏感资源（/.env、/etc/passwd、后台管理接口、上传接口、数据库备份等）
-
-            User-Agent 为 sqlmap、nikto、masscan 等自动化攻击工具
-
-            confidence ≥ 0.9 且 severity 为 High
-
-            High 不要求攻击成功。
-
-            如果判定为 High，必须说明：
-
-            "攻击成功无法从现有数据确认。"
-
-            评分范围：70~89
-
-
-            Medium
-
-            攻击特征明确，但危害相对有限，例如：
-
-            XSS
-
-            登录爆破
-
-            目录扫描
-
-            路径扫描
-
-            敏感路径探测
-
-            可疑 User-Agent
-
-            HTTP 状态异常
-
-            评分范围：40~69
-
-
-            Low
-
-            仅存在轻微异常，例如：
-
-            robots.txt
-
-            favicon.ico
-
-            单次404
-
-            普通目录探测
-
-            普通异常参数
-
-            评分范围：10~39
-
-            Informational
-
-            正常业务访问，无明显攻击特征。
-
-            评分范围：0~9
-
-            特殊规则（优先执行）
-
-
-
-            分析时重点参考以下字段
-
-            path
-
-            method
-
-            status
-
-            user_agent
-
-            请综合所有字段进行判断，不要仅依据某一个字段得出结论。
-
-            matched_type与confidence与severity暂时不作为评测因素。如果path没有明显的攻击痕迹可以给定low
-
-            '
+          text: "这里有一份安全事件数据：\n{{#1780588558254.logDatas#}}\n你是一名网络安全风险分析助手，请根据输入的单条安全事件进行分析。\n\
+            \n以下是从网络安全知识库中检索得到的参考资料： \n{{#context#}}\n参考资料仅用于查阅参考，能当作分析内容分析。\n\n分析原则\n\
+            只能依据输入数据分析，不允许编造不存在的信息。\n即使攻击成功无法确认，只要事件存在明显攻击特征，也可以评定为 High。\nmatched_type、confidence、severity\
+            \ 是仅仅是一套准确度较低的系统匹配到的内容，暂时不用做推理参考。\n仅仅是规则匹配到某些关键词或者误报，请合理的根据整体进行判断。\n另外返回的内容统一用中文，不要用其他语言。\n\
+            \n风险等级判定\nCritical\n仅当输入数据明确证明攻击已经成功时使用，例如：\nWebShell 上传成功\n远程命令执行成功\n\
+            获得管理员权限\n敏感数据泄露\n数据库导出成功\n服务遭到破坏\n评分范围：90~100\n\nHigh\n满足以下任意条件即可：\n请求包含明显攻击载荷\n\
+            请求访问敏感资源（/.env、/etc/passwd、后台管理接口、上传接口、数据库备份等）\nUser-Agent 为 sqlmap、nikto、masscan\
+            \ 等自动化攻击工具\nconfidence ≥ 0.9 且 severity 为 High\nHigh 不要求攻击成功。\n如果判定为 High，必须说明：\n\
+            \"攻击成功无法从现有数据确认。\"\n评分范围：70~89\n\nMedium\n攻击特征明确，但危害相对有限，例如：\nXSS\n登录爆破\n\
+            目录扫描\n路径扫描\n敏感路径探测\n可疑 User-Agent\nHTTP 状态异常\n评分范围：40~69\n\nLow\n仅存在轻微异常，例如：\n\
+            robots.txt\nfavicon.ico\n单次404\n普通目录探测\n普通异常参数\n评分范围：10~39\nInformational\n\
+            正常业务访问，无明显攻击特征。\n评分范围：0~9\n特殊规则（优先执行）\n\n\n分析时重点参考以下字段\npath\nmethod\n\
+            status\nuser_agent\n请综合所有字段进行判断，不要仅依据某一个字段得出结论。\nmatched_type与confidence与severity暂时不作为评测因素。如果path没有明显的攻击痕迹可以给定low\n"
         selected: true
         structured_output:
           schema:
@@ -289,10 +191,10 @@ workflow:
       height: 87
       id: '1780588640326'
       position:
-        x: 470
+        x: 468.809143150635
         y: 294
       positionAbsolute:
-        x: 470
+        x: 468.809143150635
         y: 294
       selected: true
       sourcePosition: right
@@ -322,8 +224,44 @@ workflow:
       targetPosition: left
       type: custom
       width: 241
+    - data:
+        dataset_ids:
+        - aLU7uLzPZVFOJ7sxFoSfPnKAO14mKwRrfNz2RJvE6OVhKT5Seor6ps3h+O2dRbTi
+        multiple_retrieval_config:
+          reranking_enable: false
+          reranking_mode: weighted_score
+          top_k: 4
+          weights:
+            keyword_setting:
+              keyword_weight: 0
+            vector_setting:
+              embedding_model_name: qwen3-embedding:0.6b
+              embedding_provider_name: langgenius/ollama/ollama
+              vector_weight: 1
+            weight_type: customized
+        query_attachment_selector: []
+        query_variable_selector:
+        - '1780588558254'
+        - logDatas
+        retrieval_mode: multiple
+        selected: false
+        title: Knowledge Retrieval
+        type: knowledge-retrieval
+      height: 89
+      id: '1784028498564'
+      position:
+        x: 21.821595921497362
+        y: 294
+      positionAbsolute:
+        x: 21.821595921497362
+        y: 294
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
     viewport:
-      x: 186.96469240837956
-      y: 255.27043038757398
-      zoom: 0.497235084336607
+      x: 268.70110198246346
+      y: 94.95528195067777
+      zoom: 0.7051489802421945
   rag_pipeline_variables: []
