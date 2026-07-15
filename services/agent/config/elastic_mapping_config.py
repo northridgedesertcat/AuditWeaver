@@ -163,8 +163,8 @@ def build_elastic_document(log_data: Dict[str, Any], dify_response: Dict[str, An
     # 提取 Dify 结构化字段
     dify_fields = extract_dify_fields(dify_response)
     
-    # 获取规则匹配信息
-    rule_match = actual_log.get('rule_match', {})
+    # 获取规则匹配信息（兼容新的合并结构）
+    rule_match = actual_log.get('detection_result', actual_log.get('rule_match', {}))
     
     # 优先从 @timestamp 获取，其次是 timestamp
     log_ts = actual_log.get('@timestamp') or actual_log.get('timestamp')
@@ -178,7 +178,7 @@ def build_elastic_document(log_data: Dict[str, Any], dify_response: Dict[str, An
         'method': actual_log.get('method', ''),
         'status': actual_log.get('status', 0),
         'user_agent': actual_log.get('user_agent', ''),
-        'attack_type': rule_match.get('matched_type', ''),
+        'attack_type': rule_match.get('attack_type', rule_match.get('matched_type', '')),
         'confidence': rule_match.get('confidence', 0.0),
         'severity': rule_match.get('severity', ''),
         

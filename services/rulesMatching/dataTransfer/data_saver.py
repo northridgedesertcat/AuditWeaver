@@ -114,13 +114,21 @@ class DataSaver:
             logger.error(f"验证Elasticsearch写入失败: {str(e)}")
             return False
 
-    def save_attack_log(self, log_entry, detection_result):
+    def save_attack_log(self, log_entry, detections):
+        if not isinstance(detections, list):
+            detections = [detections]
+        
+        if not detections:
+            return {'attack_logs': {'saved_es': 0, 'failed_es': 0}, 'kafka': {'sent': 0, 'failed': 0}}
+        
+        merged_detection = self._merge_detections(detections)
+        
         result = {
             'attack_logs': {'saved_es': 0, 'failed_es': 0},
             'kafka': {'sent': 0, 'failed': 0}
         }
         
-        doc_id = self.save_attack_log_to_elasticsearch(log_entry, detection_result)
+        doc_id = self.save_attack_log_to_elasticsearch(log_entry, merged_detection)
         if doc_id:
             result['attack_logs']['saved_es'] += 1
         else:
@@ -134,10 +142,10 @@ class DataSaver:
                     'path': log_entry.get('path'),
                     'method': log_entry.get('method'),
                     'status': log_entry.get('status'),
-                    'risk_level': detection_result.get('severity', 'medium'),
-                    'confidence': detection_result.get('confidence', 0),
+                    'risk_level': merged_detection.get('severity', 'medium'),
+                    'confidence': merged_detection.get('confidence', 0),
                     'detection_time': epoch_millis_now(),
-                    'detection_result': detection_result
+                    'detection_result': merged_detection
                 }
                 
                 future = self.kafka_producer.send(self.kafka_topic, message)
@@ -149,6 +157,43 @@ class DataSaver:
                 result['kafka']['failed'] += 1
         
         return result
+
+    def _merge_detections(self, detections):
+        if not detections:
+            return {}
+        
+        severity_order = {'high': 3, 'medium': 2, 'low': 1}
+        
+        merged = {
+            'attack_type': [],
+            'severity': 'low',
+            'confidence': 0,
+            'matched_rules': {'keywords': [], 'patterns': []},
+            'detection_time': epoch_millis_now(),
+            'is_attack': True
+        }
+        
+        for det in detections:
+            if det.get('attack_type') and det['attack_type'] not in merged['attack_type']:
+                merged['attack_type'].append(det['attack_type'])
+            
+            det_severity = det.get('severity', 'low')
+            if severity_order.get(det_severity, 0) > severity_order.get(merged['severity'], 0):
+                merged['severity'] = det_severity
+            
+            merged['confidence'] = max(merged['confidence'], det.get('confidence', 0))
+            
+            det_rules = det.get('matched_rules', {})
+            for keyword in det_rules.get('keywords', []):
+                if keyword not in merged['matched_rules']['keywords']:
+                    merged['matched_rules']['keywords'].append(keyword)
+            for pattern in det_rules.get('patterns', []):
+                if pattern not in merged['matched_rules']['patterns']:
+                    merged['matched_rules']['patterns'].append(pattern)
+        
+        merged['attack_type'] = ','.join(merged['attack_type'])
+        
+        return merged
 
     def save_normal_log(self, log_entry):
         try:
