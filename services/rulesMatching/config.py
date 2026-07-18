@@ -12,7 +12,7 @@ from common.env import (
 
 KAFKA_CONFIG = {
     'brokers': KAFKA_BROKERS,
-    'input_topic': 'log.audit',
+    'input_topic': 'log.structured',
     'output_topic': 'log.analysis',
     'group_id': 'rules_matching_group_test_v0002',
     'auto_offset_reset': 'earliest',
