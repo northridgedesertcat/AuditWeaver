@@ -36,7 +36,7 @@ interface OriginalRiskData {
 interface ReportDetail {
   id: string
   title: string
-  riskLevel: "critical" | "high" | "medium" | "low"
+  riskLevel: "critical" | "high" | "medium" | "low" | "normal"
   attackType: string
   confidence: number
   riskScore: number
@@ -81,6 +81,13 @@ const riskConfig = {
     badge: "bg-success/20 text-success border-success/30",
     label: "低危",
     icon: CheckCircle,
+  },
+  normal: {
+    color: "text-gray-500",
+    bg: "bg-gray-50",
+    badge: "bg-gray-100 text-gray-600 border-gray-200",
+    label: "正常",
+    icon: Shield,
   },
 }
 

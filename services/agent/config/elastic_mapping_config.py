@@ -23,8 +23,6 @@ ELASTICSEARCH_MAPPING = {
             
             # 规则匹配结果
             'attack_type': {'type': 'keyword'},        # 攻击类型
-            'confidence': {'type': 'float'},           # 置信度
-            'severity': {'type': 'keyword'},           # 严重程度
             
             # ========== Dify 结构化分析结果 ==========
             'risk_level': {'type': 'keyword'},         # 风险等级: high/medium/low/unknown
@@ -179,8 +177,6 @@ def build_elastic_document(log_data: Dict[str, Any], dify_response: Dict[str, An
         'status': actual_log.get('status', 0),
         'user_agent': actual_log.get('user_agent', ''),
         'attack_type': rule_match.get('attack_type', rule_match.get('matched_type', '')),
-        'confidence': rule_match.get('confidence', 0.0),
-        'severity': rule_match.get('severity', ''),
         
         # Dify 分析结果（扁平结构）
         'risk_level': dify_fields.get('risk_level', 'unknown'),

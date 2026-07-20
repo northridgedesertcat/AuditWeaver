@@ -71,8 +71,8 @@ class AgentMain:
 
         event_id = actual_log.get('event_id', 'unknown')
         ip = actual_log.get('ip', 'unknown')
-        detection_result = actual_log.get('detection_result', actual_log.get('rule_match', {}))
-        attack_type = detection_result.get('attack_type', detection_result.get('matched_type', 'unknown'))
+        detection_result = actual_log.get('detection_result', {})
+        attack_type = detection_result.get('attack_type', 'unknown')
 
         logger.info(f'Processing log: event_id={event_id}, ip={ip}, attack_type={attack_type}')
 

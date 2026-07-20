@@ -1,6 +1,5 @@
-# 规则引擎核心文件
 from .attack_detectors import AttackDetectors
-from utils import validate_log_entry, aggregate_results, filter_results, log_detection, generate_alert_message
+from utils import validate_log_entry, aggregate_results, log_detection, generate_alert_message
 from match_config import DETECTION_CONFIG
 
 class RuleEngine:
@@ -9,7 +8,6 @@ class RuleEngine:
     def __init__(self):
         """初始化规则引擎"""
         self.detectors = AttackDetectors()
-        self.min_confidence = DETECTION_CONFIG['min_confidence']
         self.max_matches = DETECTION_CONFIG['max_matches']
     
     def detect(self, log_entry):
@@ -21,11 +19,9 @@ class RuleEngine:
             }
         
         results = self.detectors.detect_all(log_entry)
-        filtered_results = filter_results(results, self.min_confidence)
-        aggregated_results = aggregate_results(filtered_results)
+        aggregated_results = aggregate_results(results)
         
         if len(aggregated_results) > self.max_matches:
-            aggregated_results.sort(key=lambda x: x['confidence'], reverse=True)
             aggregated_results = aggregated_results[:self.max_matches]
         
         for result in aggregated_results:
@@ -68,7 +64,7 @@ class RuleEngine:
             if 'detections' in result:
                 summary['total_detections'] += len(result['detections'])
                 for detection in result['detections']:
-                    matched_type = detection['matched_type']
+                    matched_type = detection.get('attack_type', 'unknown')
                     if matched_type not in summary['matched_types']:
                         summary['matched_types'][matched_type] = 0
                     summary['matched_types'][matched_type] += 1
@@ -97,8 +93,6 @@ class RuleEngine:
     
     def update_config(self, config):
         """更新配置"""
-        if 'min_confidence' in config:
-            self.min_confidence = config['min_confidence']
         if 'max_matches' in config:
             self.max_matches = config['max_matches']
         return True

@@ -54,24 +54,24 @@ class ThreatDistributionView(APIView):
     数据来源: dify_response.data.outputs.structured_output.risk_level
     在 agent 写入时已通过 extract_dify_fields 扁平化到顶级 risk_level 字段。
 
-    支持五种风险等级: Critical / High / Medium / Low / Informational
+    支持五种风险等级: Critical / High / Medium / Low / Normal
     """
     def get(self, request):
-        # 全部五种风险等级（包含 Informational）
-        all_levels = ['Critical', 'High', 'Medium', 'Low', 'Informational']
+        # 全部五种风险等级（包含 Normal）
+        all_levels = ['Critical', 'High', 'Medium', 'Low', 'Normal']
         level_color_map = {
             'Critical': 'oklch(0.5 0.25 25)',      # 严重 - 红色
             'High': 'oklch(0.65 0.2 60)',           # 高危 - 橙色
             'Medium': 'oklch(0.75 0.15 95)',        # 中危 - 黄色
             'Low': 'oklch(0.75 0.12 145)',          # 低危 - 绿色
-            'Informational': 'oklch(0.7 0.15 230)'  # 信息 - 蓝色
+            'Normal': 'oklch(0.7 0.05 260)'         # 正常 - 灰色
         }
         level_label_map = {
             'Critical': '严重',
             'High': '高危',
             'Medium': '中危',
             'Low': '低危',
-            'Informational': '信息'
+            'Normal': '正常'
         }
 
         # 默认全 0 的返回结构
@@ -140,13 +140,13 @@ class ThreatDistributionView(APIView):
                         if level:
                             level_lower = level.lower()
                             level_mapping = {
-                                'critical': 'Critical',
-                                'high': 'High',
-                                'medium': 'Medium',
-                                'low': 'Low',
-                                'informational': 'Informational',
-                                'unknown': 'Low'
-                            }
+                            'critical': 'Critical',
+                            'high': 'High',
+                            'medium': 'Medium',
+                            'low': 'Low',
+                            'normal': 'Normal',
+                            'unknown': 'Low'
+                        }
                             level_key = level_mapping.get(level_lower, level.capitalize())
                             if level_key in distribution:
                                 distribution[level_key]['value'] = count
@@ -739,7 +739,6 @@ class ReportDetailView(APIView):
                     # 获取字段值
                     attack_type_ai = source.get('attack_type_ai', source.get('attack_type', '未知攻击'))
                     risk_level_raw = source.get('risk_level', 'Low')
-                    confidence = source.get('confidence', 0)
                     risk_score = source.get('risk_score', 0)
                     analysis_timestamp = source.get('analysis_timestamp', '')
                     summary = source.get('summary', '')
@@ -789,8 +788,8 @@ class ReportDetailView(APIView):
                     # 格式化时间
                     formatted_time = self.format_timestamp(analysis_timestamp)
                     
-                    # 转换置信度为百分比
-                    confidence_percent = int(confidence * 100) if isinstance(confidence, (int, float)) else int(confidence)
+                    # 使用 Dify 返回的 risk_score 作为置信度
+                    confidence_percent = risk_score if isinstance(risk_score, int) else 0
                     
                     report = {
                         "id": report_id,
@@ -932,7 +931,7 @@ class ReportListView(APIView):
                         ip = original_log.get('ip', source.get('ip', '未知IP'))
                         path = original_log.get('path', source.get('path', '未知路径'))
                         analysis_timestamp = source.get('analysis_timestamp', '')
-                        confidence = source.get('confidence', 0)
+                        risk_score = source.get('risk_score', 0)
                         
                         # 转换风险等级为小写
                         risk_level_lower = risk_level_raw.lower() if risk_level_raw else 'low'
@@ -943,8 +942,8 @@ class ReportListView(APIView):
                         # 格式化时间
                         formatted_time = self.format_timestamp(analysis_timestamp)
                         
-                        # 转换置信度为百分比
-                        confidence_percent = int(confidence * 100) if isinstance(confidence, (int, float)) else int(confidence)
+                        # 使用 Dify 返回的 risk_score 作为置信度
+                        confidence_percent = risk_score if isinstance(risk_score, int) else 0
                         
                         report = {
                             "id": hit.get('_id', ''),

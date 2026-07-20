@@ -24,7 +24,7 @@ const FALLBACK_DATA: ThreatLevelData[] = [
   { name: "高危", value: 0, color: "oklch(0.65 0.2 60)" },     // High - 橙色
   { name: "中危", value: 0, color: "oklch(0.75 0.15 95)" },    // Medium - 黄色
   { name: "低危", value: 0, color: "oklch(0.75 0.12 145)" },   // Low - 绿色
-  { name: "信息", value: 0, color: "oklch(0.7 0.15 230)" },    // Informational - 蓝色
+  { name: "正常", value: 0, color: "oklch(0.7 0.05 260)" },     // Normal - 灰色
 ]
 
 export function ThreatDistributionChart() {
@@ -42,7 +42,7 @@ export function ThreatDistributionChart() {
 
         // 后端返回结构: { data: { Critical: {name, value, color}, ... }, total }
         // 转换为 recharts 需要的数组格式
-        const order = ["Critical", "High", "Medium", "Low", "Informational"]
+        const order = ["Critical", "High", "Medium", "Low", "Normal"]
         const chartData: ThreatLevelData[] = order
           .map((key) => result.data?.[key])
           .filter(Boolean)

@@ -79,9 +79,7 @@ class DataSaver:
             'log_timestamp': log_entry.get('log_timestamp', epoch_millis_now()),
             'ingestion_time': epoch_millis_now(),
             'detection_result': detection_result,
-            'matched_rules': detection_result.get('matched_rules', []),
-            'severity': detection_result.get('severity', 'medium'),
-            'confidence': detection_result.get('confidence', 0)
+            'matched_rules': detection_result.get('matched_rules', {})
         }
         
         try:
@@ -142,8 +140,7 @@ class DataSaver:
                     'path': log_entry.get('path'),
                     'method': log_entry.get('method'),
                     'status': log_entry.get('status'),
-                    'risk_level': merged_detection.get('severity', 'medium'),
-                    'confidence': merged_detection.get('confidence', 0),
+                    'user_agent': log_entry.get('user_agent'),
                     'detection_time': epoch_millis_now(),
                     'detection_result': merged_detection
                 }
@@ -162,12 +159,8 @@ class DataSaver:
         if not detections:
             return {}
         
-        severity_order = {'high': 3, 'medium': 2, 'low': 1}
-        
         merged = {
             'attack_type': [],
-            'severity': 'low',
-            'confidence': 0,
             'matched_rules': {'keywords': [], 'patterns': []},
             'detection_time': epoch_millis_now(),
             'is_attack': True
@@ -176,12 +169,6 @@ class DataSaver:
         for det in detections:
             if det.get('attack_type') and det['attack_type'] not in merged['attack_type']:
                 merged['attack_type'].append(det['attack_type'])
-            
-            det_severity = det.get('severity', 'low')
-            if severity_order.get(det_severity, 0) > severity_order.get(merged['severity'], 0):
-                merged['severity'] = det_severity
-            
-            merged['confidence'] = max(merged['confidence'], det.get('confidence', 0))
             
             det_rules = det.get('matched_rules', {})
             for keyword in det_rules.get('keywords', []):

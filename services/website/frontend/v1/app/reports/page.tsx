@@ -38,7 +38,7 @@ import { formatRelative } from "@/lib/time"
 interface Report {
   id: string
   title: string
-  riskLevel: "critical" | "high" | "medium" | "low"
+  riskLevel: "critical" | "high" | "medium" | "low" | "normal"
   attackType: string
   sourceIp: string
   targetPath: string
@@ -78,6 +78,12 @@ const riskConfig = {
     bg: "bg-success/10",
     badge: "bg-success/20 text-success border-success/30",
     label: "低危",
+  },
+  normal: {
+    color: "text-gray-500",
+    bg: "bg-gray-50",
+    badge: "bg-gray-100 text-gray-600 border-gray-200",
+    label: "正常",
   },
 }
 
@@ -123,6 +129,7 @@ const riskLevels = [
   { value: "high", label: "高危" },
   { value: "medium", label: "中危" },
   { value: "low", label: "低危" },
+  { value: "normal", label: "正常" },
 ]
 
 const timeRanges = [

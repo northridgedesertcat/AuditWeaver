@@ -1,6 +1,5 @@
-# 攻击检测器文件
 from match_config import RULES_CONFIG, ATTACK_TYPES
-from utils import match_patterns, match_keywords, calculate_confidence, format_detection_result
+from utils import match_patterns, match_keywords, format_detection_result
 
 class AttackDetectors:
     """攻击检测器类"""
@@ -15,15 +14,13 @@ class AttackDetectors:
         matched_patterns = match_patterns(path, config['patterns'])
         
         matched_count = len(matched_keywords) + len(matched_patterns)
-        total_patterns = len(config['keywords']) + len(config['patterns'])
-        confidence = calculate_confidence(matched_count, total_patterns)
         
         if matched_count >= config['threshold']:
             matched_items = {
                 'keywords': matched_keywords,
                 'patterns': matched_patterns
             }
-            return format_detection_result(log_entry, ATTACK_TYPES['SQL_INJECTION'], confidence, matched_items)
+            return format_detection_result(log_entry, ATTACK_TYPES['SQL_INJECTION'], matched_items)
         
         return None
     
@@ -37,15 +34,13 @@ class AttackDetectors:
         matched_patterns = match_patterns(path, config['patterns'])
         
         matched_count = len(matched_keywords) + len(matched_patterns)
-        total_patterns = len(config['keywords']) + len(config['patterns'])
-        confidence = calculate_confidence(matched_count, total_patterns)
         
         if matched_count >= config['threshold']:
             matched_items = {
                 'keywords': matched_keywords,
                 'patterns': matched_patterns
             }
-            return format_detection_result(log_entry, ATTACK_TYPES['XSS'], confidence, matched_items)
+            return format_detection_result(log_entry, ATTACK_TYPES['XSS'], matched_items)
         
         return None
     
@@ -59,15 +54,13 @@ class AttackDetectors:
         matched_patterns = match_patterns(path, config['patterns'])
         
         matched_count = len(matched_keywords) + len(matched_patterns)
-        total_patterns = len(config['keywords']) + len(config['patterns'])
-        confidence = calculate_confidence(matched_count, total_patterns)
         
         if matched_count >= config['threshold']:
             matched_items = {
                 'keywords': matched_keywords,
                 'patterns': matched_patterns
             }
-            return format_detection_result(log_entry, ATTACK_TYPES['COMMAND_INJECTION'], confidence, matched_items)
+            return format_detection_result(log_entry, ATTACK_TYPES['COMMAND_INJECTION'], matched_items)
         
         return None
     
@@ -81,15 +74,13 @@ class AttackDetectors:
         matched_patterns = match_patterns(path, config['patterns'])
         
         matched_count = len(matched_keywords) + len(matched_patterns)
-        total_patterns = len(config['keywords']) + len(config['patterns'])
-        confidence = calculate_confidence(matched_count, total_patterns)
         
         if matched_count >= config['threshold']:
             matched_items = {
                 'keywords': matched_keywords,
                 'patterns': matched_patterns
             }
-            return format_detection_result(log_entry, ATTACK_TYPES['PATH_TRAVERSAL'], confidence, matched_items)
+            return format_detection_result(log_entry, ATTACK_TYPES['PATH_TRAVERSAL'], matched_items)
         
         return None
     
@@ -103,15 +94,13 @@ class AttackDetectors:
         matched_patterns = match_patterns(path, config['patterns'])
         
         matched_count = len(matched_keywords) + len(matched_patterns)
-        total_patterns = len(config['keywords']) + len(config['patterns'])
-        confidence = calculate_confidence(matched_count, total_patterns)
         
         if matched_count >= config['threshold']:
             matched_items = {
                 'keywords': matched_keywords,
                 'patterns': matched_patterns
             }
-            return format_detection_result(log_entry, ATTACK_TYPES['CSRF'], confidence, matched_items)
+            return format_detection_result(log_entry, ATTACK_TYPES['CSRF'], matched_items)
         
         return None
 
@@ -125,15 +114,13 @@ class AttackDetectors:
         matched_patterns = match_patterns(path, config['patterns'])
         
         matched_count = len(matched_keywords) + len(matched_patterns)
-        total_patterns = len(config['keywords']) + len(config['patterns'])
-        confidence = calculate_confidence(matched_count, total_patterns)
         
         if matched_count >= config['threshold']:
             matched_items = {
                 'keywords': matched_keywords,
                 'patterns': matched_patterns
             }
-            return format_detection_result(log_entry, ATTACK_TYPES['SENSITIVE_ACCESS'], confidence, matched_items)
+            return format_detection_result(log_entry, ATTACK_TYPES['SENSITIVE_ACCESS'], matched_items)
         
         return None
     
