@@ -6,15 +6,15 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent.parent))
 from common.time_utils import epoch_millis_now, format_for_filename, format_for_directory
-from common.env import ES_HOST, ES_PORT, KAFKA_BROKERS
+from common.env import ES_HOST, ES_PORT, KAFKA_BROKERS, KAFKA_TOPIC_RISK, ES_INDEX_MATCHED_LOGS
 from elasticsearch import Elasticsearch
 from elasticsearch.exceptions import RequestError, ConnectionError
 
 logger = logging.getLogger('data_saver')
 
 class DataSaver:
-    def __init__(self, es_host=ES_HOST, es_port=ES_PORT, es_index='matched_logs',
-                 kafka_enabled=True, kafka_brokers=KAFKA_BROKERS, kafka_topic='log.risk'):
+    def __init__(self, es_host=ES_HOST, es_port=ES_PORT, es_index=ES_INDEX_MATCHED_LOGS,
+                 kafka_enabled=True, kafka_brokers=KAFKA_BROKERS, kafka_topic=KAFKA_TOPIC_RISK):
         self.es_host = es_host
         self.es_port = es_port
         self.es_index = es_index

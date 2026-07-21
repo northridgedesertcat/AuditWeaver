@@ -5,15 +5,20 @@ sys.path.append(str(Path(__file__).resolve().parent.parent.parent))
 
 from common.env import (
     KAFKA_BROKERS,
+    KAFKA_TOPIC_STRUCTURED,
+    KAFKA_TOPIC_ANALYSIS,
     ES_HOST,
     ES_PORT,
+    ES_USE_SSL,
+    ES_VERIFY_CERTS,
+    ES_INDEX_MATCHED_LOGS,
     LOG_LEVEL,
 )
 
 KAFKA_CONFIG = {
     'brokers': KAFKA_BROKERS,
-    'input_topic': 'log.structured',
-    'output_topic': 'log.analysis',
+    'input_topic': KAFKA_TOPIC_STRUCTURED,
+    'output_topic': KAFKA_TOPIC_ANALYSIS,
     'group_id': 'rules_matching_group_test_v0002',
     'auto_offset_reset': 'earliest',
     'enable_auto_commit': True,
@@ -28,9 +33,9 @@ KAFKA_CONFIG = {
 ELASTICSEARCH_CONFIG = {
     'host': ES_HOST,
     'port': ES_PORT,
-    'use_ssl': False,
-    'verify_certs': False,
-    'attack_index': 'matched_logs',
+    'use_ssl': ES_USE_SSL,
+    'verify_certs': ES_VERIFY_CERTS,
+    'attack_index': ES_INDEX_MATCHED_LOGS,
     'timeout': 30,
     'max_retries': 3,
     'refresh_after_write': True

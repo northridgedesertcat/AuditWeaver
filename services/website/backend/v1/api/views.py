@@ -37,6 +37,7 @@ _services_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname
 if _services_path not in sys.path:
     sys.path.insert(0, _services_path)
 from common.time_utils import now_utc, epoch_millis_now
+from common.env import ES_INDEX_ANALYSIS_REPORTS, ES_INDEX_NGINX_RAW
 from datetime import timedelta
 
 class HealthCheckView(APIView):
@@ -125,7 +126,7 @@ class ThreatDistributionView(APIView):
                         }
                     }
 
-                    result = es.search(index="log_analysis_reports", body=agg_body)
+                    result = es.search(index=ES_INDEX_ANALYSIS_REPORTS, body=agg_body)
                     buckets = result.get('aggregations', {}).get('risk_levels', {}).get('buckets', [])
                     
                     # 调试日志
@@ -200,7 +201,7 @@ class DashboardStatsView(APIView):
                             }
                         }
                     }
-                    nginx_result = es.count(index="nginx-log-raw", body=nginx_today_query)
+                    nginx_result = es.count(index=ES_INDEX_NGINX_RAW, body=nginx_today_query)
                     today_count = nginx_result.get('count', 0)
                     
                     if today_count >= 1000000:
@@ -211,7 +212,7 @@ class DashboardStatsView(APIView):
                         stats['logVolume'] = str(today_count)
                     
                     # 2. 总日志数 - nginx-log-raw
-                    total_result = es.count(index="nginx-log-raw")
+                    total_result = es.count(index=ES_INDEX_NGINX_RAW)
                     stats['totalLogs'] = total_result.get('count', 0)
                     
                     # 3. 今日攻击日志数 - log_analysis_reports (毫秒时间戳)
@@ -225,7 +226,7 @@ class DashboardStatsView(APIView):
                             }
                         }
                     }
-                    attack_result = es.count(index="log_analysis_reports", body=attack_today_query)
+                    attack_result = es.count(index=ES_INDEX_ANALYSIS_REPORTS, body=attack_today_query)
                     stats['attackLogs'] = attack_result.get('count', 0)
                     
                     # 4. 今日高危告警数 - log_analysis_reports (毫秒时间戳)
@@ -250,7 +251,7 @@ class DashboardStatsView(APIView):
                             }
                         }
                     }
-                    high_severity_result = es.count(index="log_analysis_reports", body=high_severity_query)
+                    high_severity_result = es.count(index=ES_INDEX_ANALYSIS_REPORTS, body=high_severity_query)
                     stats['highSeverityAlerts'] = high_severity_result.get('count', 0)
                     
             except Exception as e:
@@ -292,7 +293,7 @@ class LogsView(APIView):
                     if path:
                         query['query']['bool']['must'].append({"wildcard": {"path": f"*{path}*"}})
                     
-                    result = es.search(index="nginx-log-raw", body=query)
+                    result = es.search(index=ES_INDEX_NGINX_RAW, body=query)
                     logs = [hit['_source'] for hit in result['hits']['hits']]
                     total = result['hits']['total']['value']
                     
@@ -331,7 +332,7 @@ class LogStatsView(APIView):
                     today_start_ms = int(today_start.timestamp() * 1000)
                     now_ms = epoch_millis_now()
                     
-                    total_result = es.count(index="nginx-log-raw")
+                    total_result = es.count(index=ES_INDEX_NGINX_RAW)
                     stats['total'] = total_result.get('count', 0)
                     
                     today_query = {
@@ -344,7 +345,7 @@ class LogStatsView(APIView):
                             }
                         }
                     }
-                    today_result = es.count(index="nginx-log-raw", body=today_query)
+                    today_result = es.count(index=ES_INDEX_NGINX_RAW, body=today_query)
                     stats['today'] = today_result.get('count', 0)
                     
                     ip_agg = {
@@ -355,7 +356,7 @@ class LogStatsView(APIView):
                             }
                         }
                     }
-                    ip_result = es.search(index="nginx-log-raw", body=ip_agg)
+                    ip_result = es.search(index=ES_INDEX_NGINX_RAW, body=ip_agg)
                     stats['top_ips'] = [
                         {"ip": bucket['key'], "count": bucket['doc_count']}
                         for bucket in ip_result['aggregations']['top_ips']['buckets']
@@ -369,7 +370,7 @@ class LogStatsView(APIView):
                             }
                         }
                     }
-                    path_result = es.search(index="nginx-log-raw", body=path_agg)
+                    path_result = es.search(index=ES_INDEX_NGINX_RAW, body=path_agg)
                     stats['top_paths'] = [
                         {"path": bucket['key'], "count": bucket['doc_count']}
                         for bucket in path_result['aggregations']['top_paths']['buckets']
@@ -383,7 +384,7 @@ class LogStatsView(APIView):
                             }
                         }
                     }
-                    status_result = es.search(index="nginx-log-raw", body=status_agg)
+                    status_result = es.search(index=ES_INDEX_NGINX_RAW, body=status_agg)
                     stats['status_distribution'] = {
                         str(bucket['key']): bucket['doc_count']
                         for bucket in status_result['aggregations']['status_dist']['buckets']
@@ -518,7 +519,7 @@ class RecentAlertsView(APIView):
                         "sort": [{"ingestion_time": {"order": "desc"}}]
                     }
                     
-                    result = es.search(index="log_analysis_reports", body=query)
+                    result = es.search(index=ES_INDEX_ANALYSIS_REPORTS, body=query)
                     hits = result.get('hits', {}).get('hits', [])
                     
                     for hit in hits:
@@ -581,7 +582,7 @@ class LogTrendView(APIView):
                         }
                     }
                     
-                    result = es.search(index="nginx-log-raw", body=query)
+                    result = es.search(index=ES_INDEX_NGINX_RAW, body=query)
                     buckets = result['aggregations']['hourly']['buckets']
                     
                     trend_data = []
@@ -637,7 +638,7 @@ class ReportStatsView(APIView):
                 if es:
                     # 检查索引是否存在
                     try:
-                        indices = es.cat.indices(index="log_analysis_reports", format="json")
+                        indices = es.cat.indices(index=ES_INDEX_ANALYSIS_REPORTS, format="json")
                         logger.info(f"ReportStatsView: indices = {indices}")
                     except Exception as idx_err:
                         logger.error(f"ReportStatsView: indices check error = {idx_err}")
@@ -647,7 +648,7 @@ class ReportStatsView(APIView):
                         "size": 0,
                         "track_total_hits": True
                     }
-                    total_result = es.search(index="log_analysis_reports", body=total_search)
+                    total_result = es.search(index=ES_INDEX_ANALYSIS_REPORTS, body=total_search)
                     stats['total'] = total_result['hits']['total']['value']
                     logger.info(f"ReportStatsView: total = {stats['total']}")
                     
@@ -661,7 +662,7 @@ class ReportStatsView(APIView):
                             }
                         }
                     }
-                    high_result = es.search(index="log_analysis_reports", body=high_risk_search)
+                    high_result = es.search(index=ES_INDEX_ANALYSIS_REPORTS, body=high_risk_search)
                     stats['highRisk'] = high_result['hits']['total']['value']
                     logger.info(f"ReportStatsView: highRisk = {stats['highRisk']}")
                     
@@ -675,7 +676,7 @@ class ReportStatsView(APIView):
                             }
                         }
                     }
-                    medium_result = es.search(index="log_analysis_reports", body=medium_risk_search)
+                    medium_result = es.search(index=ES_INDEX_ANALYSIS_REPORTS, body=medium_risk_search)
                     stats['mediumRisk'] = medium_result['hits']['total']['value']
                     logger.info(f"ReportStatsView: mediumRisk = {stats['mediumRisk']}")
                     
@@ -697,7 +698,7 @@ class ReportStatsView(APIView):
                             }
                         }
                     }
-                    today_result = es.search(index="log_analysis_reports", body=today_search)
+                    today_result = es.search(index=ES_INDEX_ANALYSIS_REPORTS, body=today_search)
                     stats['todayNew'] = today_result['hits']['total']['value']
                     logger.info(f"ReportStatsView: todayNew = {stats['todayNew']}")
                     
@@ -733,7 +734,7 @@ class ReportDetailView(APIView):
             try:
                 es = get_es_client()
                 if es:
-                    result = es.get(index="log_analysis_reports", id=report_id)
+                    result = es.get(index=ES_INDEX_ANALYSIS_REPORTS, id=report_id)
                     source = result.get('_source', {})
                     
                     # 获取字段值
@@ -761,7 +762,7 @@ class ReportDetailView(APIView):
                                 },
                                 "size": 1
                             }
-                            log_result = es.search(index="nginx-log-raw", body=log_query)
+                            log_result = es.search(index=ES_INDEX_NGINX_RAW, body=log_query)
                             if log_result['hits']['hits']:
                                 log_source = log_result['hits']['hits'][0]['_source']
                                 original_log_content = log_source.get('event', {}).get('original', '')
@@ -917,7 +918,7 @@ class ReportListView(APIView):
                         "track_total_hits": True
                     }
                     
-                    result = es.search(index="log_analysis_reports", body=query)
+                    result = es.search(index=ES_INDEX_ANALYSIS_REPORTS, body=query)
                     hits = result.get('hits', {}).get('hits', [])
                     total = result['hits']['total']['value']
                     

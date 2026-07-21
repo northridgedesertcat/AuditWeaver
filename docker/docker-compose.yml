@@ -5,7 +5,7 @@ services:
       image: confluentinc/cp-zookeeper:7.4.0
       container_name: zookeeper
       environment:
-        - ZOOKEEPER_CLIENT_PORT=2181
+        - ZOOKEEPER_CLIENT_PORT=${ZOOKEEPER_PORT:-2181}
       volumes:
         - zk_data:/var/lib/zookeeper/data
 
@@ -85,12 +85,15 @@ services:
       - elasticsearch
     volumes:
       - ./config/logstash/pipeline:/usr/share/logstash/pipeline
+    environment:
+      - KAFKA_TOPIC_RAW=${KAFKA_TOPIC_RAW:-log.raw}
+      - KAFKA_TOPIC_STRUCTURED=${KAFKA_TOPIC_STRUCTURED:-log.structured}
 
   kibana:
     image: docker.elastic.co/kibana/kibana:8.12.0
     container_name: kibana
     ports:
-      - "5601:5601"
+      - "${KIBANA_PORT:-5601}:5601"
     environment:
       ELASTICSEARCH_HOSTS: http://elasticsearch:9200
     depends_on:
