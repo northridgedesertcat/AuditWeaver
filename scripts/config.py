@@ -1,4 +1,13 @@
 import os
+import sys
+
+_services_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _services_path not in sys.path:
+    sys.path.insert(0, _services_path)
+from common.env import (
+    KAFKA_CONNECT_HOST,
+    KAFKA_CONNECT_PORT,
+)
 
 DEFAULT_CONFIG = {
     "env": {
@@ -31,8 +40,8 @@ DEFAULT_CONFIG = {
         },
         "kafka_connect": {
             "type": "http",
-            "host": "localhost",
-            "default_port": "8083",
+            "host": KAFKA_CONNECT_HOST,
+            "default_port": KAFKA_CONNECT_PORT,
             "max_retries": 20,
             "retry_delay": 5,
             "post_delay": 0,
@@ -46,8 +55,8 @@ DEFAULT_CONFIG = {
     "connectors": {
         "log_structured_sink": {
             "path": os.path.join("docker", "config", "kafka-connect", "connectors", "log-structured-sink.json"),
-            "connect_host": "localhost",
-            "connect_port": 8083,
+            "connect_host": KAFKA_CONNECT_HOST,
+            "connect_port": KAFKA_CONNECT_PORT,
         },
     },
     "services": [

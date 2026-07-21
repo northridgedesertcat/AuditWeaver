@@ -61,15 +61,30 @@ DJANGO_SECRET_KEY = get_env('DJANGO_SECRET_KEY')
 DJANGO_DEBUG = get_env_bool('DJANGO_DEBUG', True)
 DJANGO_ALLOWED_HOSTS = get_env('DJANGO_ALLOWED_HOSTS', 'localhost')
 DJANGO_PORT = get_env_int('DJANGO_PORT', 8000)
+DJANGO_CORS_ALLOW_ALL_ORIGINS = get_env_bool('DJANGO_CORS_ALLOW_ALL_ORIGINS', True)
+DJANGO_TIME_ZONE = get_env('DJANGO_TIME_ZONE', 'UTC')
 
 ES_HOST = get_env('ES_HOST', 'localhost')
 ES_PORT = get_env_int('ES_PORT', 19200)
 ES_USER = get_env('ES_USER', 'elastic')
 ES_PASSWORD = get_env('ES_PASSWORD', 'password')
 ES_SCHEME = get_env('ES_SCHEME', 'http')
+ES_USE_SSL = get_env_bool('ES_USE_SSL', False)
+ES_VERIFY_CERTS = get_env_bool('ES_VERIFY_CERTS', False)
 
 KAFKA_PORT = get_env_int('KAFKA_PORT', 29092)
 KAFKA_BROKERS = get_env('KAFKA_BROKERS', f'localhost:{KAFKA_PORT}')
+KAFKA_CONNECT_HOST = get_env('KAFKA_CONNECT_HOST', 'localhost')
+KAFKA_CONNECT_PORT = get_env_int('KAFKA_CONNECT_PORT', 8083)
+
+KAFKA_TOPIC_RAW = get_env('KAFKA_TOPIC_RAW', 'log.raw')
+KAFKA_TOPIC_STRUCTURED = get_env('KAFKA_TOPIC_STRUCTURED', 'log.structured')
+KAFKA_TOPIC_ANALYSIS = get_env('KAFKA_TOPIC_ANALYSIS', 'log.analysis')
+KAFKA_TOPIC_RISK = get_env('KAFKA_TOPIC_RISK', 'log.risk')
+
+ES_INDEX_MATCHED_LOGS = get_env('ES_INDEX_MATCHED_LOGS', 'matched_logs')
+ES_INDEX_ANALYSIS_REPORTS = get_env('ES_INDEX_ANALYSIS_REPORTS', 'log_analysis_reports')
+ES_INDEX_NGINX_RAW = get_env('ES_INDEX_NGINX_RAW', 'nginx-log-raw')
 
 DIFY_BASE_URL = get_env('DIFY_BASE_URL', 'http://localhost/v1')
 DIFY_API_KEY = get_env('DIFY_API_KEY', '')
@@ -78,3 +93,6 @@ DIFY_TIMEOUT = get_env_int('DIFY_TIMEOUT', 60)
 NEXT_PUBLIC_API_BASE = get_env('NEXT_PUBLIC_API_BASE', 'http://localhost:8000')
 
 LOG_LEVEL = get_env('LOG_LEVEL', 'INFO')
+
+ZOOKEEPER_PORT = get_env_int('ZOOKEEPER_PORT', 2181)
+KIBANA_PORT = get_env_int('KIBANA_PORT', 5601)

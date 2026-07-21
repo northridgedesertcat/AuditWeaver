@@ -7,14 +7,14 @@ import sys
 import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
-from common.env import KAFKA_BROKERS
+from common.env import KAFKA_BROKERS, KAFKA_TOPIC_RISK
 
 logger = logging.getLogger('kafka_producer')
 
 class KafkaProducerClient:
     """Kafka生产者客户端类，负责将数据发送到Kafka消息队列"""
     
-    def __init__(self, bootstrap_servers=KAFKA_BROKERS, topic='log.risk'):
+    def __init__(self, bootstrap_servers=KAFKA_BROKERS, topic=KAFKA_TOPIC_RISK):
         """初始化Kafka生产者"""
         self.bootstrap_servers = bootstrap_servers
         self.topic = topic
