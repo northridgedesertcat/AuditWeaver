@@ -164,8 +164,8 @@ def build_elastic_document(log_data: Dict[str, Any], dify_response: Dict[str, An
     # 获取规则匹配信息（兼容新的合并结构）
     rule_match = actual_log.get('detection_result', actual_log.get('rule_match', {}))
     
-    # 优先从 @timestamp 获取，其次是 timestamp
-    log_ts = actual_log.get('@timestamp') or actual_log.get('timestamp')
+    # 优先从 @timestamp 获取，其次是 log_timestamp，最后是 timestamp
+    log_ts = actual_log.get('@timestamp') or actual_log.get('log_timestamp') or actual_log.get('timestamp')
     
     # 构建扁平文档结构
     doc = {
@@ -189,7 +189,7 @@ def build_elastic_document(log_data: Dict[str, Any], dify_response: Dict[str, An
         # 时间戳（使用 epoch_millis 格式以确保正确的 date 类型映射）
         'log_timestamp': to_epoch_millis(log_ts),
         'analysis_timestamp': epoch_millis_now(),
-        'ingestion_time': to_epoch_millis(actual_log.get('ingestion_time')),
+        'ingestion_time': to_epoch_millis(actual_log.get('ingestion_time')) or epoch_millis_now(),
         
         # 原始数据（用于调试，不参与搜索）
         'dify_response': dify_response,

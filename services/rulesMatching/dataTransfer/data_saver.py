@@ -134,6 +134,7 @@ class DataSaver:
         
         if self.kafka_enabled and self.kafka_producer:
             try:
+                log_timestamp = log_entry.get('log_timestamp') or log_entry.get('@timestamp') or log_entry.get('timestamp') or epoch_millis_now()
                 message = {
                     'event_id': log_entry.get('event_id'),
                     'ip': log_entry.get('ip'),
@@ -141,6 +142,7 @@ class DataSaver:
                     'method': log_entry.get('method'),
                     'status': log_entry.get('status'),
                     'user_agent': log_entry.get('user_agent'),
+                    'log_timestamp': log_timestamp,
                     'detection_time': epoch_millis_now(),
                     'detection_result': merged_detection
                 }
