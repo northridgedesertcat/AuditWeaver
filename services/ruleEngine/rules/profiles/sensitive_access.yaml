@@ -1,0 +1,11 @@
+id: sensitive_access
+name: Sensitive Access
+description: Detect access to administrative, credential, and configuration resources.
+attack_type: sensitive_access
+enabled: true
+target_fields:
+  - path
+  - referrer
+matchers:
+  - type: regex
+    library: sensitive_access_regex

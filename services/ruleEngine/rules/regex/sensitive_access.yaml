@@ -1,0 +1,19 @@
+id: sensitive_access_regex
+name: Sensitive Access Regex Repository
+version: "1.0"
+patterns:
+  - id: authentication_resource
+    enabled: true
+    regex: '(?i)\b(?:admin|login|signin|auth)\b'
+  - id: credential_resource
+    enabled: true
+    regex: '(?i)\b(?:password|passwd|secret|token)\b'
+  - id: api_resource
+    enabled: true
+    regex: '(?i)\b(?:api|rest|webservice|xmlrpc)\b'
+  - id: repository_metadata
+    enabled: true
+    regex: '(?i)\.(?:git|svn|hg)\b'
+  - id: backup_or_config
+    enabled: true
+    regex: '(?i)\b(?:backup|config|settings|database)\b'

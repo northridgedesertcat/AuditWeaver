@@ -1,0 +1,22 @@
+id: xss_regex
+name: XSS Regex Repository
+version: "1.0"
+patterns:
+  - id: script_tag
+    enabled: true
+    regex: '(?is)<script[^>]*>.*?</script>'
+  - id: iframe_tag
+    enabled: true
+    regex: '(?is)<iframe[^>]*>.*?</iframe>'
+  - id: javascript_uri
+    enabled: true
+    regex: '(?i)javascript:\s*[^\s]+'
+  - id: event_handler
+    enabled: true
+    regex: '(?is)on\w+\s*=\s*["\''].*?["\'']'
+  - id: javascript_function
+    enabled: true
+    regex: '(?is)\b(?:eval|alert|prompt|confirm)\s*\(.*?\)'
+  - id: image_source
+    enabled: true
+    regex: '(?is)<img[^>]*src\s*=\s*["\''].*?["\'']'

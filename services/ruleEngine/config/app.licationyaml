@@ -29,7 +29,7 @@ processing:
 kafka:
 
   bootstrap_servers:
-    - localhost:9092
+    - localhost:29023
 
   consumer:
 
