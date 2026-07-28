@@ -10,7 +10,7 @@ dependencies:
 - current_identifier: null
   type: marketplace
   value:
-    marketplace_plugin_unique_identifier: langgenius/ollama:0.1.3@66e156c4f612964c131c49168882e78c2cdfe366879506b97ad855b23c5d6d98
+    marketplace_plugin_unique_identifier: langgenius/ollama:1.0.0@ae50a2db261bffa7289677f2b0a60e60762ceb187b602113b72425ccbe772dc3
     version: null
 kind: app
 version: 0.6.0
@@ -68,23 +68,34 @@ workflow:
     edges:
     - data:
         isInLoop: false
-        sourceType: start
-        targetType: llm
-      id: 1780588558254-source-1780588640326-target
-      source: '1780588558254'
-      sourceHandle: source
-      target: '1780588640326'
-      targetHandle: target
-      type: custom
-      zIndex: 0
-    - data:
-        isInLoop: false
         sourceType: llm
         targetType: end
       id: 1780588640326-source-1780588677082-target
       source: '1780588640326'
       sourceHandle: source
       target: '1780588677082'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: start
+        targetType: knowledge-retrieval
+      id: 1780588558254-source-1784028498564-target
+      source: '1780588558254'
+      sourceHandle: source
+      target: '1784028498564'
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: knowledge-retrieval
+        targetType: llm
+      id: 1784028498564-source-1780588640326-target
+      source: '1784028498564'
+      sourceHandle: source
+      target: '1780588640326'
       targetHandle: target
       type: custom
       zIndex: 0
@@ -106,10 +117,10 @@ workflow:
       height: 108
       id: '1780588558254'
       position:
-        x: 64
+        x: -365.96349107500066
         y: 273
       positionAbsolute:
-        x: 64
+        x: -365.96349107500066
         y: 273
       selected: false
       sourcePosition: right
@@ -118,141 +129,268 @@ workflow:
       width: 242
     - data:
         context:
-          enabled: false
-          variable_selector: []
+          enabled: true
+          variable_selector:
+          - '1784028498564'
+          - result
         model:
           completion_params:
             temperature: 0.6
           mode: chat
-          name: deepseek-r1:7b
+          name: qwen3:8b
           provider: langgenius/ollama/ollama
         prompt_template:
         - id: b11ac6a3-6382-4937-8c1a-66a6c32f3c4e
           role: system
           text: '这里有一份安全事件数据：
 
+
             {{#1780588558254.logDatas#}}
 
-            你是一名网络安全风险分析助手，请根据输入的单条安全事件进行分析。
 
+            你是一名网络安全风险分析助手，请根据输入的单条 Nginx 日志进行分析。
+
+
+            以下是从网络安全知识库中检索得到的参考资料：
+
+
+            {{#context#}}
+
+
+            ========================
 
             分析原则
 
-            只能依据输入数据分析，不允许编造不存在的信息。
+            ========================
 
-            即使攻击成功无法确认，只要事件存在明显攻击特征，也可以评定为 High。
 
-            matched_type、confidence、severity 是仅仅是一套准确度较低的系统匹配到的内容，暂时不用做推理参考。
+            输入日志是唯一可信事实来源。
 
-            仅仅是规则匹配到某些关键词或者误报，请合理的根据整体进行判断。
 
-            另外返回的内容统一用中文，不要用其他语言。
+            知识库仅作为背景知识，用于解释攻击原理、补充攻击背景、提供修复建议。
 
+
+            严禁因为知识库出现某种攻击（例如 XSS、SQL 注入等），就判定此次日志属于该攻击。
+
+
+            攻击类型、风险等级、攻击是否成功，必须完全依据输入日志判断。
+
+
+            若日志内容与知识库冲突，以日志内容为准。
+
+
+            如果日志没有足够证据支持某种攻击，即使知识库检索到了相关内容，也不得判定为该攻击。
+
+
+            ========================
+
+            分析流程
+
+            ========================
+
+
+            请严格按照以下步骤思考：
+
+
+            第一步：
+
+            仅根据日志提取客观事实，例如：
+
+
+            - 请求方法
+
+            - URL
+
+            - Query 参数
+
+            - 请求体
+
+            - User-Agent
+
+            - HTTP 状态码
+
+            - IP
+
+            - 是否命中规则
+
+
+            第二步：
+
+
+            根据第一步得到的事实，
+
+
+            判断：
+
+
+            - 是否存在攻击行为
+
+            - 攻击类型
+
+            - 攻击是否成功（若无法确认必须明确说明）
+
+
+            此阶段禁止依据知识库判断攻击类型。
+
+
+            第三步：
+
+
+            只有当第二步已经能够确定攻击类型后，
+
+
+            才允许引用知识库：
+
+
+            - 解释攻击原理
+
+            - 补充 ATT&CK / OWASP 等背景
+
+            - 提供修复建议
+
+
+            若第二步无法确认攻击类型，则忽略知识库。
+
+
+            ========================
 
             风险等级判定
 
+            ========================
+
+
             Critical
 
-            仅当输入数据明确证明攻击已经成功时使用，例如：
 
-            WebShell 上传成功
+            仅当日志明确证明攻击已经成功时使用，例如：
 
-            远程命令执行成功
 
-            获得管理员权限
+            - WebShell 上传成功
 
-            敏感数据泄露
+            - 远程命令执行成功
 
-            数据库导出成功
+            - 获得管理员权限
 
-            服务遭到破坏
+            - 敏感数据泄露
+
+            - 数据库导出成功
+
+            - 服务遭到破坏
+
 
             评分范围：90~100
 
 
+            ------------------------
+
+
             High
+
 
             满足以下任意条件即可：
 
-            请求包含明显攻击载荷
 
-            请求访问敏感资源（/.env、/etc/passwd、后台管理接口、上传接口、数据库备份等）
+            - 请求包含明显攻击载荷
 
-            User-Agent 为 sqlmap、nikto、masscan 等自动化攻击工具
+            - 请求访问敏感资源
 
-            confidence ≥ 0.9 且 severity 为 High
+            - User-Agent 为 sqlmap、nikto、masscan 等自动化攻击工具
+
+            - confidence ≥0.9 且 severity 为 High
+
 
             High 不要求攻击成功。
 
-            如果判定为 High，必须说明：
 
-            "攻击成功无法从现有数据确认。"
+            如果判定 High，
+
+
+            必须说明：
+
+
+            "攻击成功无法从现有日志确认。"
+
 
             评分范围：70~89
 
 
+            ------------------------
+
+
             Medium
 
-            攻击特征明确，但危害相对有限，例如：
 
-            XSS
+            攻击特征明确，但危害有限，例如：
 
-            登录爆破
 
-            目录扫描
+            - XSS
 
-            路径扫描
+            - 登录爆破
 
-            敏感路径探测
+            - 路径扫描
 
-            可疑 User-Agent
+            - 目录扫描
 
-            HTTP 状态异常
+            - 敏感路径探测
+
+            - 可疑 User-Agent
+
+            - HTTP 状态异常
+
 
             评分范围：40~69
 
 
+            ------------------------
+
+
             Low
 
-            仅存在轻微异常，例如：
 
-            robots.txt
+            轻微异常，例如：
 
-            favicon.ico
 
-            单次404
+            - robots.txt
 
-            普通目录探测
+            - favicon.ico
 
-            普通异常参数
+            - 单次404
+
+            - 普通目录探测
+
 
             评分范围：10~39
 
-            Informational
+
+            ------------------------
+
+
+            Normal
+
 
             正常业务访问，无明显攻击特征。
 
+
             评分范围：0~9
 
-            特殊规则（优先执行）
+
+            ========================
+
+            输出要求
+
+            ========================
 
 
+            所有结论必须能够从日志中找到对应证据。
 
-            分析时重点参考以下字段
 
-            path
+            不得编造日志中不存在的信息。
 
-            method
 
-            status
+            不得引用知识库作为攻击存在的证据。
 
-            user_agent
 
-            请综合所有字段进行判断，不要仅依据某一个字段得出结论。
-
-            matched_type与confidence与severity暂时不作为评测因素。如果path没有明显的攻击痕迹可以给定low
-
-            '
+            返回内容统一使用中文。'
         selected: true
         structured_output:
           schema:
@@ -289,10 +427,10 @@ workflow:
       height: 87
       id: '1780588640326'
       position:
-        x: 470
+        x: 468.809143150635
         y: 294
       positionAbsolute:
-        x: 470
+        x: 468.809143150635
         y: 294
       selected: true
       sourcePosition: right
@@ -322,8 +460,44 @@ workflow:
       targetPosition: left
       type: custom
       width: 241
+    - data:
+        dataset_ids:
+        - aLU7uLzPZVFOJ7sxFoSfPnKAO14mKwRrfNz2RJvE6OVhKT5Seor6ps3h+O2dRbTi
+        multiple_retrieval_config:
+          reranking_enable: false
+          reranking_mode: weighted_score
+          top_k: 4
+          weights:
+            keyword_setting:
+              keyword_weight: 0
+            vector_setting:
+              embedding_model_name: qwen3-embedding:0.6b
+              embedding_provider_name: langgenius/ollama/ollama
+              vector_weight: 1
+            weight_type: customized
+        query_attachment_selector: []
+        query_variable_selector:
+        - '1780588558254'
+        - logDatas
+        retrieval_mode: multiple
+        selected: false
+        title: Knowledge Retrieval
+        type: knowledge-retrieval
+      height: 89
+      id: '1784028498564'
+      position:
+        x: 21.821595921497362
+        y: 294
+      positionAbsolute:
+        x: 21.821595921497362
+        y: 294
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
     viewport:
-      x: 186.96469240837956
-      y: 255.27043038757398
-      zoom: 0.497235084336607
+      x: 283.25187999981597
+      y: 28.336919564436585
+      zoom: 0.8397314929441401
   rag_pipeline_variables: []

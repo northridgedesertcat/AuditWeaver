@@ -5,17 +5,19 @@ sys.path.append(str(Path(__file__).resolve().parent.parent.parent.parent))
 
 from common.env import (
     KAFKA_BROKERS,
+    KAFKA_TOPIC_ANALYSIS,
     DIFY_BASE_URL,
     DIFY_API_KEY,
     DIFY_TIMEOUT,
     ES_HOST,
     ES_PORT,
+    ES_INDEX_ANALYSIS_REPORTS,
     LOG_LEVEL,
 )
 
 KAFKA_CONFIG = {
     'brokers': KAFKA_BROKERS,
-    'input_topic': 'log.analysis',
+    'input_topic': KAFKA_TOPIC_ANALYSIS,
     'group_id': 'agent_analysis_group_v10022',
     'auto_offset_reset': 'earliest',
     'consumer_timeout_ms': 5000,
@@ -33,7 +35,7 @@ DIFY_CONFIG = {
 ELASTICSEARCH_CONFIG = {
     'host': ES_HOST,
     'port': ES_PORT,
-    'index': 'log_analysis_reports',
+    'index': ES_INDEX_ANALYSIS_REPORTS,
     'refresh': True
 }
 

@@ -5,7 +5,7 @@ import sys
 from typing import Dict, Any, Optional
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
-from common.env import ES_HOST, ES_PORT
+from common.env import ES_HOST, ES_PORT, ES_INDEX_ANALYSIS_REPORTS
 from elasticsearch import Elasticsearch
 from elasticsearch.exceptions import NotFoundError, ConnectionError as ESConnectionError
 
@@ -17,7 +17,7 @@ class ESClient:
         self.port = port
         self.url = f'http://{host}:{port}'
         self.client: Optional[Elasticsearch] = None
-        self.index_name = 'log_analysis_reports'
+        self.index_name = ES_INDEX_ANALYSIS_REPORTS
 
     def connect(self) -> bool:
         try:

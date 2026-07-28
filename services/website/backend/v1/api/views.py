@@ -37,6 +37,7 @@ _services_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname
 if _services_path not in sys.path:
     sys.path.insert(0, _services_path)
 from common.time_utils import now_utc, epoch_millis_now
+from common.env import ES_INDEX_ANALYSIS_REPORTS, ES_INDEX_NGINX_RAW
 from datetime import timedelta
 
 class HealthCheckView(APIView):
@@ -54,24 +55,24 @@ class ThreatDistributionView(APIView):
     数据来源: dify_response.data.outputs.structured_output.risk_level
     在 agent 写入时已通过 extract_dify_fields 扁平化到顶级 risk_level 字段。
 
-    支持五种风险等级: Critical / High / Medium / Low / Informational
+    支持五种风险等级: Critical / High / Medium / Low / Normal
     """
     def get(self, request):
-        # 全部五种风险等级（包含 Informational）
-        all_levels = ['Critical', 'High', 'Medium', 'Low', 'Informational']
+        # 全部五种风险等级（包含 Normal）
+        all_levels = ['Critical', 'High', 'Medium', 'Low', 'Normal']
         level_color_map = {
             'Critical': 'oklch(0.5 0.25 25)',      # 严重 - 红色
             'High': 'oklch(0.65 0.2 60)',           # 高危 - 橙色
             'Medium': 'oklch(0.75 0.15 95)',        # 中危 - 黄色
             'Low': 'oklch(0.75 0.12 145)',          # 低危 - 绿色
-            'Informational': 'oklch(0.7 0.15 230)'  # 信息 - 蓝色
+            'Normal': 'oklch(0.7 0.05 260)'         # 正常 - 灰色
         }
         level_label_map = {
             'Critical': '严重',
             'High': '高危',
             'Medium': '中危',
             'Low': '低危',
-            'Informational': '信息'
+            'Normal': '正常'
         }
 
         # 默认全 0 的返回结构
@@ -125,7 +126,7 @@ class ThreatDistributionView(APIView):
                         }
                     }
 
-                    result = es.search(index="log_analysis_reports", body=agg_body)
+                    result = es.search(index=ES_INDEX_ANALYSIS_REPORTS, body=agg_body)
                     buckets = result.get('aggregations', {}).get('risk_levels', {}).get('buckets', [])
                     
                     # 调试日志
@@ -140,13 +141,13 @@ class ThreatDistributionView(APIView):
                         if level:
                             level_lower = level.lower()
                             level_mapping = {
-                                'critical': 'Critical',
-                                'high': 'High',
-                                'medium': 'Medium',
-                                'low': 'Low',
-                                'informational': 'Informational',
-                                'unknown': 'Low'
-                            }
+                            'critical': 'Critical',
+                            'high': 'High',
+                            'medium': 'Medium',
+                            'low': 'Low',
+                            'normal': 'Normal',
+                            'unknown': 'Low'
+                        }
                             level_key = level_mapping.get(level_lower, level.capitalize())
                             if level_key in distribution:
                                 distribution[level_key]['value'] = count
@@ -200,7 +201,7 @@ class DashboardStatsView(APIView):
                             }
                         }
                     }
-                    nginx_result = es.count(index="nginx-log-raw", body=nginx_today_query)
+                    nginx_result = es.count(index=ES_INDEX_NGINX_RAW, body=nginx_today_query)
                     today_count = nginx_result.get('count', 0)
                     
                     if today_count >= 1000000:
@@ -211,7 +212,7 @@ class DashboardStatsView(APIView):
                         stats['logVolume'] = str(today_count)
                     
                     # 2. 总日志数 - nginx-log-raw
-                    total_result = es.count(index="nginx-log-raw")
+                    total_result = es.count(index=ES_INDEX_NGINX_RAW)
                     stats['totalLogs'] = total_result.get('count', 0)
                     
                     # 3. 今日攻击日志数 - log_analysis_reports (毫秒时间戳)
@@ -225,7 +226,7 @@ class DashboardStatsView(APIView):
                             }
                         }
                     }
-                    attack_result = es.count(index="log_analysis_reports", body=attack_today_query)
+                    attack_result = es.count(index=ES_INDEX_ANALYSIS_REPORTS, body=attack_today_query)
                     stats['attackLogs'] = attack_result.get('count', 0)
                     
                     # 4. 今日高危告警数 - log_analysis_reports (毫秒时间戳)
@@ -250,7 +251,7 @@ class DashboardStatsView(APIView):
                             }
                         }
                     }
-                    high_severity_result = es.count(index="log_analysis_reports", body=high_severity_query)
+                    high_severity_result = es.count(index=ES_INDEX_ANALYSIS_REPORTS, body=high_severity_query)
                     stats['highSeverityAlerts'] = high_severity_result.get('count', 0)
                     
             except Exception as e:
@@ -292,7 +293,7 @@ class LogsView(APIView):
                     if path:
                         query['query']['bool']['must'].append({"wildcard": {"path": f"*{path}*"}})
                     
-                    result = es.search(index="nginx-log-raw", body=query)
+                    result = es.search(index=ES_INDEX_NGINX_RAW, body=query)
                     logs = [hit['_source'] for hit in result['hits']['hits']]
                     total = result['hits']['total']['value']
                     
@@ -331,7 +332,7 @@ class LogStatsView(APIView):
                     today_start_ms = int(today_start.timestamp() * 1000)
                     now_ms = epoch_millis_now()
                     
-                    total_result = es.count(index="nginx-log-raw")
+                    total_result = es.count(index=ES_INDEX_NGINX_RAW)
                     stats['total'] = total_result.get('count', 0)
                     
                     today_query = {
@@ -344,7 +345,7 @@ class LogStatsView(APIView):
                             }
                         }
                     }
-                    today_result = es.count(index="nginx-log-raw", body=today_query)
+                    today_result = es.count(index=ES_INDEX_NGINX_RAW, body=today_query)
                     stats['today'] = today_result.get('count', 0)
                     
                     ip_agg = {
@@ -355,7 +356,7 @@ class LogStatsView(APIView):
                             }
                         }
                     }
-                    ip_result = es.search(index="nginx-log-raw", body=ip_agg)
+                    ip_result = es.search(index=ES_INDEX_NGINX_RAW, body=ip_agg)
                     stats['top_ips'] = [
                         {"ip": bucket['key'], "count": bucket['doc_count']}
                         for bucket in ip_result['aggregations']['top_ips']['buckets']
@@ -369,7 +370,7 @@ class LogStatsView(APIView):
                             }
                         }
                     }
-                    path_result = es.search(index="nginx-log-raw", body=path_agg)
+                    path_result = es.search(index=ES_INDEX_NGINX_RAW, body=path_agg)
                     stats['top_paths'] = [
                         {"path": bucket['key'], "count": bucket['doc_count']}
                         for bucket in path_result['aggregations']['top_paths']['buckets']
@@ -383,7 +384,7 @@ class LogStatsView(APIView):
                             }
                         }
                     }
-                    status_result = es.search(index="nginx-log-raw", body=status_agg)
+                    status_result = es.search(index=ES_INDEX_NGINX_RAW, body=status_agg)
                     stats['status_distribution'] = {
                         str(bucket['key']): bucket['doc_count']
                         for bucket in status_result['aggregations']['status_dist']['buckets']
@@ -518,7 +519,7 @@ class RecentAlertsView(APIView):
                         "sort": [{"ingestion_time": {"order": "desc"}}]
                     }
                     
-                    result = es.search(index="log_analysis_reports", body=query)
+                    result = es.search(index=ES_INDEX_ANALYSIS_REPORTS, body=query)
                     hits = result.get('hits', {}).get('hits', [])
                     
                     for hit in hits:
@@ -581,7 +582,7 @@ class LogTrendView(APIView):
                         }
                     }
                     
-                    result = es.search(index="nginx-log-raw", body=query)
+                    result = es.search(index=ES_INDEX_NGINX_RAW, body=query)
                     buckets = result['aggregations']['hourly']['buckets']
                     
                     trend_data = []
@@ -637,7 +638,7 @@ class ReportStatsView(APIView):
                 if es:
                     # 检查索引是否存在
                     try:
-                        indices = es.cat.indices(index="log_analysis_reports", format="json")
+                        indices = es.cat.indices(index=ES_INDEX_ANALYSIS_REPORTS, format="json")
                         logger.info(f"ReportStatsView: indices = {indices}")
                     except Exception as idx_err:
                         logger.error(f"ReportStatsView: indices check error = {idx_err}")
@@ -647,7 +648,7 @@ class ReportStatsView(APIView):
                         "size": 0,
                         "track_total_hits": True
                     }
-                    total_result = es.search(index="log_analysis_reports", body=total_search)
+                    total_result = es.search(index=ES_INDEX_ANALYSIS_REPORTS, body=total_search)
                     stats['total'] = total_result['hits']['total']['value']
                     logger.info(f"ReportStatsView: total = {stats['total']}")
                     
@@ -661,7 +662,7 @@ class ReportStatsView(APIView):
                             }
                         }
                     }
-                    high_result = es.search(index="log_analysis_reports", body=high_risk_search)
+                    high_result = es.search(index=ES_INDEX_ANALYSIS_REPORTS, body=high_risk_search)
                     stats['highRisk'] = high_result['hits']['total']['value']
                     logger.info(f"ReportStatsView: highRisk = {stats['highRisk']}")
                     
@@ -675,7 +676,7 @@ class ReportStatsView(APIView):
                             }
                         }
                     }
-                    medium_result = es.search(index="log_analysis_reports", body=medium_risk_search)
+                    medium_result = es.search(index=ES_INDEX_ANALYSIS_REPORTS, body=medium_risk_search)
                     stats['mediumRisk'] = medium_result['hits']['total']['value']
                     logger.info(f"ReportStatsView: mediumRisk = {stats['mediumRisk']}")
                     
@@ -697,7 +698,7 @@ class ReportStatsView(APIView):
                             }
                         }
                     }
-                    today_result = es.search(index="log_analysis_reports", body=today_search)
+                    today_result = es.search(index=ES_INDEX_ANALYSIS_REPORTS, body=today_search)
                     stats['todayNew'] = today_result['hits']['total']['value']
                     logger.info(f"ReportStatsView: todayNew = {stats['todayNew']}")
                     
@@ -733,13 +734,12 @@ class ReportDetailView(APIView):
             try:
                 es = get_es_client()
                 if es:
-                    result = es.get(index="log_analysis_reports", id=report_id)
+                    result = es.get(index=ES_INDEX_ANALYSIS_REPORTS, id=report_id)
                     source = result.get('_source', {})
                     
                     # 获取字段值
                     attack_type_ai = source.get('attack_type_ai', source.get('attack_type', '未知攻击'))
                     risk_level_raw = source.get('risk_level', 'Low')
-                    confidence = source.get('confidence', 0)
                     risk_score = source.get('risk_score', 0)
                     analysis_timestamp = source.get('analysis_timestamp', '')
                     summary = source.get('summary', '')
@@ -762,7 +762,7 @@ class ReportDetailView(APIView):
                                 },
                                 "size": 1
                             }
-                            log_result = es.search(index="nginx-log-raw", body=log_query)
+                            log_result = es.search(index=ES_INDEX_NGINX_RAW, body=log_query)
                             if log_result['hits']['hits']:
                                 log_source = log_result['hits']['hits'][0]['_source']
                                 original_log_content = log_source.get('event', {}).get('original', '')
@@ -789,8 +789,8 @@ class ReportDetailView(APIView):
                     # 格式化时间
                     formatted_time = self.format_timestamp(analysis_timestamp)
                     
-                    # 转换置信度为百分比
-                    confidence_percent = int(confidence * 100) if isinstance(confidence, (int, float)) else int(confidence)
+                    # 使用 Dify 返回的 risk_score 作为置信度
+                    confidence_percent = risk_score if isinstance(risk_score, int) else 0
                     
                     report = {
                         "id": report_id,
@@ -918,7 +918,7 @@ class ReportListView(APIView):
                         "track_total_hits": True
                     }
                     
-                    result = es.search(index="log_analysis_reports", body=query)
+                    result = es.search(index=ES_INDEX_ANALYSIS_REPORTS, body=query)
                     hits = result.get('hits', {}).get('hits', [])
                     total = result['hits']['total']['value']
                     
@@ -932,7 +932,7 @@ class ReportListView(APIView):
                         ip = original_log.get('ip', source.get('ip', '未知IP'))
                         path = original_log.get('path', source.get('path', '未知路径'))
                         analysis_timestamp = source.get('analysis_timestamp', '')
-                        confidence = source.get('confidence', 0)
+                        risk_score = source.get('risk_score', 0)
                         
                         # 转换风险等级为小写
                         risk_level_lower = risk_level_raw.lower() if risk_level_raw else 'low'
@@ -943,8 +943,8 @@ class ReportListView(APIView):
                         # 格式化时间
                         formatted_time = self.format_timestamp(analysis_timestamp)
                         
-                        # 转换置信度为百分比
-                        confidence_percent = int(confidence * 100) if isinstance(confidence, (int, float)) else int(confidence)
+                        # 使用 Dify 返回的 risk_score 作为置信度
+                        confidence_percent = risk_score if isinstance(risk_score, int) else 0
                         
                         report = {
                             "id": hit.get('_id', ''),

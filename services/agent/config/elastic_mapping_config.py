@@ -23,8 +23,6 @@ ELASTICSEARCH_MAPPING = {
             
             # 规则匹配结果
             'attack_type': {'type': 'keyword'},        # 攻击类型
-            'confidence': {'type': 'float'},           # 置信度
-            'severity': {'type': 'keyword'},           # 严重程度
             
             # ========== Dify 结构化分析结果 ==========
             'risk_level': {'type': 'keyword'},         # 风险等级: high/medium/low/unknown
@@ -163,11 +161,11 @@ def build_elastic_document(log_data: Dict[str, Any], dify_response: Dict[str, An
     # 提取 Dify 结构化字段
     dify_fields = extract_dify_fields(dify_response)
     
-    # 获取规则匹配信息
-    rule_match = actual_log.get('rule_match', {})
+    # 获取规则匹配信息（兼容新的合并结构）
+    rule_match = actual_log.get('detection_result', actual_log.get('rule_match', {}))
     
-    # 优先从 @timestamp 获取，其次是 timestamp
-    log_ts = actual_log.get('@timestamp') or actual_log.get('timestamp')
+    # 优先从 @timestamp 获取，其次是 log_timestamp，最后是 timestamp
+    log_ts = actual_log.get('@timestamp') or actual_log.get('log_timestamp') or actual_log.get('timestamp')
     
     # 构建扁平文档结构
     doc = {
@@ -178,9 +176,7 @@ def build_elastic_document(log_data: Dict[str, Any], dify_response: Dict[str, An
         'method': actual_log.get('method', ''),
         'status': actual_log.get('status', 0),
         'user_agent': actual_log.get('user_agent', ''),
-        'attack_type': rule_match.get('matched_type', ''),
-        'confidence': rule_match.get('confidence', 0.0),
-        'severity': rule_match.get('severity', ''),
+        'attack_type': rule_match.get('attack_type', rule_match.get('matched_type', '')),
         
         # Dify 分析结果（扁平结构）
         'risk_level': dify_fields.get('risk_level', 'unknown'),
@@ -193,7 +189,7 @@ def build_elastic_document(log_data: Dict[str, Any], dify_response: Dict[str, An
         # 时间戳（使用 epoch_millis 格式以确保正确的 date 类型映射）
         'log_timestamp': to_epoch_millis(log_ts),
         'analysis_timestamp': epoch_millis_now(),
-        'ingestion_time': to_epoch_millis(actual_log.get('ingestion_time')),
+        'ingestion_time': to_epoch_millis(actual_log.get('ingestion_time')) or epoch_millis_now(),
         
         # 原始数据（用于调试，不参与搜索）
         'dify_response': dify_response,

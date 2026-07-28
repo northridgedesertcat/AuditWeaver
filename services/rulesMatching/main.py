@@ -125,20 +125,19 @@ def main():
                                 detection_result = rule_engine.detect(message)
                                 
                                 if 'detections' in detection_result and detection_result['detections']:
-                                    for det in detection_result['detections']:
-                                        save_result = data_saver.save_attack_log(message, det)
-                                        
-                                        if save_result['attack_logs']['saved_es'] > 0:
-                                            logger.info(f"[OK] 攻击日志 - Elasticsearch: 已保存={save_result['attack_logs']['saved_es']}")
-                                            logger.info(f"     索引: '{ELASTICSEARCH_CONFIG['attack_index']}'")
-                                        if save_result['attack_logs']['failed_es'] > 0:
-                                            logger.error(f"[FAIL] 攻击日志 - Elasticsearch: 保存失败={save_result['attack_logs']['failed_es']}")
-                                        
-                                        if save_result.get('kafka', {}).get('sent', 0) > 0:
-                                            logger.info(f"[OK] 攻击日志 - Kafka: 已发送到 {KAFKA_CONFIG['output_topic']}")
-                                        
-                                        if DEBUG_CONFIG['log_detection_details']:
-                                            logger.debug(f"[DEBUG] 检测详情: {det}")
+                                    save_result = data_saver.save_attack_log(message, detection_result['detections'])
+                                    
+                                    if save_result['attack_logs']['saved_es'] > 0:
+                                        logger.info(f"[OK] 攻击日志 - Elasticsearch: 已保存={save_result['attack_logs']['saved_es']}")
+                                        logger.info(f"     索引: '{ELASTICSEARCH_CONFIG['attack_index']}'")
+                                    if save_result['attack_logs']['failed_es'] > 0:
+                                        logger.error(f"[FAIL] 攻击日志 - Elasticsearch: 保存失败={save_result['attack_logs']['failed_es']}")
+                                    
+                                    if save_result.get('kafka', {}).get('sent', 0) > 0:
+                                        logger.info(f"[OK] 攻击日志 - Kafka: 已发送到 {KAFKA_CONFIG['output_topic']}")
+                                    
+                                    if DEBUG_CONFIG['log_detection_details']:
+                                        logger.debug(f"[DEBUG] 检测详情: {detection_result['detections']}")
                                 else:
                                     if PROCESSING_CONFIG['save_normal_logs']:
                                         data_saver.save_normal_log(message)

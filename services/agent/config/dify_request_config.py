@@ -13,9 +13,7 @@ LOG_FIELD_MAPPING = {
     'method': lambda data: data.get('method', 'unknown'),
     'status': lambda data: data.get('status', 'unknown'),
     'user_agent': lambda data: data.get('user_agent', 'unknown'),
-    'matched_type': lambda data: data.get('rule_match', {}).get('matched_type', 'unknown'),
-    'confidence': lambda data: data.get('rule_match', {}).get('confidence', 0),
-    'severity': lambda data: data.get('rule_match', {}).get('severity', 'unknown'),
+    'matched_type': lambda data: data.get('detection_result', {}).get('attack_type', 'unknown'),
 }
 
 # ========== 查询提示词模板 ==========
@@ -33,8 +31,6 @@ INPUTS_FIELDS = [
     'status',
     'user_agent',
     'matched_type',
-    'confidence',
-    'severity',
 ]
 
 # ========== 用户标识配置 ==========

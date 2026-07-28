@@ -33,18 +33,10 @@ def match_keywords(text, keywords):
     return matched
 
 
-def calculate_confidence(matched_count, total_patterns):
-    if total_patterns == 0:
-        return 0
-    return min(int((matched_count / total_patterns) * 100), 100)
-
-
-def format_detection_result(log_entry, attack_type, confidence, matched_items):
+def format_detection_result(log_entry, attack_type, matched_items):
     return {
         'event_id': log_entry.get('event_id', ''),
         'attack_type': attack_type,
-        'confidence': confidence,
-        'severity': 'high' if confidence >= 70 else 'medium' if confidence >= 40 else 'low',
         'matched_rules': {
             'keywords': matched_items.get('keywords', []),
             'patterns': matched_items.get('patterns', [])
@@ -64,18 +56,14 @@ def validate_log_entry(log_entry):
     return True
 
 
-def filter_results(results, min_confidence):
-    return [r for r in results if r.get('confidence', 0) >= min_confidence]
-
-
 def aggregate_results(results):
     return results
 
 
 def log_detection(result):
     logger = logging.getLogger('detection')
-    logger.warning(f"检测到攻击: {result.get('attack_type')}, 置信度: {result.get('confidence')}%, IP: {result.get('event_id')}")
+    logger.warning(f"检测到攻击: {result.get('attack_type')}, IP: {result.get('event_id')}")
 
 
 def generate_alert_message(result):
-    return f"[告警] 检测到{result.get('attack_type')}攻击, 置信度: {result.get('confidence')}%, 严重程度: {result.get('severity')}"
+    return f"[告警] 检测到{result.get('attack_type')}攻击"

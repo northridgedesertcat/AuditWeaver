@@ -3,10 +3,11 @@ from django.conf import settings
 
 def get_es_client():
     try:
+        scheme = "https" if settings.ELASTICSEARCH_USE_SSL else "http"
         es = Elasticsearch(
-            hosts=[f"http://{settings.ELASTICSEARCH_HOST}:{settings.ELASTICSEARCH_PORT}"],
+            hosts=[f"{scheme}://{settings.ELASTICSEARCH_HOST}:{settings.ELASTICSEARCH_PORT}"],
             basic_auth=(settings.ELASTICSEARCH_USER, settings.ELASTICSEARCH_PASSWORD),
-            verify_certs=False,
+            verify_certs=settings.ELASTICSEARCH_VERIFY_CERTS,
             ssl_show_warn=False,
         )
         return es

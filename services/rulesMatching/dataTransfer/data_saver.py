@@ -6,15 +6,15 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent.parent))
 from common.time_utils import epoch_millis_now, format_for_filename, format_for_directory
-from common.env import ES_HOST, ES_PORT, KAFKA_BROKERS
+from common.env import ES_HOST, ES_PORT, KAFKA_BROKERS, KAFKA_TOPIC_RISK, ES_INDEX_MATCHED_LOGS
 from elasticsearch import Elasticsearch
 from elasticsearch.exceptions import RequestError, ConnectionError
 
 logger = logging.getLogger('data_saver')
 
 class DataSaver:
-    def __init__(self, es_host=ES_HOST, es_port=ES_PORT, es_index='matched_logs',
-                 kafka_enabled=True, kafka_brokers=KAFKA_BROKERS, kafka_topic='log.risk'):
+    def __init__(self, es_host=ES_HOST, es_port=ES_PORT, es_index=ES_INDEX_MATCHED_LOGS,
+                 kafka_enabled=True, kafka_brokers=KAFKA_BROKERS, kafka_topic=KAFKA_TOPIC_RISK):
         self.es_host = es_host
         self.es_port = es_port
         self.es_index = es_index
@@ -79,9 +79,7 @@ class DataSaver:
             'log_timestamp': log_entry.get('log_timestamp', epoch_millis_now()),
             'ingestion_time': epoch_millis_now(),
             'detection_result': detection_result,
-            'matched_rules': detection_result.get('matched_rules', []),
-            'severity': detection_result.get('severity', 'medium'),
-            'confidence': detection_result.get('confidence', 0)
+            'matched_rules': detection_result.get('matched_rules', {})
         }
         
         try:
@@ -114,13 +112,21 @@ class DataSaver:
             logger.error(f"验证Elasticsearch写入失败: {str(e)}")
             return False
 
-    def save_attack_log(self, log_entry, detection_result):
+    def save_attack_log(self, log_entry, detections):
+        if not isinstance(detections, list):
+            detections = [detections]
+        
+        if not detections:
+            return {'attack_logs': {'saved_es': 0, 'failed_es': 0}, 'kafka': {'sent': 0, 'failed': 0}}
+        
+        merged_detection = self._merge_detections(detections)
+        
         result = {
             'attack_logs': {'saved_es': 0, 'failed_es': 0},
             'kafka': {'sent': 0, 'failed': 0}
         }
         
-        doc_id = self.save_attack_log_to_elasticsearch(log_entry, detection_result)
+        doc_id = self.save_attack_log_to_elasticsearch(log_entry, merged_detection)
         if doc_id:
             result['attack_logs']['saved_es'] += 1
         else:
@@ -128,16 +134,17 @@ class DataSaver:
         
         if self.kafka_enabled and self.kafka_producer:
             try:
+                log_timestamp = log_entry.get('log_timestamp') or log_entry.get('@timestamp') or log_entry.get('timestamp') or epoch_millis_now()
                 message = {
                     'event_id': log_entry.get('event_id'),
                     'ip': log_entry.get('ip'),
                     'path': log_entry.get('path'),
                     'method': log_entry.get('method'),
                     'status': log_entry.get('status'),
-                    'risk_level': detection_result.get('severity', 'medium'),
-                    'confidence': detection_result.get('confidence', 0),
+                    'user_agent': log_entry.get('user_agent'),
+                    'log_timestamp': log_timestamp,
                     'detection_time': epoch_millis_now(),
-                    'detection_result': detection_result
+                    'detection_result': merged_detection
                 }
                 
                 future = self.kafka_producer.send(self.kafka_topic, message)
@@ -149,6 +156,33 @@ class DataSaver:
                 result['kafka']['failed'] += 1
         
         return result
+
+    def _merge_detections(self, detections):
+        if not detections:
+            return {}
+        
+        merged = {
+            'attack_type': [],
+            'matched_rules': {'keywords': [], 'patterns': []},
+            'detection_time': epoch_millis_now(),
+            'is_attack': True
+        }
+        
+        for det in detections:
+            if det.get('attack_type') and det['attack_type'] not in merged['attack_type']:
+                merged['attack_type'].append(det['attack_type'])
+            
+            det_rules = det.get('matched_rules', {})
+            for keyword in det_rules.get('keywords', []):
+                if keyword not in merged['matched_rules']['keywords']:
+                    merged['matched_rules']['keywords'].append(keyword)
+            for pattern in det_rules.get('patterns', []):
+                if pattern not in merged['matched_rules']['patterns']:
+                    merged['matched_rules']['patterns'].append(pattern)
+        
+        merged['attack_type'] = ','.join(merged['attack_type'])
+        
+        return merged
 
     def save_normal_log(self, log_entry):
         try:
