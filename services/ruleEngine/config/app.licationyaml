@@ -1,0 +1,49 @@
+application:
+
+  name: rule-matching-engine
+
+  version: "1.0.0"
+
+  environment: development
+
+
+log:
+
+  level: INFO
+
+
+rule:
+
+  profile_path: ./rules/profiles
+
+  regex_path: ./rules/regex
+
+
+processing:
+
+  worker_threads: 1
+
+  max_batch_size: 100
+
+
+kafka:
+
+  bootstrap_servers:
+    - localhost:29023
+
+  consumer:
+
+    topic: log.structured
+
+    group_id: rule-engine-group
+
+    auto_offset_reset: latest
+
+    enable_auto_commit: false
+
+
+  producer:
+
+    topics:
+      - log.analysis
+      - rule.event.save

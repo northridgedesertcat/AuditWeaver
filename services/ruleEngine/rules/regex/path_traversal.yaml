@@ -1,0 +1,19 @@
+id: path_traversal_regex
+name: Path Traversal Regex Repository
+version: "1.0"
+patterns:
+  - id: unix_parent_traversal
+    enabled: true
+    regex: '(?i)\.\./'
+  - id: windows_parent_traversal
+    enabled: true
+    regex: '(?i)\.\\'
+  - id: encoded_parent_traversal
+    enabled: true
+    regex: '(?i)\.\.(?:%2f|%5c)'
+  - id: unix_sensitive_file
+    enabled: true
+    regex: '(?i)/(?:etc/(?:passwd|shadow)|var/|proc/|sys/)'
+  - id: windows_sensitive_path
+    enabled: true
+    regex: '(?i)(?:[a-z]:\\(?:windows|system32)\\|windows\\|system32\\)'

@@ -1,0 +1,22 @@
+id: sql_injection_regex
+name: SQL Injection Regex Repository
+version: "1.0"
+patterns:
+  - id: union_select
+    enabled: true
+    regex: '(?i)\bunion\b.*\bselect\b'
+  - id: select_from
+    enabled: true
+    regex: '(?i)\bselect\b.*\bfrom\b'
+  - id: quoted_where_clause
+    enabled: true
+    regex: '(?i)\bwhere\b.*[\''"].*[=<>]'
+  - id: destructive_statement
+    enabled: true
+    regex: '(?i)\b(?:drop\s+table|delete\s+from|insert\s+into|update\s+\w+\s+set)\b'
+  - id: boolean_bypass
+    enabled: true
+    regex: '(?i)\b(?:and|or)\b.*\b1\s*=\s*1\b'
+  - id: null_bypass
+    enabled: true
+    regex: '(?i)\bnot\b.*\bnull\b'

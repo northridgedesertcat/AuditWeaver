@@ -1,0 +1,11 @@
+id: sql_injection
+name: SQL Injection
+description: Detect SQL injection payloads in request paths and referrers.
+attack_type: sql_injection
+enabled: true
+target_fields:
+  - path
+  - referrer
+matchers:
+  - type: regex
+    library: sql_injection_regex

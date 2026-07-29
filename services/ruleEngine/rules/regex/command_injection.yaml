@@ -1,0 +1,16 @@
+id: command_injection_regex
+name: Command Injection Regex Repository
+version: "1.0"
+patterns:
+  - id: shell_separator
+    enabled: true
+    regex: '(?i)(?:;|&|\|)\s*[a-z]+'
+  - id: command_substitution
+    enabled: true
+    regex: '(?i)(?:`[a-z]+`|\$\([a-z]+\))'
+  - id: command_shell
+    enabled: true
+    regex: '(?i)cmd\.exe\s*/c|powershell\s*-c'
+  - id: shell_command_keyword
+    enabled: true
+    regex: '(?i)\b(?:cat|ls|dir|rm|cp|mv|chmod|chown|mkdir|rmdir|ping|whoami|uname|bash|powershell)\b'
