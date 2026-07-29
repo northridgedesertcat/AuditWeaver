@@ -145,6 +145,15 @@ def print_header():
     print()
 
 
+def resolve_host(host_env_key, default_host):
+    if host_env_key:
+        env_value = get_env(host_env_key, default_host)
+        if ':' in env_value:
+            return env_value.split(':')[0]
+        return env_value
+    return default_host
+
+
 def resolve_port(port_env_key, default_port):
     if port_env_key:
         env_value = get_env(port_env_key, default_port)
@@ -172,7 +181,10 @@ def run_service(service, project_dir, service_config, docker_manager=None):
         
         wait_config = service_config.get_wait_config(wait_config_key)
         
-        host = wait_config.get("host", "localhost")
+        host_env_key = wait_config.get("host_env_key")
+        default_host = wait_config.get("default_host", "localhost")
+        host = resolve_host(host_env_key, default_host)
+        
         port_env_key = wait_config.get("port_env_key")
         default_port = wait_config.get("default_port", "80")
         max_retries = wait_config.get("max_retries", 10)
@@ -207,10 +219,11 @@ def run_service(service, project_dir, service_config, docker_manager=None):
         print(f"          Script: {full_script_path}")
         success, stdout, stderr = run_python_script(full_script_path, cwd=project_dir)
         if not success:
-            print_warning(f"Failed to execute script!")
+            print_error(f"Failed to execute script!")
+            return False
         else:
             print_success("Script executed successfully!")
-        return True
+            return True
     
     elif service_type == "window":
         window_title = service.get("window_title", "")
@@ -226,6 +239,7 @@ def run_service(service, project_dir, service_config, docker_manager=None):
             print_success(f"Started -> Window: {window_title}")
         else:
             print_warning(f"Failed to start {window_title}!")
+            return False
         
         if post_delay > 0:
             time.sleep(post_delay)

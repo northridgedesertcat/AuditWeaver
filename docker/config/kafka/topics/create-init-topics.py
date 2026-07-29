@@ -120,7 +120,9 @@ def list_existing_topics(admin_client: KafkaAdminClient) -> set:
 
 
 def create_topics(admin_client: KafkaAdminClient, topics: list, dry_run: bool = False):
-    """Create topics that do not already exist. Existing topics are skipped."""
+    """Create topics that do not already exist. Existing topics are skipped.
+    Returns (created_count, failed_count).
+    """
     existing = list_existing_topics(admin_client)
 
     to_create = []
@@ -144,28 +146,34 @@ def create_topics(admin_client: KafkaAdminClient, topics: list, dry_run: bool = 
 
     if not to_create:
         log.info("All topics are already up to date. Nothing to create.")
-        return
+        return 0, 0
 
     if dry_run:
         log.info(f"[DRY-RUN] {len(to_create)} topic(s) would be created. "
                  "No changes applied.")
-        return
+        return len(to_create), 0
 
     log.info(f"Creating {len(to_create)} topic(s) ...")
+    failed = 0
     try:
         futures = admin_client.create_topics(new_topics=to_create, validate_only=False)
         for future in futures:
             try:
                 future.result()
             except TopicAlreadyExistsError:
-                pass  # race condition: another client created it between list and create
+                pass
             except InvalidTopicError as e:
                 log.error(f"Invalid topic: {e}")
+                failed += 1
             except KafkaError as e:
                 log.error(f"Failed to create topic: {e}")
-        log.info("Topic creation completed.")
+                failed += 1
+        log.info(f"Topic creation completed. "
+                 f"{len(to_create) - failed}/{len(to_create)} succeeded.")
     except KafkaError as e:
         raise RuntimeError(f"Failed to create topics: {e}") from e
+
+    return len(to_create) - failed, failed
 
 
 def show_status(admin_client: KafkaAdminClient, topics: list):
@@ -274,8 +282,11 @@ def main():
             show_status(admin, topics)
         else:
             show_status(admin, topics)
-            create_topics(admin, topics, dry_run=args.dry_run)
+            created, failed = create_topics(admin, topics, dry_run=args.dry_run)
             show_status(admin, topics)
+            if failed > 0:
+                log.error(f"{failed} topic(s) failed to be created.")
+                sys.exit(1)
     finally:
         admin.close()
         log.info("Admin client closed.")

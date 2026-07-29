@@ -11,8 +11,6 @@ from common.env import (
 
 DEFAULT_CONFIG = {
     "env": {
-        "es_port": {"env_key": "ES_PORT", "default": "19200"},
-        "kafka_brokers": {"env_key": "KAFKA_BROKERS", "default": "localhost:29092"},
         "django_port": {"env_key": "DJANGO_PORT", "default": "8000"},
         "frontend_port": {"env_key": "FRONTEND_PORT", "default": "3000"},
     },
@@ -31,7 +29,8 @@ DEFAULT_CONFIG = {
         },
         "kafka": {
             "type": "tcp",
-            "host": "localhost",
+            "host_env_key": "KAFKA_BROKERS",
+            "default_host": "localhost",
             "port_env_key": "KAFKA_BROKERS",
             "default_port": "29092",
             "max_retries": 5,
@@ -154,9 +153,6 @@ class ServiceConfig:
     def __init__(self, config=None):
         self.config = config or DEFAULT_CONFIG
     
-    def get_env_config(self, key):
-        return self.config["env"].get(key, {})
-    
     def get_wait_config(self, key):
         return self.config["wait"].get(key, {})
     
@@ -168,22 +164,3 @@ class ServiceConfig:
     
     def get_services(self):
         return self.config["services"]
-    
-    def get_service_by_id(self, service_id):
-        for service in self.config["services"]:
-            if service["id"] == service_id:
-                return service
-        return None
-    
-    def add_service(self, service):
-        self.config["services"].append(service)
-    
-    def remove_service(self, service_id):
-        self.config["services"] = [s for s in self.config["services"] if s["id"] != service_id]
-    
-    def update_service(self, service_id, updates):
-        for service in self.config["services"]:
-            if service["id"] == service_id:
-                service.update(updates)
-                return True
-        return False

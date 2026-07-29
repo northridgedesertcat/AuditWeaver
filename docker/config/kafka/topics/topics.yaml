@@ -74,8 +74,7 @@ topics:
       retention.ms: "259200000"
     description: >
       Rule Engine produce.Consumed by the Elasticsearch.
-  
-  
+
   - name: isolation.event.save
     partitions: 2
     replication_factor: 1
@@ -83,7 +82,7 @@ topics:
       retention.ms: "259200000"
     description: >
       isolation produce.Consumed by the Elasticsearch.
-  
+
   - name: agent.event.save
     partitions: 2
     replication_factor: 1
