@@ -65,6 +65,7 @@ topics:
 
   # ---------------------------------------------------------------------------
   # Event Save (Anaysis Modules output -> Elasticsearch input)
+  # These topics used to save data into elasticsearch
   # ---------------------------------------------------------------------------
   - name: rule.event.save
     partitions: 2

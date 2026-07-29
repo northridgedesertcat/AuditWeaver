@@ -48,6 +48,9 @@ DEFAULT_CONFIG = {
         },
     },
     "scripts": {
+        "kafka_topics": {
+            "path": os.path.join("docker", "config", "kafka", "topics", "create-init-topics.py"),
+        },
         "es_mapping": {
             "path": os.path.join("docker", "config", "elasticsearch", "creatMapping.py"),
         },
@@ -79,6 +82,12 @@ DEFAULT_CONFIG = {
             "type": "wait",
             "wait_type": "tcp",
             "wait_config": "kafka",
+        },
+        {
+            "id": "init_kafka_topics",
+            "name": "Initializing Kafka Topics",
+            "type": "script",
+            "script_config": "kafka_topics",
         },
         {
             "id": "es_mapping",
