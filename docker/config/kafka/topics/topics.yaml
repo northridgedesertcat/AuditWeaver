@@ -62,3 +62,31 @@ topics:
       Final risk-evaluation records enriched by DataSaver (ES persistence +
       Kafka relay). Consumed by the RiskAssessment service for downstream
       alerting. Retained for 3 days.
+
+  # ---------------------------------------------------------------------------
+  # Event Save (Anaysis Modules output -> Elasticsearch input)
+  # ---------------------------------------------------------------------------
+  - name: rule.event.save
+    partitions: 2
+    replication_factor: 1
+    configs:
+      retention.ms: "259200000"
+    description: >
+      Rule Engine produce.Consumed by the Elasticsearch.
+  
+  
+  - name: isolation.event.save
+    partitions: 2
+    replication_factor: 1
+    configs:
+      retention.ms: "259200000"
+    description: >
+      isolation produce.Consumed by the Elasticsearch.
+  
+  - name: agent.event.save
+    partitions: 2
+    replication_factor: 1
+    configs:
+      retention.ms: "259200000"
+    description: >
+      agent produce.Consumed by the Elasticsearch.
