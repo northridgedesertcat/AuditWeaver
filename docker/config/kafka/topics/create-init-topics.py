@@ -135,7 +135,7 @@ def create_topics(admin_client: KafkaAdminClient, topics: list, dry_run: bool = 
                 name=t['name'],
                 num_partitions=t['partitions'],
                 replication_factor=t['replication_factor'],
-                configs=t['configs'] or None,
+                topic_configs=t['configs'] or None,
             )
         )
         log.info(
@@ -154,26 +154,18 @@ def create_topics(admin_client: KafkaAdminClient, topics: list, dry_run: bool = 
         return len(to_create), 0
 
     log.info(f"Creating {len(to_create)} topic(s) ...")
-    failed = 0
     try:
-        futures = admin_client.create_topics(new_topics=to_create, validate_only=False)
-        for future in futures:
-            try:
-                future.result()
-            except TopicAlreadyExistsError:
-                pass
-            except InvalidTopicError as e:
-                log.error(f"Invalid topic: {e}")
-                failed += 1
-            except KafkaError as e:
-                log.error(f"Failed to create topic: {e}")
-                failed += 1
+        admin_client.create_topics(new_topics=to_create, validate_only=False)
         log.info(f"Topic creation completed. "
-                 f"{len(to_create) - failed}/{len(to_create)} succeeded.")
+                 f"{len(to_create)}/{len(to_create)} succeeded.")
+    except TopicAlreadyExistsError:
+        log.info("Some topics already exist (skipped).")
+    except InvalidTopicError as e:
+        raise RuntimeError(f"Invalid topic: {e}") from e
     except KafkaError as e:
         raise RuntimeError(f"Failed to create topics: {e}") from e
 
-    return len(to_create) - failed, failed
+    return len(to_create), 0
 
 
 def show_status(admin_client: KafkaAdminClient, topics: list):
