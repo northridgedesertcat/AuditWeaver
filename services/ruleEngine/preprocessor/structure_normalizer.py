@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 from typing import Any, Mapping
 
 from ..models.log_message import LogMessage
+
+logger = logging.getLogger(__name__)
 
 
 class LogValidationError(ValueError):

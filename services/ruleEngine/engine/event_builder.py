@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import logging
+
 from ..models.log_message import LogMessage
 from ..models.security_event import Detection, SecurityEvent
+
+logger = logging.getLogger(__name__)
 
 
 class EventBuilder:
@@ -16,4 +20,7 @@ class EventBuilder:
         context["normalized_path"] = log.path
         context["bytes"] = context.pop("response_bytes")
         context["timestamp"] = context.pop("log_timestamp")
-        return SecurityEvent(log.event_id, attack_types, tuple(detections), context)
+        event = SecurityEvent(log.event_id, attack_types, tuple(detections), context)
+        logger.debug("Built SecurityEvent: event_id=%s, attack_types=%s, detections=%d",
+                      event.event_id, event.attack_type, len(event.detections))
+        return event

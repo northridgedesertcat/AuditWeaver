@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from ..models.log_message import LogMessage
@@ -9,6 +10,8 @@ from ..models.security_event import Detection, SecurityEvent
 from .event_builder import EventBuilder
 from .regex_matcher import RegexMatcher
 from .rule_loader import LoadedRules, RuleLoader
+
+logger = logging.getLogger(__name__)
 
 
 class RuleEngine:
@@ -25,6 +28,7 @@ class RuleEngine:
     def analyze(self, log: LogMessage) -> SecurityEvent | None:
         rules = self._rules or self._load_rules()
         detections: list[Detection] = []
+        matched_profiles: list[str] = []
         for profile in rules.profiles:
             if not profile.get("enabled", True):
                 continue
@@ -39,7 +43,14 @@ class RuleEngine:
                     attack_type=str(profile.get("attack_type", profile["id"])),
                     matches=tuple(matches),
                 ))
-        return self.event_builder.build(log, detections) if detections else None
+                matched_profiles.append(profile["id"])
+        if detections:
+            logger.info("Detected %d rule(s) for event_id=%s: %s",
+                         len(detections), log.event_id, ", ".join(matched_profiles))
+            return self.event_builder.build(log, detections)
+        else:
+            logger.debug("No detection for event_id=%s", log.event_id)
+            return None
 
     def _load_rules(self) -> LoadedRules:
         self._rules = self.rule_loader.load()

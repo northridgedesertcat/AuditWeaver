@@ -32,10 +32,10 @@ def main() -> None:
         settings.bootstrap_servers, settings.consumer_topic, settings.consumer_group_id,
         settings.auto_offset_reset, settings.enable_auto_commit,
     )
-    producer = KafkaProducerAdapter(settings.bootstrap_servers, settings.producer_topic)
+    producer = KafkaProducerAdapter(settings.bootstrap_servers, settings.producer_topics)
     consumer.connect()
     producer.connect()
-    logger.info("Rule engine started: %s -> %s", settings.consumer_topic, settings.producer_topic)
+    logger.info("Rule engine started: %s -> %s", settings.consumer_topic, settings.producer_topics)
     try:
         for raw_log in consumer.consume():
             try:

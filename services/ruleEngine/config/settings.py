@@ -18,7 +18,7 @@ class Settings:
     consumer_group_id: str
     auto_offset_reset: str
     enable_auto_commit: bool
-    producer_topic: str
+    producer_topics: list[str]
 
 
 def load_settings(config_path: str | Path | None = None) -> Settings:
@@ -39,5 +39,5 @@ def load_settings(config_path: str | Path | None = None) -> Settings:
         consumer_group_id=str(consumer.get("group_id", "rule-engine-group")),
         auto_offset_reset=str(consumer.get("auto_offset_reset", "latest")),
         enable_auto_commit=bool(consumer.get("enable_auto_commit", False)),
-        producer_topic=str(producer.get("topic", "log.analysis")),
+        producer_topics=list(producer.get("topics", ["log.analysis"])),
     )

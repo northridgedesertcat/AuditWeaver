@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
 
 import yaml
+
+logger = logging.getLogger(__name__)
 
 
 class RuleConfigurationError(ValueError):
@@ -29,6 +32,8 @@ class RuleLoader:
     def load(self) -> LoadedRules:
         libraries = self.load_regex_libraries()
         profiles = self.load_profiles(libraries)
+        logger.info("Loaded %d profile(s) and %d regex librar%s",
+                     len(profiles), len(libraries), "y" if len(libraries) == 1 else "ies")
         return LoadedRules(tuple(profiles), libraries)
 
     def load_regex_libraries(self) -> dict[str, dict[str, Any]]:

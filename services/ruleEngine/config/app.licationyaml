@@ -44,4 +44,5 @@ kafka:
 
   producer:
 
-    topic: log.analysis
+    topics:
+      - log.analysis

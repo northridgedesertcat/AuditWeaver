@@ -9,9 +9,9 @@ from ..models.security_event import SecurityEvent
 
 
 class KafkaProducer:
-    def __init__(self, bootstrap_servers: list[str] | str, topic: str) -> None:
+    def __init__(self, bootstrap_servers: list[str] | str, topics: list[str]) -> None:
         self.bootstrap_servers = bootstrap_servers
-        self.topic = topic
+        self.topics = topics
         self._producer: Any = None
 
     def connect(self) -> None:
@@ -27,7 +27,9 @@ class KafkaProducer:
     def send(self, event: SecurityEvent) -> None:
         if self._producer is None:
             raise RuntimeError("Kafka producer is not connected")
-        self._producer.send(self.topic, event.to_dict())
+        payload = event.to_dict()
+        for topic in self.topics:
+            self._producer.send(topic, payload)
 
     def close(self) -> None:
         if self._producer is not None:
