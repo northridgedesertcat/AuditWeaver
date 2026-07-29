@@ -1,0 +1,64 @@
+# =============================================================================
+# AuditWeaver - Kafka Topic Configuration
+# =============================================================================
+# This file defines all business-level Kafka topics used by the AuditWeaver
+# pipeline. Topics are created and managed exclusively via create-init-topics.py.
+# Kafka auto-topic-creation should be disabled to enforce this single source
+# of truth.
+#
+# Fields:
+#   name:              Topic name (string, required)
+#   partitions:        Number of partitions (integer, required)
+#   replication_factor: Replication factor (integer, required)
+#   configs:           Optional per-topic broker configs (e.g. retention.ms)
+#   description:       Human-readable purpose (comment only)
+# =============================================================================
+
+topics:
+
+  # ---------------------------------------------------------------------------
+  # Raw log ingestion (Logstash input)
+  # ---------------------------------------------------------------------------
+  - name: log.raw
+    partitions: 2
+    replication_factor: 1
+    description: >
+      Raw nginx access logs ingested by Logstash. Acts as the entry point of
+      the pipeline before Grok parsing and structuring.
+
+  # ---------------------------------------------------------------------------
+  # Structured logs (Logstash output -> RulesMatching input -> Kafka Connect -> ES)
+  # ---------------------------------------------------------------------------
+  - name: log.structured
+    partitions: 2
+    replication_factor: 1
+    description: >
+      Logs after Grok/Date/Mutate processing in Logstash. Consumed by the
+      RulesMatching engine for attack-pattern detection and also sinked to
+      Elasticsearch via Kafka Connect (log-structured-sink connector).
+
+  # ---------------------------------------------------------------------------
+  # Analysis results (RulesMatching output -> Agent input)
+  # ---------------------------------------------------------------------------
+  - name: log.analysis
+    partitions: 2
+    replication_factor: 1
+    configs:
+      retention.ms: "259200000"
+    description: >
+      Matched attack events produced by RulesMatching. Each event carries an
+      event_id and a list of detected attack types. Consumed by the Agent
+      module for Dify-based AI analysis. Retained for 3 days.
+
+  # ---------------------------------------------------------------------------
+  # Risk assessment (DataSaver output -> RiskAssessment input)
+  # ---------------------------------------------------------------------------
+  - name: log.risk
+    partitions: 2
+    replication_factor: 1
+    configs:
+      retention.ms: "259200000"
+    description: >
+      Final risk-evaluation records enriched by DataSaver (ES persistence +
+      Kafka relay). Consumed by the RiskAssessment service for downstream
+      alerting. Retained for 3 days.
