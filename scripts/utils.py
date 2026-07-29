@@ -3,7 +3,6 @@ import subprocess
 import time
 import socket
 import http.client
-import json
 import logging
 
 logging.basicConfig(
@@ -146,6 +145,15 @@ def print_header():
     print()
 
 
+def resolve_host(host_env_key, default_host):
+    if host_env_key:
+        env_value = get_env(host_env_key, default_host)
+        if ':' in env_value:
+            return env_value.split(':')[0]
+        return env_value
+    return default_host
+
+
 def resolve_port(port_env_key, default_port):
     if port_env_key:
         env_value = get_env(port_env_key, default_port)
@@ -153,49 +161,6 @@ def resolve_port(port_env_key, default_port):
             return env_value.split(':')[-1]
         return env_value
     return default_port
-
-
-def check_connector_exists(connector_name, connect_host='localhost', connect_port=8083):
-    try:
-        conn = http.client.HTTPConnection(connect_host, connect_port, timeout=10)
-        conn.request('GET', f'/connectors/{connector_name}')
-        response = conn.getresponse()
-        conn.close()
-        return response.status == 200
-    except Exception:
-        return False
-
-
-def create_connector(connector_config_path, connect_host='localhost', connect_port=8083):
-    try:
-        with open(connector_config_path, 'r', encoding='utf-8') as f:
-            connector_config = json.load(f)
-        
-        connector_name = connector_config.get('name', '')
-        if not connector_name:
-            print_warning("Connector config does not have a 'name' field")
-            return False
-        
-        if check_connector_exists(connector_name, connect_host, connect_port):
-            print(f"          Connector '{connector_name}' already exists, skipping...")
-            return True
-        
-        conn = http.client.HTTPConnection(connect_host, connect_port, timeout=10)
-        headers = {'Content-Type': 'application/json'}
-        conn.request('POST', '/connectors', body=json.dumps(connector_config), headers=headers)
-        response = conn.getresponse()
-        response_body = response.read().decode('utf-8')
-        conn.close()
-        
-        if response.status == 201:
-            print_success(f"Connector '{connector_name}' created successfully!")
-            return True
-        else:
-            print_warning(f"Failed to create connector '{connector_name}'. Status: {response.status}, Response: {response_body}")
-            return False
-    except Exception as e:
-        print_warning(f"Error creating connector: {e}")
-        return False
 
 
 def run_service(service, project_dir, service_config, docker_manager=None):
@@ -216,7 +181,10 @@ def run_service(service, project_dir, service_config, docker_manager=None):
         
         wait_config = service_config.get_wait_config(wait_config_key)
         
-        host = wait_config.get("host", "localhost")
+        host_env_key = wait_config.get("host_env_key")
+        default_host = wait_config.get("default_host", "localhost")
+        host = resolve_host(host_env_key, default_host)
+        
         port_env_key = wait_config.get("port_env_key")
         default_port = wait_config.get("default_port", "80")
         max_retries = wait_config.get("max_retries", 10)
@@ -251,10 +219,11 @@ def run_service(service, project_dir, service_config, docker_manager=None):
         print(f"          Script: {full_script_path}")
         success, stdout, stderr = run_python_script(full_script_path, cwd=project_dir)
         if not success:
-            print_warning(f"Failed to execute script!")
+            print_error(f"Failed to execute script!")
+            return False
         else:
             print_success("Script executed successfully!")
-        return True
+            return True
     
     elif service_type == "window":
         window_title = service.get("window_title", "")
@@ -270,26 +239,10 @@ def run_service(service, project_dir, service_config, docker_manager=None):
             print_success(f"Started -> Window: {window_title}")
         else:
             print_warning(f"Failed to start {window_title}!")
+            return False
         
         if post_delay > 0:
             time.sleep(post_delay)
-        return True
-    
-    elif service_type == "connector":
-        connector_config_key = service.get("connector_config")
-        
-        connector_config = service_config.get_connector_config(connector_config_key)
-        
-        connector_path = connector_config.get("path", "")
-        connect_host = connector_config.get("connect_host", "localhost")
-        connect_port = connector_config.get("connect_port", 8083)
-        
-        full_connector_path = os.path.join(project_dir, connector_path)
-        
-        print(f"          Connector Config: {full_connector_path}")
-        success = create_connector(full_connector_path, connect_host, connect_port)
-        if not success:
-            print_warning("Failed to create connector!")
         return True
     
     else:
