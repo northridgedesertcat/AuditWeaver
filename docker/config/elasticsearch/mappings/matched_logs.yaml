@@ -1,0 +1,104 @@
+settings:
+  number_of_shards: 1
+  number_of_replicas: 0
+
+  analysis:
+    analyzer:
+      default:
+        type: standard
+
+
+mappings:
+
+  properties:
+
+    event_id:
+      type: keyword
+
+
+    attack_type:
+      type: keyword
+
+
+    detections:
+      type: nested
+
+      properties:
+
+        rule_id:
+          type: keyword
+
+
+        matches:
+          type: nested
+
+          properties:
+
+            field:
+              type: keyword
+
+
+            pattern_id:
+              type: keyword
+
+
+            matched_value:
+              type: text
+
+              fields:
+                keyword:
+                  type: keyword
+                  ignore_above: 1024
+
+
+
+    log_context:
+
+      properties:
+
+        ip:
+          type: ip
+
+
+        method:
+          type: keyword
+
+
+        path:
+          type: keyword
+
+
+        normalized_path:
+          type: keyword
+
+
+        http_version:
+          type: keyword
+
+
+        status:
+          type: integer
+
+
+        bytes:
+          type: long
+
+
+        referrer:
+          type: keyword
+
+
+        user_agent:
+          type: text
+
+          fields:
+            keyword:
+              type: keyword
+              ignore_above: 256
+
+
+        timestamp:
+          type: date
+
+          format:
+            epoch_millis

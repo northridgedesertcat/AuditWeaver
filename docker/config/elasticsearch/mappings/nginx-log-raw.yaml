@@ -1,0 +1,68 @@
+mappings:
+  properties:
+    "@timestamp":
+      type: date
+      format: "epoch_millis||strict_date_optional_time||yyyy-MM-dd HH:mm:ss"
+    "@version":
+      type: keyword
+    bytes:
+      type: long
+    event:
+      properties:
+        original:
+          type: text
+          fields:
+            keyword:
+              type: keyword
+              ignore_above: 1024
+    event_id:
+      type: keyword
+    http_version:
+      type: keyword
+    ip:
+      type: ip
+    method:
+      type: keyword
+    path:
+      type: keyword
+    referrer:
+      type: text
+      fields:
+        keyword:
+          type: keyword
+          ignore_above: 256
+    status:
+      type: integer
+    user_agent:
+      type: text
+      fields:
+        keyword:
+          type: keyword
+          ignore_above: 256
+    log_source:
+      type: keyword
+    audit_user:
+      type: keyword
+    audit_event:
+      type: text
+      fields:
+        keyword:
+          type: keyword
+          ignore_above: 512
+    pipeline:
+      properties:
+        rule_matching:
+          properties:
+            status:
+              type: keyword
+        agent_analysis:
+          properties:
+            status:
+              type: keyword
+settings:
+  number_of_shards: 1
+  number_of_replicas: 0
+  analysis:
+    analyzer:
+      default:
+        type: standard
