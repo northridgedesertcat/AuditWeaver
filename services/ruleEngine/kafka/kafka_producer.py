@@ -21,6 +21,7 @@ class KafkaProducer:
             raise RuntimeError("kafka-python is required to run the Kafka adapter") from error
         self._producer = KafkaProducer(
             bootstrap_servers=self.bootstrap_servers,
+            key_serializer=lambda k: k.encode("utf-8"),
             value_serializer=lambda payload: json.dumps(payload, ensure_ascii=False).encode("utf-8"),
         )
 
@@ -29,7 +30,7 @@ class KafkaProducer:
             raise RuntimeError("Kafka producer is not connected")
         payload = event.to_dict()
         for topic in self.topics:
-            self._producer.send(topic, payload)
+            self._producer.send(topic, payload, key=event.event_id)
 
     def close(self) -> None:
         if self._producer is not None:

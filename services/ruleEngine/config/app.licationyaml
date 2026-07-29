@@ -46,3 +46,4 @@ kafka:
 
     topics:
       - log.analysis
+      - rule.event.save
