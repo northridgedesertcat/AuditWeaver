@@ -1,146 +1,104 @@
-mappings:
-  properties:
-    "@timestamp":
-      type: date
-      format: "epoch_millis||strict_date_optional_time||yyyy-MM-dd HH:mm:ss"
-    "@version":
-      type: keyword
-    event:
-      properties:
-        original:
-          type: text
-          fields:
-            keyword:
-              type: keyword
-              ignore_above: 1024
-    event_id:
-      type: keyword
-    ip:
-      type: ip
-    method:
-      type: keyword
-    path:
-      type: keyword
-    http_version:
-      type: keyword
-    status:
-      type: integer
-    bytes:
-      type: long
-    referrer:
-      type: text
-      fields:
-        keyword:
-          type: keyword
-          ignore_above: 256
-    user_agent:
-      type: text
-      fields:
-        keyword:
-          type: keyword
-          ignore_above: 256
-    log_source:
-      type: keyword
-    audit_user:
-      type: keyword
-    audit_event:
-      type: text
-      fields:
-        keyword:
-          type: keyword
-          ignore_above: 512
-    rule_match:
-      properties:
-        is_matched:
-          type: boolean
-        rule_id:
-          type: keyword
-        matched_type:
-          type: keyword
-        confidence:
-          type: float
-        severity:
-          type: keyword
-        matched_items:
-          type: object
-    detection_result:
-      properties:
-        event_id:
-          type: keyword
-        attack_type:
-          type: text
-          fields:
-            keyword:
-              type: keyword
-              ignore_above: 256
-        confidence:
-          type: long
-        severity:
-          type: text
-          fields:
-            keyword:
-              type: keyword
-              ignore_above: 256
-        matched_rules:
-          properties:
-            keywords:
-              type: text
-              fields:
-                keyword:
-                  type: keyword
-                  ignore_above: 256
-            patterns:
-              type: text
-              fields:
-                keyword:
-                  type: keyword
-                  ignore_above: 256
-        detection_time:
-          type: long
-        is_attack:
-          type: boolean
-    matched_rules:
-      properties:
-        keywords:
-          type: text
-          fields:
-            keyword:
-              type: keyword
-              ignore_above: 256
-        patterns:
-          type: text
-          fields:
-            keyword:
-              type: keyword
-              ignore_above: 256
-    severity:
-      type: text
-      fields:
-        keyword:
-          type: keyword
-          ignore_above: 256
-    confidence:
-      type: long
-    log_timestamp:
-      type: date
-      format: epoch_millis
-    ingestion_time:
-      type: date
-      format: epoch_millis
-    pipeline:
-      properties:
-        rule_matching:
-          properties:
-            status:
-              type: keyword
-        agent_analysis:
-          properties:
-            status:
-              type: keyword
 settings:
   number_of_shards: 1
   number_of_replicas: 0
+
   analysis:
     analyzer:
       default:
         type: standard
+
+
+mappings:
+
+  properties:
+
+    event_id:
+      type: keyword
+
+
+    attack_type:
+      type: keyword
+
+
+    detections:
+      type: nested
+
+      properties:
+
+        rule_id:
+          type: keyword
+
+
+        matches:
+          type: nested
+
+          properties:
+
+            field:
+              type: keyword
+
+
+            pattern_id:
+              type: keyword
+
+
+            matched_value:
+              type: text
+
+              fields:
+                keyword:
+                  type: keyword
+                  ignore_above: 1024
+
+
+
+    log_context:
+
+      properties:
+
+        ip:
+          type: ip
+
+
+        method:
+          type: keyword
+
+
+        path:
+          type: keyword
+
+
+        normalized_path:
+          type: keyword
+
+
+        http_version:
+          type: keyword
+
+
+        status:
+          type: integer
+
+
+        bytes:
+          type: long
+
+
+        referrer:
+          type: keyword
+
+
+        user_agent:
+          type: text
+
+          fields:
+            keyword:
+              type: keyword
+              ignore_above: 256
+
+
+        timestamp:
+          type: date
+
+          format:
+            epoch_millis
