@@ -51,15 +51,11 @@ DEFAULT_CONFIG = {
         "kafka_topics": {
             "path": os.path.join("docker", "config", "kafka", "topics", "create-init-topics.py"),
         },
+        "init_connectors": {
+            "path": os.path.join("docker", "config", "kafka-connect", "init-connectors.py"),
+        },
         "es_mapping": {
             "path": os.path.join("docker", "config", "elasticsearch", "creatMapping.py"),
-        },
-    },
-    "connectors": {
-        "log_structured_sink": {
-            "path": os.path.join("docker", "config", "kafka-connect", "connectors", "log-structured-sink.json"),
-            "connect_host": KAFKA_CONNECT_HOST,
-            "connect_port": KAFKA_CONNECT_PORT,
         },
     },
     "services": [
@@ -103,10 +99,10 @@ DEFAULT_CONFIG = {
             "wait_config": "kafka_connect",
         },
         {
-            "id": "kafka_connect_connector",
-            "name": "Creating Kafka Connect Connectors",
-            "type": "connector",
-            "connector_config": "log_structured_sink",
+            "id": "init_kafka_connectors",
+            "name": "Initializing Kafka Connect Connectors",
+            "type": "script",
+            "script_config": "init_connectors",
         },
         {
             "id": "rules_matching",
@@ -166,9 +162,6 @@ class ServiceConfig:
     
     def get_script_config(self, key):
         return self.config["scripts"].get(key, {})
-    
-    def get_connector_config(self, key):
-        return self.config["connectors"].get(key, {})
     
     def get_docker_config(self):
         return self.config["docker"]
