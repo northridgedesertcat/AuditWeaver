@@ -34,6 +34,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { formatRelative } from "@/lib/time"
+import { getRiskConfig, getConfidenceColor } from "@/lib/risk-level"
 
 interface Report {
   id: string
@@ -52,39 +53,6 @@ interface ReportStats {
   highRisk: number
   mediumRisk: number
   todayNew: number
-}
-
-const riskConfig = {
-  critical: {
-    color: "text-critical",
-    bg: "bg-critical/10",
-    badge: "bg-critical/20 text-critical border-critical/30",
-    label: "严重",
-  },
-  high: {
-    color: "text-warning",
-    bg: "bg-warning/10",
-    badge: "bg-warning/20 text-warning border-warning/30",
-    label: "高危",
-  },
-  medium: {
-    color: "text-info",
-    bg: "bg-info/10",
-    badge: "bg-info/20 text-info border-info/30",
-    label: "中危",
-  },
-  low: {
-    color: "text-success",
-    bg: "bg-success/10",
-    badge: "bg-success/20 text-success border-success/30",
-    label: "低危",
-  },
-  normal: {
-    color: "text-gray-500",
-    bg: "bg-gray-50",
-    badge: "bg-gray-100 text-gray-600 border-gray-200",
-    label: "正常",
-  },
 }
 
 const statusConfig = {
@@ -512,7 +480,7 @@ export default function ReportsPage() {
             ) : (
               <div className="space-y-4">
                 {reports.map((report) => {
-                  const riskCfg = riskConfig[report.riskLevel]
+                  const riskCfg = getRiskConfig(report.riskLevel)
                   const statusCfg = statusConfig[report.status]
                   const StatusIcon = statusCfg.icon
 
@@ -521,7 +489,7 @@ export default function ReportsPage() {
                       key={report.id}
                       className={cn(
                         "rounded-lg border p-4 transition-all hover:shadow-md",
-                        riskCfg.bg
+                        riskCfg.twBg
                       )}
                     >
                       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -532,7 +500,7 @@ export default function ReportsPage() {
                             <h3 className="font-semibold text-base">
                               {report.title}
                             </h3>
-                            <Badge className={cn("border", riskCfg.badge)}>
+                            <Badge className={cn("border", riskCfg.twBadge)}>
                               {riskCfg.label}
                             </Badge>
                             <Badge className={cn(statusCfg.badge)}>
@@ -561,11 +529,10 @@ export default function ReportsPage() {
                             <div className="flex items-center gap-2">
                               <Brain className="h-4 w-4 shrink-0" />
                               <span className="truncate">
-                                AI可信度: 
+                                AI可信度:
                                 <span className={cn(
                                   "ml-1 font-semibold",
-                                  report.aiConfidence >= 90 ? "text-success" :
-                                  report.aiConfidence >= 70 ? "text-info" : "text-warning"
+                                  getConfidenceColor(report.aiConfidence)
                                 )}>
                                   {report.aiConfidence}%
                                 </span>

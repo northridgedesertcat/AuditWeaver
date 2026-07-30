@@ -4,6 +4,10 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* 显式声明扫描风险等级单一数据源文件,确保 text-high/text-medium/bg-high/bg-medium
+   等类名被 Tailwind JIT 识别生成(该文件为动态拼接类名的来源,需显式扫描) */
+@source "../lib/risk-level.ts";
+
 @theme inline {
   --font-heading: var(--font-sans);
   --font-sans: 'Inter', 'Inter Fallback', system-ui, sans-serif;
@@ -47,6 +51,10 @@
   --color-info-foreground: var(--info-foreground);
   --color-critical: var(--critical);
   --color-critical-foreground: var(--critical-foreground);
+  --color-high: var(--high);
+  --color-high-foreground: var(--high-foreground);
+  --color-medium: var(--medium);
+  --color-medium-foreground: var(--medium-foreground);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -97,6 +105,11 @@
   --info-foreground: oklch(0.98 0 0);
   --critical: oklch(0.6 0.25 25);
   --critical-foreground: oklch(0.98 0 0);
+  /* 风险等级专用 token:与 lib/risk-level.ts 中 RISK_LEVEL_CONFIG 严格对齐 */
+  --high: oklch(0.65 0.2 60);
+  --high-foreground: oklch(0.98 0 0);
+  --medium: oklch(0.75 0.15 95);
+  --medium-foreground: oklch(0.2 0.05 95);
 }
 
 .dark {
@@ -139,6 +152,11 @@
   --info-foreground: oklch(0.98 0 0);
   --critical: oklch(0.6 0.25 25);
   --critical-foreground: oklch(0.98 0 0);
+  /* 风险等级专用 token:与 lib/risk-level.ts 中 RISK_LEVEL_CONFIG 严格对齐 */
+  --high: oklch(0.65 0.2 60);
+  --high-foreground: oklch(0.98 0 0);
+  --medium: oklch(0.75 0.15 95);
+  --medium-foreground: oklch(0.2 0.05 95);
 }
 
 @layer base {

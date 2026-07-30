@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Activity, Zap, Brain, Target } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { getConfidenceColor } from "@/lib/risk-level"
 
 const aiInsights = [
   {
@@ -94,8 +95,7 @@ export function AIInsights() {
                     <span className="text-muted-foreground">置信度:</span>
                     <span className={cn(
                       "font-medium",
-                      insight.confidence >= 90 ? "text-success" :
-                      insight.confidence >= 75 ? "text-warning" : "text-muted-foreground"
+                      getConfidenceColor(insight.confidence)
                     )}>
                       {insight.confidence}%
                     </span>

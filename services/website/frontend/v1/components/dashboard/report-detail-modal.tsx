@@ -8,7 +8,6 @@ import {
   ArrowLeft,
   AlertTriangle,
   AlertCircle,
-  CheckCircle,
   Clock,
   Globe,
   Route,
@@ -18,10 +17,10 @@ import {
   Shield,
   Zap,
   Target,
-  AlertOctagon,
   ChevronRight,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { getRiskConfig, getConfidenceColor } from "@/lib/risk-level"
 
 interface OriginalRiskData {
   event_id: string
@@ -51,44 +50,6 @@ interface ReportDetailModalProps {
   reportId: string
   isOpen: boolean
   onClose: () => void
-}
-
-const riskConfig = {
-  critical: {
-    color: "text-critical",
-    bg: "bg-critical/10",
-    badge: "bg-critical/20 text-critical border-critical/30",
-    label: "严重",
-    icon: AlertOctagon,
-  },
-  high: {
-    color: "text-warning",
-    bg: "bg-warning/10",
-    badge: "bg-warning/20 text-warning border-warning/30",
-    label: "高危",
-    icon: AlertTriangle,
-  },
-  medium: {
-    color: "text-info",
-    bg: "bg-info/10",
-    badge: "bg-info/20 text-info border-info/30",
-    label: "中危",
-    icon: AlertCircle,
-  },
-  low: {
-    color: "text-success",
-    bg: "bg-success/10",
-    badge: "bg-success/20 text-success border-success/30",
-    label: "低危",
-    icon: CheckCircle,
-  },
-  normal: {
-    color: "text-gray-500",
-    bg: "bg-gray-50",
-    badge: "bg-gray-100 text-gray-600 border-gray-200",
-    label: "正常",
-    icon: Shield,
-  },
 }
 
 export function ReportDetailModal({ reportId, isOpen, onClose }: ReportDetailModalProps) {
@@ -155,7 +116,7 @@ export function ReportDetailModal({ reportId, isOpen, onClose }: ReportDetailMod
     )
   }
 
-  const riskCfg = riskConfig[detail.riskLevel]
+  const riskCfg = getRiskConfig(detail.riskLevel)
   const RiskIcon = riskCfg.icon
 
   return (
@@ -179,7 +140,7 @@ export function ReportDetailModal({ reportId, isOpen, onClose }: ReportDetailMod
               </div>
             </div>
           </div>
-          <Badge className={cn("border", riskCfg.badge)}>
+          <Badge className={cn("border", riskCfg.twBadge)}>
             <RiskIcon className="h-3 w-3 mr-1" />
             {riskCfg.label}
           </Badge>
@@ -187,15 +148,15 @@ export function ReportDetailModal({ reportId, isOpen, onClose }: ReportDetailMod
 
         <div className="overflow-y-auto max-h-[calc(90vh-72px)]">
           <div className="grid gap-4 p-6 md:grid-cols-2 lg:grid-cols-4">
-            <Card className={cn(riskCfg.bg, "border-0")}>
+            <Card className={cn(riskCfg.twBg, "border-0")}>
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
-                  <div className={cn("rounded-lg p-2", riskCfg.bg)}>
-                    <AlertTriangle className={cn("h-4 w-4", riskCfg.color)} />
+                  <div className={cn("rounded-lg p-2", riskCfg.twBg)}>
+                    <AlertTriangle className={cn("h-4 w-4", riskCfg.twText)} />
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">风险等级</p>
-                    <p className={cn("font-semibold", riskCfg.color)}>{riskCfg.label}</p>
+                    <p className={cn("font-semibold", riskCfg.twText)}>{riskCfg.label}</p>
                   </div>
                 </div>
               </CardContent>
@@ -223,7 +184,7 @@ export function ReportDetailModal({ reportId, isOpen, onClose }: ReportDetailMod
                   </div>
                   <div>
                     <p className="text-xs text-muted-foreground">AI可信度</p>
-                    <p className={cn("font-semibold", detail.confidence >= 90 ? "text-success" : detail.confidence >= 70 ? "text-info" : "text-warning")}>
+                    <p className={cn("font-semibold", getConfidenceColor(detail.confidence))}>
                       {detail.confidence}%
                     </p>
                   </div>
@@ -276,7 +237,7 @@ export function ReportDetailModal({ reportId, isOpen, onClose }: ReportDetailMod
                     <div className="grid gap-4 md:grid-cols-2">
                       <div className="rounded-lg border border-border p-4">
                         <p className="text-xs text-muted-foreground mb-1">风险等级</p>
-                        <p className={cn("font-semibold", riskCfg.color)}>{riskCfg.label}</p>
+                        <p className={cn("font-semibold", riskCfg.twText)}>{riskCfg.label}</p>
                       </div>
                       <div className="rounded-lg border border-border p-4">
                         <p className="text-xs text-muted-foreground mb-1">风险分数</p>
