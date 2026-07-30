@@ -1,19 +1,92 @@
 id: sensitive_access_regex
-name: Sensitive Access Regex Repository
+
+name: Sensitive Resource Access Regex Repository
+
 version: "1.0"
+
+
 patterns:
-  - id: authentication_resource
+
+
+  # =====================================
+  # Authentication related endpoints
+  #
+  # Examples:
+  # /admin
+  # /administrator
+  # /login
+  # /signin
+  # =====================================
+
+  - id: authentication_endpoint
+
     enabled: true
-    regex: '(?i)\b(?:admin|login|signin|auth)\b'
-  - id: credential_resource
+
+    regex: '(?i)/(?:admin(?:istrator)?|login|signin|auth)(?:/|$|\?)'
+
+
+
+  # =====================================
+  # Sensitive credential files
+  #
+  # Examples:
+  # password.txt
+  # passwd
+  # secret.key
+  # =====================================
+
+  - id: credential_file_access
+
     enabled: true
-    regex: '(?i)\b(?:password|passwd|secret|token)\b'
-  - id: api_resource
+
+    regex: '(?i)/(?:password|passwd|shadow|secret|credentials?)(?:\.(?:txt|json|yaml|yml|xml|key|pem))?(?:/|$|\?)'
+
+
+
+  # =====================================
+  # API documentation exposure
+  #
+  # Examples:
+  # /swagger
+  # /openapi.json
+  # /api-docs
+  # =====================================
+
+  - id: api_documentation_exposure
+
     enabled: true
-    regex: '(?i)\b(?:api|rest|webservice|xmlrpc)\b'
-  - id: repository_metadata
+
+    regex: '(?i)/(?:swagger(?:-ui)?|openapi(?:\.json)?|api-docs|graphql)(?:/|$|\?)'
+
+
+
+  # =====================================
+  # Version control metadata exposure
+  #
+  # Examples:
+  # /.git/config
+  # /.svn/entries
+  # =====================================
+
+  - id: repository_metadata_exposure
+
     enabled: true
-    regex: '(?i)\.(?:git|svn|hg)\b'
-  - id: backup_or_config
+
+    regex: '(?i)/\.(?:git|svn|hg)(?:/|$)'
+
+
+
+  # =====================================
+  # Backup file exposure
+  #
+  # Examples:
+  # database.sql
+  # backup.zip
+  # config.bak
+  # =====================================
+
+  - id: backup_file_exposure
+
     enabled: true
-    regex: '(?i)\b(?:backup|config|settings|database)\b'
+
+    regex: '(?i)(?:/[^?]*(?:backup|backup_[0-9]+|dump|database|config|settings)[^?]*(?:\.zip|\.tar|\.gz|\.sql|\.bak|\.old)?)'
