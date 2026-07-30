@@ -1,0 +1,17 @@
+# Dify API 请求数据配置
+
+# 发送到 Dify inputs 字典的字段列表
+inputs_fields:
+  - log_id
+  - ip
+  - path
+  - method
+  - status
+  - user_agent
+  - matched_type
+
+# 用户标识模板
+user_id_template: "log_{log_id}"
+
+# 响应模式: blocking / streaming
+response_mode: blocking

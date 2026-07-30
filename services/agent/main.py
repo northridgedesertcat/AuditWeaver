@@ -7,10 +7,10 @@ import logging
 # 添加项目路径
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from config import KAFKA_CONFIG, DIFY_CONFIG, ELASTICSEARCH_CONFIG, LOG_CONFIG, PROCESS_CONFIG
-from kafka_consumer import LogAnalysisConsumer
+from config import KAFKA_CONFIG, DIFY_CONFIG, LOG_CONFIG, PROCESS_CONFIG
+from kafka import LogAnalysisConsumer, AnalysisResultProducer
 from dify import DifyClient
-from es_client import DataSaver
+from config.elastic_mapping_config import build_elastic_document
 
 logging.basicConfig(
     level=getattr(logging, LOG_CONFIG['level']),
@@ -21,14 +21,15 @@ logger = logging.getLogger('agent_main')
 class AgentMain:
     def __init__(self):
         self.kafka_consumer = None
+        self.kafka_producer = None
         self.dify_client = None
-        self.data_saver = None
         self.running = False
 
     def initialize(self) -> bool:
         logger.info('Initializing Agent module...')
 
-        logger.info('Connecting to Kafka...')
+        # 连接 Kafka 消费者
+        logger.info('Connecting to Kafka consumer...')
         self.kafka_consumer = LogAnalysisConsumer(
             bootstrap_servers=KAFKA_CONFIG['brokers'],
             topic=KAFKA_CONFIG['input_topic'],
@@ -37,10 +38,22 @@ class AgentMain:
             consumer_timeout_ms=KAFKA_CONFIG['consumer_timeout_ms']
         )
         if not self.kafka_consumer.connect():
-            logger.error('Failed to connect to Kafka')
+            logger.error('Failed to connect Kafka consumer')
             return False
-        logger.info('Kafka connected successfully')
+        logger.info('Kafka consumer connected successfully')
 
+        # 连接 Kafka 生产者
+        logger.info('Connecting to Kafka producer...')
+        self.kafka_producer = AnalysisResultProducer(
+            bootstrap_servers=KAFKA_CONFIG['brokers'],
+            topic=KAFKA_CONFIG['output_topic']
+        )
+        if not self.kafka_producer.connect():
+            logger.error('Failed to connect Kafka producer')
+            return False
+        logger.info('Kafka producer connected successfully')
+
+        # 初始化 Dify 客户端
         logger.info('Connecting to Dify API...')
         self.dify_client = DifyClient(
             base_url=DIFY_CONFIG['base_url'],
@@ -49,17 +62,6 @@ class AgentMain:
             endpoint=DIFY_CONFIG['endpoint']
         )
         logger.info('Dify client initialized')
-
-        logger.info('Connecting to Elasticsearch...')
-        self.data_saver = DataSaver(
-            es_host=ELASTICSEARCH_CONFIG['host'],
-            es_port=ELASTICSEARCH_CONFIG['port'],
-            es_index=ELASTICSEARCH_CONFIG['index']
-        )
-        if not self.data_saver.connect():
-            logger.error('Failed to connect to Elasticsearch')
-            return False
-        logger.info('Elasticsearch connected successfully')
 
         return True
 
@@ -80,12 +82,15 @@ class AgentMain:
             dify_response = self.dify_client.analyze_log(actual_log)
 
             if dify_response.get('status') == 'success':
-                doc_id = self.data_saver.save_analysis_report(actual_log, dify_response.get('response', {}))
-                if doc_id:
-                    logger.info(f'Analysis report saved: {doc_id}')
+                # 构建 ES 文档并通过 Kafka 生产者发送到 agent.event.save
+                # Kafka Connect Sink (agent-event-save-sink) 负责写入 Elasticsearch
+                document = build_elastic_document(actual_log, dify_response.get('response', {}))
+                success = self.kafka_producer.send(document, key=event_id)
+                if success:
+                    logger.info(f'Analysis result sent to Kafka: event_id={event_id}')
                     return True
                 else:
-                    logger.error('Failed to save analysis report')
+                    logger.error(f'Failed to send analysis result to Kafka: event_id={event_id}')
                     return False
             else:
                 logger.error(f'Dify analysis failed: {dify_response.get("error")}')
@@ -137,10 +142,10 @@ class AgentMain:
         logger.info('Shutting down Agent module...')
         if self.kafka_consumer:
             self.kafka_consumer.close()
+        if self.kafka_producer:
+            self.kafka_producer.close()
         if self.dify_client:
             self.dify_client.close()
-        if self.data_saver:
-            self.data_saver.close()
         logger.info('Agent module stopped')
 
 def main():

@@ -1,0 +1,116 @@
+# Elasticsearch 映射和提取规则配置
+
+# ========== Elasticsearch 索引映射 ==========
+elasticsearch_mapping:
+  mappings:
+    properties:
+      # 原始日志字段
+      event_id:
+        type: keyword
+      ip:
+        type: ip
+      path:
+        type: keyword
+      method:
+        type: keyword
+      status:
+        type: integer
+      user_agent:
+        type: text
+        fields:
+          keyword:
+            type: keyword
+
+      # 规则匹配结果
+      attack_type:
+        type: keyword
+
+      # Dify 结构化分析结果
+      risk_level:
+        type: keyword
+      risk_score:
+        type: integer
+      attack_type_ai:
+        type: keyword
+      summary:
+        type: text
+        fields:
+          keyword:
+            type: keyword
+
+      reasoning:
+        type: text
+        fields:
+          keyword:
+            type: keyword
+            ignore_above: 256
+
+      recommendations:
+        type: text
+        fields:
+          keyword:
+            type: keyword
+            ignore_above: 256
+
+      # 时间戳字段（epoch_millis 格式）
+      log_timestamp:
+        type: date
+        format: epoch_millis
+      analysis_timestamp:
+        type: date
+        format: epoch_millis
+      ingestion_time:
+        type: date
+        format: epoch_millis
+
+      # 原始数据（不参与搜索）
+      dify_response:
+        type: object
+        enabled: false
+      original_log:
+        type: object
+        enabled: false
+
+  settings:
+    number_of_shards: 1
+    number_of_replicas: 0
+    analysis:
+      analyzer:
+        default:
+          type: standard
+
+# ========== Dify 响应字段提取规则 ==========
+# 字段名: [可选路径列表, 默认值]
+dify_extraction_rules:
+  risk_level:
+    paths:
+      - risk_level
+      - threat_level
+    default: unknown
+  risk_score:
+    paths:
+      - risk_score
+      - score
+    default: 0
+  attack_type_ai:
+    paths:
+      - attack_type
+      - attack_category
+    default: ""
+  summary:
+    paths:
+      - summary
+      - event_summary
+      - analysis_summary
+    default: ""
+  reasoning:
+    paths:
+      - reasoning
+      - analysis_reasoning
+    default: []
+  recommendations:
+    paths:
+      - recommendations
+      - suggestions
+      - mitigation_steps
+    default: []
