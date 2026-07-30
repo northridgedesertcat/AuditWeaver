@@ -33,16 +33,6 @@ class AnalysisResultProducer:
             return False
 
     def send(self, document: Dict[str, Any], key: str) -> bool:
-        """
-        发送分析结果文档到 Kafka。
-        
-        Args:
-            document: 构建好的 Elasticsearch 文档
-            key: 消息 key（event_id），用于 Kafka Connect Sink UPSERT 去重
-            
-        Returns:
-            是否发送成功
-        """
         if not self.producer:
             logger.error('Kafka producer not connected')
             return False
