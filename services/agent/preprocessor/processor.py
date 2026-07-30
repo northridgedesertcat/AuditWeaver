@@ -150,7 +150,7 @@ def build_elastic_document(raw_message: Dict[str, Any], dify_response: Dict[str,
         'method':     ctx.get('method', log_data.get('method', '')),
         'status':     ctx.get('status', log_data.get('status', 0)),
         'user_agent': ctx.get('user_agent', log_data.get('user_agent', '')),
-        'attack_type': attack_type,
+        'detect_type': attack_type,
 
         'risk_level':     dify_fields.get('risk_level', 'unknown'),
         'risk_score':     dify_fields.get('risk_score', 0),

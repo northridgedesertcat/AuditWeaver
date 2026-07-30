@@ -16,11 +16,7 @@ mappings:
         keyword:
           type: keyword
           ignore_above: 256
-    attack_type:
-      type: keyword
-    confidence:
-      type: float
-    severity:
+    detect_type:
       type: keyword
     risk_level:
       type: keyword
