@@ -738,7 +738,7 @@ class ReportDetailView(APIView):
                     source = result.get('_source', {})
                     
                     # 获取字段值
-                    attack_type_ai = source.get('attack_type_ai', source.get('attack_type', '未知攻击'))
+                    attack_type_ai = source.get('attack_type_ai', source.get('detect_type', '未知攻击'))
                     risk_level_raw = source.get('risk_level', 'Low')
                     risk_score = source.get('risk_score', 0)
                     analysis_timestamp = source.get('analysis_timestamp', '')
