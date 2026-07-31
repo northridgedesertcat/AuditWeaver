@@ -31,13 +31,13 @@ AuditWeaver is an AI-powered log analysis system designed for distributed cluste
 ***
 
 ## 🏗 Architecture
-current verion V1.0.0
+current verion V1.0.0  
 current architecture:
 ![Architecture](docs/develop/system-design/architecture/current.drawio.png "Architecture")
 
 ***
 V2 architecture:
-![Architecture](docs\images\version.png "Architecture")
+![Architecture](docs/images/version.png "Architecture")
 
 
 ## 🛠 Tech Stack
