@@ -37,7 +37,7 @@ current architecture:
 
 ***
 V2 architecture:
-![Architecture](docs\images\version.png "Architecture")
+![Architecture](docs/images/version.png "Architecture")
 
 
 ## 🛠 Tech Stack
