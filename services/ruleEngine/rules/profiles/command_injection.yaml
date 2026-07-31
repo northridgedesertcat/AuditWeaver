@@ -1,0 +1,11 @@
+id: command_injection
+name: Command Injection
+description: Detect shell metacharacters and command execution payloads.
+attack_type: command_injection
+enabled: true
+target_fields:
+  - path
+  - referrer
+matchers:
+  - type: regex
+    library: command_injection_regex

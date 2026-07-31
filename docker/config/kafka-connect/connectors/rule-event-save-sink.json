@@ -1,0 +1,24 @@
+{
+  "name": "rule-event-save-sink",
+  "config": {
+    "connector.class": "io.confluent.connect.elasticsearch.ElasticsearchSinkConnector",
+
+    "topics": "rule.event.save",
+
+    "tasks.max": "1",
+
+    "connection.url": "http://elasticsearch:9200",
+
+    "external.resource.usage": "INDEX",
+
+    "topic.to.external.resource.mapping": "rule.event.save:matched_logs",
+
+    "key.ignore": "false",
+
+    "schema.ignore": "true",
+
+    "behavior.on.null.values": "ignore",
+
+    "write.method": "UPSERT"
+  }
+}

@@ -1,0 +1,126 @@
+id: sql_injection_regex
+
+name: SQL Injection Regex Repository
+
+version: "1.0"
+
+
+patterns:
+
+
+  # =====================================
+  # UNION based SQL injection
+  #
+  # Examples:
+  # ' UNION SELECT username,password--
+  #
+  # =====================================
+
+  - id: union_select
+
+    enabled: true
+
+    regex: '(?i)(?:union\s+(?:all\s+)?select)'
+
+
+
+  # =====================================
+  # SQL comment injection
+  #
+  # Examples:
+  # admin'--
+  # admin'#
+  # admin/*
+  #
+  # =====================================
+
+  - id: sql_comment_bypass
+
+    enabled: true
+
+    regex: '(?i)(?:[''"]\s*(?:--|#)|/\*.*?\*/)'
+
+
+
+  # =====================================
+  # Boolean based blind SQL injection
+  #
+  # Examples:
+  # id=1 OR 1=1
+  # id=1 AND 2=2
+  #
+  # =====================================
+
+  - id: boolean_condition_bypass
+
+    enabled: true
+
+    regex: '(?i)(?:\b(?:and|or)\b\s+[\w\d''"]+\s*(?:=|<>|!=)\s*[\w\d''"]+)'
+
+
+
+
+  # =====================================
+  # Time based SQL injection
+  #
+  # Examples:
+  # sleep(5)
+  # benchmark(...)
+  # pg_sleep(...)
+  #
+  # =====================================
+
+  - id: time_based_injection
+
+    enabled: true
+
+    regex: '(?i)\b(?:sleep|benchmark|pg_sleep|waitfor\s+delay)\s*\('
+
+
+
+  # =====================================
+  # SQL stacked query
+  #
+  # Examples:
+  # ;drop table users
+  #
+  # =====================================
+
+  - id: stacked_query
+
+    enabled: true
+
+    regex: '(?i);\s*(?:drop|delete|insert|update|alter)\s+'
+
+
+
+  # =====================================
+  # Sensitive database function usage
+  #
+  # Examples:
+  # load_file()
+  # xp_cmdshell
+  #
+  # =====================================
+
+  - id: dangerous_sql_function
+
+    enabled: true
+
+    regex: '(?i)\b(?:load_file|into\s+outfile|xp_cmdshell)\s*\('
+
+
+
+  # =====================================
+  # SQL information schema probing
+  #
+  # Examples:
+  # information_schema.tables
+  #
+  # =====================================
+
+  - id: database_metadata_probe
+
+    enabled: true
+
+    regex: '(?i)\binformation_schema\b|\bpg_catalog\b'

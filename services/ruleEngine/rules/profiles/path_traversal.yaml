@@ -1,0 +1,11 @@
+id: path_traversal
+name: Path Traversal
+description: Detect attempts to access files outside an application root.
+attack_type: path_traversal
+enabled: true
+target_fields:
+  - path
+  - referrer
+matchers:
+  - type: regex
+    library: path_traversal_regex

@@ -10,6 +10,11 @@ import {
   Legend,
   Tooltip,
 } from "recharts"
+import {
+  RISK_LEVEL_CONFIG,
+  RISK_LEVEL_ORDER,
+  getRiskConfig,
+} from "@/lib/risk-level"
 
 interface ThreatLevelData {
   name: string
@@ -17,15 +22,12 @@ interface ThreatLevelData {
   color: string
 }
 
-// 五种风险等级（来源: dify_response.data.outputs.structured_output.risk_level）
-// 颜色与后端保持一致
-const FALLBACK_DATA: ThreatLevelData[] = [
-  { name: "严重", value: 0, color: "oklch(0.5 0.25 25)" },      // Critical - 红色
-  { name: "高危", value: 0, color: "oklch(0.65 0.2 60)" },     // High - 橙色
-  { name: "中危", value: 0, color: "oklch(0.75 0.15 95)" },    // Medium - 黄色
-  { name: "低危", value: 0, color: "oklch(0.75 0.12 145)" },   // Low - 绿色
-  { name: "正常", value: 0, color: "oklch(0.7 0.05 260)" },     // Normal - 灰色
-]
+// 兜底数据:从单一数据源派生,保证颜色与其它组件永远一致
+const FALLBACK_DATA: ThreatLevelData[] = RISK_LEVEL_ORDER.map((key) => ({
+  name: RISK_LEVEL_CONFIG[key].label,
+  value: 0,
+  color: RISK_LEVEL_CONFIG[key].color,
+}))
 
 export function ThreatDistributionChart() {
   const [data, setData] = useState<ThreatLevelData[]>(FALLBACK_DATA)
@@ -41,11 +43,21 @@ export function ThreatDistributionChart() {
         const result = await response.json()
 
         // 后端返回结构: { data: { Critical: {name, value, color}, ... }, total }
-        // 转换为 recharts 需要的数组格式
-        const order = ["Critical", "High", "Medium", "Low", "Normal"]
-        const chartData: ThreatLevelData[] = order
-          .map((key) => result.data?.[key])
-          .filter(Boolean)
+        // 按 RISK_LEVEL_ORDER 顺序提取,并对缺失/异常的 color 用单一数据源兜底,
+        // 防止后端 color 字段漂移导致与其它组件颜色不一致
+        const chartData: ThreatLevelData[] = RISK_LEVEL_ORDER.map((key) => {
+          // 兼容大写 Critical/High/... 与小写 critical/high/... 两种键
+          const raw =
+            result.data?.[key.charAt(0).toUpperCase() + key.slice(1)] ??
+            result.data?.[key]
+          if (!raw) return null
+          const cfg = getRiskConfig(key)
+          return {
+            name: raw.name ?? cfg.label,
+            value: Number(raw.value) || 0,
+            color: cfg.color,
+          }
+        }).filter(Boolean) as ThreatLevelData[]
 
         if (chartData.length > 0) {
           setData(chartData)

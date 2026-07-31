@@ -1,0 +1,132 @@
+id: path_traversal_regex
+
+name: Path Traversal Regex Repository
+
+version: "1.0"
+
+
+patterns:
+
+
+  # =====================================
+  # Unix path traversal
+  #
+  # Examples:
+  # ../../etc/passwd
+  # ../../../config
+  # =====================================
+
+  - id: unix_parent_traversal
+
+    enabled: true
+
+    regex: '(?i)(?:\.\./){1,}'
+
+
+
+  # =====================================
+  # Windows path traversal
+  #
+  # Examples:
+  # ..\..\windows\system32
+  # =====================================
+
+  - id: windows_parent_traversal
+
+    enabled: true
+
+    regex: '(?i)(?:\.\.\\){1,}'
+
+
+
+  # =====================================
+  # Mixed separator traversal
+  #
+  # Examples:
+  # ../..\etc
+  # ..\/..\ 
+  # =====================================
+
+  - id: mixed_separator_traversal
+
+    enabled: true
+
+    regex: '(?i)\.\.(?:/|\\){1,2}'
+
+
+
+  # =====================================
+  # URL encoded traversal
+  #
+  # Examples:
+  # ..%2f
+  # ..%5c
+  # =====================================
+
+  - id: encoded_parent_traversal
+
+    enabled: true
+
+    regex: '(?i)\.\.(?:%2f|%5c)'
+
+
+
+  # =====================================
+  # Double URL encoded traversal
+  #
+  # Examples:
+  # ..%252f
+  # ..%255c
+  # =====================================
+
+  - id: double_encoded_traversal
+
+    enabled: true
+
+    regex: '(?i)\.\.%25(?:2f|5c)'
+
+
+
+  # =====================================
+  # Unix sensitive file access
+  #
+  # Examples:
+  # /etc/passwd
+  # /etc/shadow
+  # =====================================
+
+  - id: unix_sensitive_file
+
+    enabled: true
+
+    regex: '(?i)/(?:etc/(?:passwd|shadow|hosts)|proc/(?:self|version)|var/log/)'
+
+
+
+  # =====================================
+  # Windows sensitive file access
+  #
+  # Examples:
+  # C:\Windows\System32
+  # =====================================
+
+  - id: windows_sensitive_path
+
+    enabled: true
+
+    regex: '(?i)(?:[a-z]:\\(?:windows|winnt)\\(?:system32)?|\\windows\\system32\\)'
+
+
+
+  # =====================================
+  # Null byte traversal bypass
+  #
+  # Examples:
+  # ../../etc/passwd%00.jpg
+  # =====================================
+
+  - id: null_byte_path_bypass
+
+    enabled: true
+
+    regex: '(?i)(?:%00|\\x00)'

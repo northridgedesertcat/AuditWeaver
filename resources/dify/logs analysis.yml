@@ -137,7 +137,7 @@ workflow:
           completion_params:
             temperature: 0.6
           mode: chat
-          name: qwen3:8b
+          name: qwen2.5:7b
           provider: langgenius/ollama/ollama
         prompt_template:
         - id: b11ac6a3-6382-4937-8c1a-66a6c32f3c4e
@@ -497,7 +497,7 @@ workflow:
       type: custom
       width: 241
     viewport:
-      x: 283.25187999981597
-      y: 28.336919564436585
-      zoom: 0.8397314929441401
+      x: 245.7092190951322
+      y: 8.354579106506606
+      zoom: 0.9999999999999998
   rag_pipeline_variables: []

@@ -1,0 +1,105 @@
+id: xss_regex
+
+name: XSS Regex Repository
+
+version: "1.0"
+
+
+patterns:
+
+
+  # =====================================
+  # Script tag injection
+  #
+  # Examples:
+  # <script>alert(1)</script>
+  #
+  # =====================================
+
+  - id: script_tag_injection
+
+    enabled: true
+
+    regex: '(?is)<script[^>]*>.*?(?:</script>|$)'
+
+
+
+  # =====================================
+  # Javascript URI execution
+  #
+  # Examples:
+  # javascript:alert(1)
+  # javascript:void(...)
+  #
+  # =====================================
+
+  - id: javascript_uri
+
+    enabled: true
+
+    regex: '(?i)javascript\s*:\s*(?:alert|eval|prompt|confirm|void)\s*\('
+
+
+
+  # =====================================
+  # HTML event handler injection
+  #
+  # Examples:
+  # <img src=x onerror=alert(1)>
+  #
+  # =====================================
+
+  - id: html_event_handler
+
+    enabled: true
+
+    regex: '(?i)\bon[a-z]+\s*=\s*(?:["'']?\s*(?:javascript:)?\s*(?:alert|eval|prompt|confirm)|[^>]+)'
+
+
+
+  # =====================================
+  # Dangerous javascript execution
+  #
+  # Examples:
+  # eval(...)
+  # Function(...)
+  #
+  # =====================================
+
+  - id: javascript_execution_function
+
+    enabled: true
+
+    regex: '(?i)\b(?:eval|Function|setTimeout|setInterval)\s*\('
+
+
+
+  # =====================================
+  # SVG based XSS
+  #
+  # Examples:
+  # <svg onload=alert(1)>
+  #
+  # =====================================
+
+  - id: svg_xss
+
+    enabled: true
+
+    regex: '(?is)<svg[^>]*(?:onload|onerror)\s*='
+
+
+
+  # =====================================
+  # Encoded javascript payload
+  #
+  # Examples:
+  # &#106;avascript:
+  #
+  # =====================================
+
+  - id: html_encoded_javascript
+
+    enabled: true
+
+    regex: '(?i)(?:&#x?[0-9a-f]+;)+'

@@ -4,8 +4,8 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { AlertTriangle, AlertCircle, Info, Shield } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { getRiskConfig } from "@/lib/risk-level"
 
 interface Alert {
   id: string
@@ -14,37 +14,6 @@ interface Alert {
   source: string
   time: string
   ip: string
-}
-
-const severityConfig = {
-  critical: {
-    icon: AlertCircle,
-    color: "text-critical",
-    bg: "bg-critical/10",
-    badge: "bg-critical/20 text-critical",
-    label: "严重",
-  },
-  high: {
-    icon: AlertTriangle,
-    color: "text-warning",
-    bg: "bg-warning/10",
-    badge: "bg-warning/20 text-warning",
-    label: "高危",
-  },
-  medium: {
-    icon: Info,
-    color: "text-info",
-    bg: "bg-info/10",
-    badge: "bg-info/20 text-info",
-    label: "中危",
-  },
-  low: {
-    icon: Shield,
-    color: "text-success",
-    bg: "bg-success/10",
-    badge: "bg-success/20 text-success",
-    label: "低危",
-  },
 }
 
 const defaultAlerts: Alert[] = [
@@ -135,7 +104,7 @@ export function RecentAlerts() {
         <ScrollArea className="h-[340px]">
           <div className="space-y-1 p-4 pt-0">
             {alerts.map((alert) => {
-              const config = severityConfig[alert.severity as keyof typeof severityConfig] || severityConfig.low
+              const config = getRiskConfig(alert.severity)
               const Icon = config.icon
 
               return (
@@ -143,13 +112,13 @@ export function RecentAlerts() {
                   key={alert.id}
                   className={cn(
                     "flex items-start gap-3 rounded-lg p-3 transition-colors hover:bg-muted/50",
-                    config.bg
+                    config.twBg
                   )}
                 >
-                  <Icon className={cn("h-5 w-5 mt-0.5 shrink-0", config.color)} />
+                  <Icon className={cn("h-5 w-5 mt-0.5 shrink-0", config.twText)} />
                   <div className="flex-1 space-y-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <Badge className={cn("text-xs", config.badge)}>
+                      <Badge className={cn("text-xs", config.twBadge)}>
                         {config.label}
                       </Badge>
                       <span className="text-xs text-muted-foreground">

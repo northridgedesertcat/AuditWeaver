@@ -1,0 +1,35 @@
+# Dify 响应字段提取规则配置
+# 字段名: [可选路径列表, 默认值]
+dify_extraction_rules:
+  risk_level:
+    paths:
+      - risk_level
+      - threat_level
+    default: unknown
+  risk_score:
+    paths:
+      - risk_score
+      - score
+    default: 0
+  attack_type_ai:
+    paths:
+      - attack_type
+      - attack_category
+    default: ""
+  summary:
+    paths:
+      - summary
+      - event_summary
+      - analysis_summary
+    default: ""
+  reasoning:
+    paths:
+      - reasoning
+      - analysis_reasoning
+    default: []
+  recommendations:
+    paths:
+      - recommendations
+      - suggestions
+      - mitigation_steps
+    default: []

@@ -1,0 +1,11 @@
+id: xss
+name: Cross-Site Scripting
+description: Detect reflected script payloads.
+attack_type: xss
+enabled: true
+target_fields:
+  - path
+  - referrer
+matchers:
+  - type: regex
+    library: xss_regex

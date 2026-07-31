@@ -2,7 +2,7 @@
 
 > A log analysis platform based on AI and Dify.
 
-[![License](https://img.shields.io/badge/license-MIT-blue.svg "License")](#license)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg "License")](#license)
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg "Python")]()
 [![Docker](https://img.shields.io/badge/docker-supported-blue.svg "Docker")]()
 
@@ -19,37 +19,42 @@ AuditWeaver is an AI-powered log analysis system designed for distributed cluste
 ## ✨ Features
 
 - 📥 Collect logs from distributed servers
-- 🔍 Detect known attacks with rule matching
+- 🔍 Detect known attacks with rule matching (SQL injection, XSS, command injection, path traversal, etc.)
 - 🤖 Identify anomalous behaviors using Isolation Forest
 - ⚖️ Assess security risks automatically
-- 🧠 Analyze suspicious logs with LLMs (Dify)
+- 🧠 Analyze suspicious logs with LLMs (Dify Workflow)
 - 📄 Generate structured security reports
-- 🐳 Support Docker deployment
+- 🔄 Real-time data pipeline based on Kafka + Kafka Connect
+- 🐳 Support Docker deployment with one-click startup
 - 🔐 Manage configuration through environment variables
 
-
+***
 
 ## 🏗 Architecture
-
+current verion V1.0.0
 current architecture:
-![Architecture](docs/images/current.png "Architecture")
+![Architecture](docs/develop/system-design/architecture/current.drawio.png "Architecture")
 
-version 1.0.0 architecture:
-![Architecture](docs/images/version.png "Architecture")
-
+***
+V2 architecture:
+![Architecture](docs\images\version.png "Architecture")
 
 
 ## 🛠 Tech Stack
 
 | Category      | Technology    |
 | :------------ | :------------ |
-| Backend       | Django        |
-| Frontend      | Next.js       |
-| AI            | Dify / Ollama |
-| Queue         | Kafka         |
-| Search        | Elasticsearch |
-| Visualization | Kibana        |
-| Container     | Docker        |
+| Backend       | Django + Django REST Framework |
+| Frontend      | Next.js + TypeScript |
+| AI Analysis   | Dify Workflow / Ollama |
+| Rule Engine   | Python Regex + YAML-based rules |
+| Anomaly Detection | Isolation Forest (scikit-learn) |
+| Message Queue | Apache Kafka |
+| Data Integration | Kafka Connect (Elasticsearch Sink) |
+| Log Pipeline  | Logstash |
+| Search & Storage | Elasticsearch |
+| Visualization | Kibana |
+| Container     | Docker Compose |
 
 ***
 
@@ -57,13 +62,33 @@ version 1.0.0 architecture:
 
 ```text
 AuditWeaver/
-├── common/     # Common code and resources
-├── docker/     # Docker configuration 
-├── resources/  # dependent resources
-├── services/   # Service code
-├── .env.example
-├── start.bat
-├── stop.bat
+├── common/              # Common code and resources
+│   ├── env.py           # Environment variable configuration
+│   └── time_utils.py    # Timezone utility (multi-timezone support)
+├── docker/              # Docker configuration
+│   ├── config/
+│   │   ├── elasticsearch/   # ES mappings and initialization
+│   │   ├── kafka/           # Kafka topics configuration
+│   │   ├── kafka-connect/   # Kafka Connect connectors
+│   │   └── logstash/        # Logstash pipeline
+│   └── docker-compose.yml
+├── docs/                # Documentation
+├── resources/           # Dify workflow resources
+├── scripts/             # Startup/Management scripts
+│   ├── config.py        # Service configuration
+│   ├── docker_manager.py # Docker lifecycle manager
+│   └── utils.py         # Utility functions
+├── services/            # Microservices
+│   ├── agent/           # AI analysis module (Dify integration)
+│   ├── ruleEngine/      # Rule matching engine
+│   ├── isolationForest/ # Anomaly detection model
+│   ├── riskAssessment/  # Risk assessment module
+│   └── website/         # Web platform (Django + Next.js)
+├── .env.example         # Environment variable template
+├── start.py             # One-click startup script (Python)
+├── start.bat            # One-click startup script (Windows)
+├── stop.bat             # Stop script (Windows)
+├── requirements.txt
 ├── README.md
 └── .gitignore
 ```
@@ -72,72 +97,121 @@ AuditWeaver/
 
 ## 🚀 Quick Start
 
-### 1.server dependencies
-before you start, please ensure that you have the following dependencies installed:
-- Python 3.11+
-- Docker
-- ollama
-- dify platform
+### 1. Prerequisites
 
+Before you start, please ensure that you have the following dependencies installed:
+
+- Python 3.11+
+- Node.js 18+ (for Next.js frontend)
+- Docker & Docker Compose
+- A running Dify platform (or Ollama for local LLM)
 
 ### 2. Clone the repository
 
 ```bash
-git clone https://github.com/yourname/project.git
+git clone https://github.com/yourname/AuditWeaver.git
 cd AuditWeaver
 ```
 
-### 3. Install dependencies
+### 3. Install Python dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. config dify platform
-add workflow file into dify platform
+### 4. Install frontend dependencies (optional, for development)
+
+```bash
+cd services/website/frontend/v1
+npm install
+cd ../../..
+```
+
+### 5. Configure Dify platform
+
+Upload the workflow file to your Dify platform:
+
+```
 resources/dify/logs analysis.yml
+```
 
-
-### 5. Create environment variables
+### 6. Create environment variables
 
 ```bash
 cp .env.example .env
 ```
 
-Edit the `.env` file.
+Edit the `.env` file and configure:
+- `DIFY_API_KEY`: Your Dify API Key
+- `DIFY_BASE_URL`: Dify API base URL
+- Other services ports as needed
 
-
-### 6. Start services
-
-windows users:
-
-```bash
-start.bat   
-```
-
-linux users:
+### 7. Start all services
 
 ```bash
-cd docker
-docker compose up -d
+python start.py
 ```
-Then start all applications in the services directory, including the Agent, Backend, Frontend, and Rule Matching services.
-
-A Linux startup script will be provided in a future release.
 
 
 
+The startup script will automatically:
+1. Start all Docker Compose services (Kafka, Elasticsearch, Kibana, Logstash, Kafka Connect)
+2. Wait for Elasticsearch and Kafka to be ready
+3. Initialize Kafka topics and Elasticsearch indexes
+4. Initialize Kafka Connect connectors
+5. Start Rule Engine, Agent module, Django backend, and Next.js frontend
+
+Once started, access:
+- Dashboard Frontend: http://localhost:3000
+- Django Backend API: http://localhost:8000
+- Kibana: http://localhost:5601
+
+***
 
 ## ⚙ Configuration
 
-| Variable                  | Description       |
-| :------------------------ | :---------------- |
-| ES\_HOST                  | Elasticsearch URL |
-| KAFKA\_BOOTSTRAP\_SERVERS | Kafka server      |
-| DIFY\_API\_KEY            | Dify API Key      |
-| DIFY\_BASE\_URL           | Dify URL          |
+### Core Environment Variables
 
-See `.env.example` for all available options.
+| Variable                  | Description                          | Default     |
+| :------------------------ | :----------------------------------- | :---------- |
+| DJANGO_SECRET_KEY         | Django secret key                    | -           |
+| DJANGO_DEBUG              | Django debug mode                    | True        |
+| DJANGO_PORT               | Django backend port                  | 8000        |
+| ES_HOST                   | Elasticsearch host                   | localhost   |
+| ES_PORT                   | Elasticsearch port                   | 19200       |
+| KAFKA_BROKERS             | Kafka brokers                        | localhost:29092 |
+| KAFKA_CONNECT_HOST        | Kafka Connect host                   | localhost   |
+| KAFKA_CONNECT_PORT        | Kafka Connect REST API port          | 8083        |
+| KAFKA_TOPIC_RAW           | Kafka topic for raw logs             | log.raw     |
+| KAFKA_TOPIC_STRUCTURED    | Kafka topic for structured logs      | log.structured |
+| KAFKA_TOPIC_ANALYSIS      | Kafka topic for analysis results     | log.analysis |
+| KAFKA_TOPIC_RISK          | Kafka topic for risk assessment     | log.risk    |
+| DIFY_BASE_URL             | Dify API base URL                    | http://localhost/v1 |
+| DIFY_API_KEY              | Dify API Key                         | -           |
+| NEXT_PUBLIC_API_BASE      | Frontend API base URL                | http://localhost:8000 |
+
+> See `.env.example` for all available options.
+
+### Kafka Topics
+
+| Topic                 | Description                                    |
+| :-------------------- | :--------------------------------------------- |
+| log.raw               | Raw log data input                             |
+| log.structured        | Structured/parsed logs (via Logstash)           |
+| log.audit             | Logs to be processed by the Rule Engine        |
+| log.analysis          | Analysis results from the Rule Engine           |
+| agent.event.save      | Agent AI analysis results (ES sink target)     |
+| rule.event.save       | Rule Engine events (ES sink target)            |
+
+> Topics are auto-initialized via `docker/config/kafka/topics/topics.yaml` and `create-init-topics.py`.
+
+### Elasticsearch Indexes
+
+| Index                    | Description                              |
+| :----------------------- | :--------------------------------------- |
+| nginx-log-raw            | Raw Nginx logs                           |
+| matched_logs             | Logs matched by rules                    |
+| log_analysis_reports     | AI-generated analysis reports            |
 
 ***
 
@@ -151,7 +225,6 @@ Analysis Report
 
 ![Report](docs/images/report1.png "Report")
 ![Report](docs/images/report2.png "Report")
-
 
 ***
 
@@ -174,11 +247,13 @@ This project is licensed under the Apache 2.0 License.
 
 ## 🙏 Acknowledgements
 
-- Dify
-- Elasticsearch
-- Kafka
-- Django
-- Next.js
+- [Dify](https://github.com/langgenius/dify) - LLM Application Platform
+- [Elasticsearch](https://www.elastic.co/) - Search and Analytics
+- [Kafka](https://kafka.apache.org/) - Distributed Message Queue
+- [Logstash](https://www.elastic.co/logstash) - Data Processing Pipeline
+- [Django](https://www.djangoproject.com/) - Python Web Framework
+- [Next.js](https://nextjs.org/) - React Framework
+- [scikit-learn](https://scikit-learn.org/) - Isolation Forest Anomaly Detection
 
 ***
 

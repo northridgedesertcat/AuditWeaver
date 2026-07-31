@@ -1,0 +1,25 @@
+# Agent 模块运行配置
+# 环境敏感值（brokers, input_topic, base_url, api_key, timeout, host, port, level）
+# 由 common.env 注入，不在此文件中定义。
+
+kafka:
+  group_id: agent_analysis_group_v10022
+  auto_offset_reset: earliest
+  consumer_timeout_ms: 5000
+  max_poll_records: 10
+  # 分析结果输出到此 topic，由 Kafka Connect Sink (agent-event-save-sink) 写入 ES
+  output_topic: agent.event.save
+
+dify:
+  endpoint: workflows/run
+  response_mode: blocking
+
+logging:
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: agent_analysis.log
+
+process:
+  batch_size: 5
+  poll_interval_ms: 1000
+  retry_times: 3
+  retry_delay: 2

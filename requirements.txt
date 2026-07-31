@@ -7,3 +7,5 @@ pandas==3.0.3
 requests==2.34.2
 scikit-learn==1.9.0
 seaborn==0.13.2
+PyYAML==6.0.2
+kafka-python==2.0.2

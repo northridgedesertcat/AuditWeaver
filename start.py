@@ -1,6 +1,5 @@
 import os
 import sys
-import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -48,9 +47,14 @@ def main():
         
         success = run_service(service, project_dir, service_config, docker_manager)
         
-        if not success and service.get("type") == "docker":
-            input("Press Enter to exit...")
-            return
+        if not success:
+            service_type = service.get("type")
+            if service_type in ("docker", "script"):
+                print_error(f"Critical service '{service_name}' failed to start. Aborting.")
+                input("Press Enter to exit...")
+                return
+            elif service_type == "window":
+                print_warning(f"Window service '{service_name}' failed to start, continuing...")
     
     print()
     print_separator()

