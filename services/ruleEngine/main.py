@@ -35,6 +35,7 @@ def main() -> None:
     producer = KafkaProducerAdapter(settings.bootstrap_servers, settings.producer_topics)
     consumer.connect()
     producer.connect()
+    producer.set_consumer(consumer)
     logger.info("Rule engine started: %s -> %s", settings.consumer_topic, settings.producer_topics)
     try:
         for raw_log in consumer.consume():
@@ -42,9 +43,15 @@ def main() -> None:
                 event = pipeline.process(raw_log)
             except LogValidationError as error:
                 logger.warning("Dropping invalid log message: %s", error)
+                producer.commit_offset()
+                continue
+            except Exception as error:
+                logger.error("Error processing log message: %s", error, exc_info=True)
                 continue
             if event is not None:
                 producer.send(event)
+            else:
+                producer.commit_offset()
     finally:
         consumer.close()
         producer.close()

@@ -15,6 +15,7 @@ class KafkaConsumer:
         self.auto_offset_reset = auto_offset_reset
         self.enable_auto_commit = enable_auto_commit
         self._consumer: Any = None
+        self._last_message: Any = None
 
     def connect(self) -> None:
         try:
@@ -31,7 +32,13 @@ class KafkaConsumer:
         if self._consumer is None:
             raise RuntimeError("Kafka consumer is not connected")
         for message in self._consumer:
+            self._last_message = message
             yield message.value
+
+    def commit(self) -> None:
+        if self._consumer is None:
+            raise RuntimeError("Kafka consumer is not connected")
+        self._consumer.commit()
 
     def close(self) -> None:
         if self._consumer is not None:

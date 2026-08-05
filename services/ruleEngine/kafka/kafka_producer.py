@@ -13,6 +13,10 @@ class KafkaProducer:
         self.bootstrap_servers = bootstrap_servers
         self.topics = topics
         self._producer: Any = None
+        self._consumer: Any = None
+
+    def set_consumer(self, consumer: Any) -> None:
+        self._consumer = consumer
 
     def connect(self) -> None:
         try:
@@ -31,6 +35,13 @@ class KafkaProducer:
         payload = event.to_dict()
         for topic in self.topics:
             self._producer.send(topic, payload, key=event.event_id)
+        self._producer.flush()
+        if self._consumer is not None:
+            self._consumer.commit()
+
+    def commit_offset(self) -> None:
+        if self._consumer is not None:
+            self._consumer.commit()
 
     def close(self) -> None:
         if self._producer is not None:
