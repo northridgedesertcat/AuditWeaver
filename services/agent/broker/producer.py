@@ -53,6 +53,24 @@ class AnalysisResultProducer:
     def is_connected(self) -> bool:
         return self.producer is not None
 
+    def send_dlq(self, payload: Dict[str, Any], key: str = None) -> bool:
+        """将处理失败的消息发送到死信队列"""
+        if not self.producer:
+            logger.error('Kafka producer not connected, cannot send to DLQ')
+            return False
+        try:
+            future = self.producer.send(self.topic, value=payload, key=key)
+            record_metadata = future.get(timeout=10)
+            logger.info(
+                f'DLQ message sent: topic={record_metadata.topic}, '
+                f'partition={record_metadata.partition}, offset={record_metadata.offset}, '
+                f'key={key}'
+            )
+            return True
+        except Exception as e:
+            logger.error(f'Failed to send DLQ message (key={key}): {str(e)}')
+            return False
+
     def close(self):
         if self.producer:
             self.producer.flush()

@@ -21,6 +21,7 @@ class AgentMain:
     def __init__(self):
         self.kafka_consumer = None
         self.kafka_producer = None
+        self.dlq_producer = None
         self.dify_client = None
         self.running = False
 
@@ -50,6 +51,16 @@ class AgentMain:
             return False
         logger.info('Kafka producer connected')
 
+        logger.info('Connecting to DLQ producer...')
+        self.dlq_producer = AnalysisResultProducer(
+            bootstrap_servers=KAFKA_CONFIG['brokers'],
+            topic=KAFKA_CONFIG['dlq_topic']
+        )
+        if not self.dlq_producer.connect():
+            logger.error('Failed to connect DLQ producer')
+            return False
+        logger.info('DLQ producer connected')
+
         logger.info('Connecting to Dify API...')
         self.dify_client = DifyClient(
             base_url=DIFY_CONFIG['base_url'],
@@ -62,7 +73,7 @@ class AgentMain:
         return True
 
     def process_log(self, raw_message: dict) -> bool:
-        """管道: Dify 分析 → 构建文档 → 发送 Kafka"""
+        """管道: Dify 分析 → 构建文档 → 发送 Kafka。失败时发送到 DLQ。"""
         event_id = raw_message.get('event_id', 'unknown')
 
         try:
@@ -75,13 +86,16 @@ class AgentMain:
                     return True
                 else:
                     logger.error(f'Kafka send failed: event_id={event_id}')
+                    self.dlq_producer.send_dlq(raw_message, key=event_id)
                     return False
             else:
                 logger.error(f'Dify analysis failed: {response.get("error")}')
+                self.dlq_producer.send_dlq(raw_message, key=event_id)
                 return False
 
         except Exception as e:
             logger.error(f'Error processing {event_id}: {str(e)}')
+            self.dlq_producer.send_dlq(raw_message, key=event_id)
             return False
 
     def run(self):
@@ -122,6 +136,8 @@ class AgentMain:
             self.kafka_consumer.close()
         if self.kafka_producer:
             self.kafka_producer.close()
+        if self.dlq_producer:
+            self.dlq_producer.close()
         if self.dify_client:
             self.dify_client.close()
         logger.info('Agent module stopped')

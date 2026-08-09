@@ -50,6 +50,38 @@ class KafkaProducer:
             self._producer = None
 
 
+class DlqProducer:
+    """独立的 DLQ 生产者，发送原始 dict 到死信队列。"""
+
+    def __init__(self, bootstrap_servers: list[str] | str, topic: str) -> None:
+        self.bootstrap_servers = bootstrap_servers
+        self.topic = topic
+        self._producer: Any = None
+
+    def connect(self) -> None:
+        try:
+            from kafka import KafkaProducer
+        except ImportError as error:
+            raise RuntimeError("kafka-python is required to run the Kafka adapter") from error
+        self._producer = KafkaProducer(
+            bootstrap_servers=self.bootstrap_servers,
+            key_serializer=lambda k: k.encode("utf-8") if k else None,
+            value_serializer=lambda payload: json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+        )
+
+    def send(self, payload: dict[str, Any], key: str | None = None) -> None:
+        if self._producer is None:
+            raise RuntimeError("DLQ producer is not connected")
+        self._producer.send(self.topic, payload, key=key)
+        self._producer.flush()
+
+    def close(self) -> None:
+        if self._producer is not None:
+            self._producer.flush()
+            self._producer.close()
+            self._producer = None
+
+
 # Kept as a descriptive alias for callers that want to distinguish this
 # infrastructure adapter from kafka-python's KafkaProducer.
 KafkaProducerAdapter = KafkaProducer
