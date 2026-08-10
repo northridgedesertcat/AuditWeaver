@@ -41,5 +41,5 @@ def load_settings(config_path: str | Path | None = None) -> Settings:
         auto_offset_reset=str(consumer.get("auto_offset_reset", "latest")),
         enable_auto_commit=bool(consumer.get("enable_auto_commit", False)),
         producer_topics=list(producer.get("topics", ["log.analysis"])),
-        dlq_topic=str(producer.get("dlq_topic", "log.structured.dlq")),
+        dlq_topic=str(producer.get("dlq_topic", "log.dlq")),
     )

@@ -10,7 +10,7 @@ kafka:
   # 分析结果输出到此 topic，由 Kafka Connect Sink (agent-event-save-sink) 写入 ES
   output_topic: agent.event.save
   # 处理失败的消息发送到此死信队列
-  dlq_topic: log.analysis.dlq
+  dlq_topic: log.dlq
 
 dify:
   endpoint: workflows/run

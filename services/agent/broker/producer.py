@@ -1,5 +1,6 @@
 # Kafka 生产者模块
 # 将 Dify 分析结果发送到 agent.event.save topic，由 Kafka Connect Sink 写入 Elasticsearch
+# DlqProducer 已提取到 core.kafka.dlq，send_dlq() 不再在此维护
 
 import json
 import logging
@@ -9,8 +10,9 @@ from kafka.errors import KafkaError
 
 logger = logging.getLogger('kafka_producer')
 
+
 class AnalysisResultProducer:
-    """分析结果生产者，将构建好的 ES 文档发送到 Kafka 输出 topic"""
+    """分析结果生产者，将构建好的 ES 文档发送到 Kafka 输出 topic。"""
 
     def __init__(self, bootstrap_servers: str, topic: str):
         self.bootstrap_servers = bootstrap_servers
@@ -52,24 +54,6 @@ class AnalysisResultProducer:
 
     def is_connected(self) -> bool:
         return self.producer is not None
-
-    def send_dlq(self, payload: Dict[str, Any], key: str = None) -> bool:
-        """将处理失败的消息发送到死信队列"""
-        if not self.producer:
-            logger.error('Kafka producer not connected, cannot send to DLQ')
-            return False
-        try:
-            future = self.producer.send(self.topic, value=payload, key=key)
-            record_metadata = future.get(timeout=10)
-            logger.info(
-                f'DLQ message sent: topic={record_metadata.topic}, '
-                f'partition={record_metadata.partition}, offset={record_metadata.offset}, '
-                f'key={key}'
-            )
-            return True
-        except Exception as e:
-            logger.error(f'Failed to send DLQ message (key={key}): {str(e)}')
-            return False
 
     def close(self):
         if self.producer:

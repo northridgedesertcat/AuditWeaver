@@ -95,28 +95,13 @@ topics:
 
   # ---------------------------------------------------------------------------
   # DLQ (Dead Letter Queue)
-  # These topics used to store failed data that cannot be processed by the consumer module
+  # 统一死信队列，汇总所有模块（Logstash / Rule Engine / Agent）的处理失败消息。
+  # 由 Kafka Connect Sink 写入 ES logs_dead_letter 索引。
   # ---------------------------------------------------------------------------
-  - name: log.raw.dlq
+  - name: log.dlq
     partitions: 1
     replication_factor: 1
     configs:
       retention.ms: "259200000"
     description: >
-      Failed data that cannot be processed by the logstash module from log.raw topic.
-  
-  - name: log.structured.dlq
-    partitions: 1
-    replication_factor: 1
-    configs:
-      retention.ms: "259200000"
-    description: >
-      Failed data that cannot be processed by the rule engine from log.structured topic.
-
-  - name: log.analysis.dlq
-    partitions: 1
-    replication_factor: 1
-    configs:
-      retention.ms: "259200000"
-    description: >
-      Failed data that cannot be processed by the agent module from log.analysis topic.
+      Unified dead letter queue for all modules (logstash / rule engine / agent).
