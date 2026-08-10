@@ -42,7 +42,7 @@ export function LogVolumeChart() {
     }
 
     fetchTrend()
-    const interval = setInterval(fetchTrend, 30000)
+    const interval = setInterval(fetchTrend, 10000)
 
     return () => clearInterval(interval)
   }, [])
