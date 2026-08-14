@@ -101,11 +101,12 @@ class AgentMain:
                     )
                     return False
             else:
-                logger.error(f'Dify analysis failed: {response.get("error")}')
+                dify_error = response.get('error', 'unknown')
+                logger.error(f'Dify analysis failed: {dify_error}')
                 self.dlq_producer.send_dlq(
                     original_payload=raw_message,
                     key=event_id,
-                    failure_reason='dify_analysis_failed',
+                    failure_reason=f'dify_analysis_failed: {dify_error}',
                     source_topic=KAFKA_CONFIG['input_topic'],
                 )
                 return False

@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import traceback
 from datetime import datetime, timezone
@@ -58,8 +59,17 @@ class DlqProducer(KafkaBaseProducer):
             error: 捕获的异常对象（可选，用于提取 error_type/error_message/traceback）
             source_topic: 原始消息来源 topic
         """
+        # 校验 original_payload 必须为 dict (ES mapping: flattened 只接受 object)
+        if not isinstance(original_payload, dict):
+            original_payload = {'raw': original_payload}
+
         event_id = str(original_payload.get('event_id', str(uuid4())))
         reason = failure_reason or (str(error) if error else 'unknown')
+
+        # 派生人类可读的 message 冗余字段 (mapping: text, ignore_above 2048)
+        message = original_payload.get('message', '')
+        if not message:
+            message = json.dumps(original_payload, ensure_ascii=False)[:2048]
 
         dlq_message: dict[str, Any] = {
             '@timestamp': datetime.now(timezone.utc).isoformat(),
@@ -71,6 +81,7 @@ class DlqProducer(KafkaBaseProducer):
             'error_message': str(error) if error else '',
             'error_traceback': traceback.format_exc() if error else '',
             'original_payload': original_payload,
+            'message': message,
             'tags': ['dlq', self.failed_stage],
             'dlq_status': 'pending',
             'retry_count': 0,
