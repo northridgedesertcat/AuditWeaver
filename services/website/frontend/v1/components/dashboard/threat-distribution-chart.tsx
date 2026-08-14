@@ -72,8 +72,8 @@ export function ThreatDistributionChart() {
     }
 
     fetchDistribution()
-    // 每 30 秒刷新一次
-    const interval = setInterval(fetchDistribution, 30000)
+    // 每 10 秒刷新一次
+    const interval = setInterval(fetchDistribution, 10000)
 
     return () => clearInterval(interval)
   }, [])

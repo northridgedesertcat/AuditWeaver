@@ -87,7 +87,7 @@ export function RecentAlerts() {
     }
 
     fetchAlerts()
-    const interval = setInterval(fetchAlerts, 30000)
+    const interval = setInterval(fetchAlerts, 10000)
 
     return () => clearInterval(interval)
   }, [])

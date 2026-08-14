@@ -1,4 +1,8 @@
-"""Kafka adapter that serializes SecurityEvent objects."""
+"""Kafka adapter that serializes SecurityEvent objects.
+
+保留 Rule Engine 特有逻辑：SecurityEvent 序列化、多 topic 发送、consumer 联动 offset 提交。
+DlqProducer 已提取到 core.kafka.dlq。
+"""
 
 from __future__ import annotations
 
@@ -9,6 +13,8 @@ from ..models.security_event import SecurityEvent
 
 
 class KafkaProducer:
+    """SecurityEvent 专用多 topic 生产者，支持 consumer 联动 offset 提交。"""
+
     def __init__(self, bootstrap_servers: list[str] | str, topics: list[str]) -> None:
         self.bootstrap_servers = bootstrap_servers
         self.topics = topics

@@ -4,7 +4,14 @@ import os
 import time
 import logging
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# 将 agent 目录加入 sys.path，以便导入 config/broker/dify 等模块
+_AGENT_DIR = os.path.dirname(os.path.abspath(__file__))
+# 将项目根目录加入 sys.path，以便导入 core 等公共模块
+_PROJECT_ROOT = os.path.abspath(os.path.join(_AGENT_DIR, '..', '..'))
+sys.path.insert(0, _AGENT_DIR)
+sys.path.insert(0, _PROJECT_ROOT)
+
+from core.kafka.dlq import DlqProducer
 
 from config import KAFKA_CONFIG, DIFY_CONFIG, LOG_CONFIG, PROCESS_CONFIG
 from broker import LogAnalysisConsumer, AnalysisResultProducer
@@ -17,10 +24,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger('agent_main')
 
+
 class AgentMain:
     def __init__(self):
         self.kafka_consumer = None
         self.kafka_producer = None
+        self.dlq_producer = None
         self.dify_client = None
         self.running = False
 
@@ -50,6 +59,15 @@ class AgentMain:
             return False
         logger.info('Kafka producer connected')
 
+        logger.info('Connecting to DLQ producer...')
+        self.dlq_producer = DlqProducer(
+            KAFKA_CONFIG['brokers'],
+            KAFKA_CONFIG['dlq_topic'],
+            failed_stage='agent',
+        )
+        self.dlq_producer.connect()
+        logger.info('DLQ producer connected')
+
         logger.info('Connecting to Dify API...')
         self.dify_client = DifyClient(
             base_url=DIFY_CONFIG['base_url'],
@@ -62,7 +80,7 @@ class AgentMain:
         return True
 
     def process_log(self, raw_message: dict) -> bool:
-        """管道: Dify 分析 → 构建文档 → 发送 Kafka"""
+        """管道: Dify 分析 → 构建文档 → 发送 Kafka。失败时发送到 DLQ。"""
         event_id = raw_message.get('event_id', 'unknown')
 
         try:
@@ -75,13 +93,33 @@ class AgentMain:
                     return True
                 else:
                     logger.error(f'Kafka send failed: event_id={event_id}')
+                    self.dlq_producer.send_dlq(
+                        original_payload=raw_message,
+                        key=event_id,
+                        failure_reason='kafka_send_failed',
+                        source_topic=KAFKA_CONFIG['input_topic'],
+                    )
                     return False
             else:
-                logger.error(f'Dify analysis failed: {response.get("error")}')
+                dify_error = response.get('error', 'unknown')
+                logger.error(f'Dify analysis failed: {dify_error}')
+                self.dlq_producer.send_dlq(
+                    original_payload=raw_message,
+                    key=event_id,
+                    failure_reason=f'dify_analysis_failed: {dify_error}',
+                    source_topic=KAFKA_CONFIG['input_topic'],
+                )
                 return False
 
         except Exception as e:
             logger.error(f'Error processing {event_id}: {str(e)}')
+            self.dlq_producer.send_dlq(
+                original_payload=raw_message,
+                key=event_id,
+                failure_reason='processing_exception',
+                error=e,
+                source_topic=KAFKA_CONFIG['input_topic'],
+            )
             return False
 
     def run(self):
@@ -122,9 +160,12 @@ class AgentMain:
             self.kafka_consumer.close()
         if self.kafka_producer:
             self.kafka_producer.close()
+        if self.dlq_producer:
+            self.dlq_producer.close()
         if self.dify_client:
             self.dify_client.close()
         logger.info('Agent module stopped')
+
 
 def main():
     agent = AgentMain()
@@ -136,6 +177,7 @@ def main():
     except Exception as e:
         logger.error(f'Fatal error: {str(e)}')
         sys.exit(1)
+
 
 if __name__ == '__main__':
     main()

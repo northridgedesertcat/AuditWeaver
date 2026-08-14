@@ -1,5 +1,6 @@
 # Kafka 生产者模块
 # 将 Dify 分析结果发送到 agent.event.save topic，由 Kafka Connect Sink 写入 Elasticsearch
+# DlqProducer 已提取到 core.kafka.dlq，send_dlq() 不再在此维护
 
 import json
 import logging
@@ -9,8 +10,9 @@ from kafka.errors import KafkaError
 
 logger = logging.getLogger('kafka_producer')
 
+
 class AnalysisResultProducer:
-    """分析结果生产者，将构建好的 ES 文档发送到 Kafka 输出 topic"""
+    """分析结果生产者，将构建好的 ES 文档发送到 Kafka 输出 topic。"""
 
     def __init__(self, bootstrap_servers: str, topic: str):
         self.bootstrap_servers = bootstrap_servers

@@ -47,3 +47,4 @@ kafka:
     topics:
       - log.analysis
       - rule.event.save
+    dlq_topic: log.dlq

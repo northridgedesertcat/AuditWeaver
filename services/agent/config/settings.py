@@ -26,6 +26,7 @@ KAFKA_CONFIG = {
     'consumer_timeout_ms': _cfg['kafka']['consumer_timeout_ms'],
     'max_poll_records': _cfg['kafka']['max_poll_records'],
     'output_topic': _cfg['kafka']['output_topic'],
+    'dlq_topic': _cfg['kafka']['dlq_topic'],
 }
 
 DIFY_CONFIG = {

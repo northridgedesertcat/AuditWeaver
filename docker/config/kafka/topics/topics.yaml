@@ -90,3 +90,18 @@ topics:
       retention.ms: "259200000"
     description: >
       agent produce.Consumed by the Elasticsearch.
+
+
+
+  # ---------------------------------------------------------------------------
+  # DLQ (Dead Letter Queue)
+  # 统一死信队列，汇总所有模块（Logstash / Rule Engine / Agent）的处理失败消息。
+  # 由 Kafka Connect Sink 写入 ES logs_dead_letter 索引。
+  # ---------------------------------------------------------------------------
+  - name: log.dlq
+    partitions: 1
+    replication_factor: 1
+    configs:
+      retention.ms: "259200000"
+    description: >
+      Unified dead letter queue for all modules (logstash / rule engine / agent).

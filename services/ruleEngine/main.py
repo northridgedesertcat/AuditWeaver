@@ -5,6 +5,8 @@ Run from the repository root with ``python -m services.ruleEngine.main``.
 
 import logging
 
+from core.kafka.dlq import DlqProducer
+
 from .config.settings import load_settings
 from .engine.rule_engine import RuleEngine
 from .engine.rule_loader import RuleLoader
@@ -33,20 +35,36 @@ def main() -> None:
         settings.auto_offset_reset, settings.enable_auto_commit,
     )
     producer = KafkaProducerAdapter(settings.bootstrap_servers, settings.producer_topics)
+    dlq_producer = DlqProducer(settings.bootstrap_servers, settings.dlq_topic, failed_stage="rule_engine")
     consumer.connect()
     producer.connect()
+    dlq_producer.connect()
     producer.set_consumer(consumer)
-    logger.info("Rule engine started: %s -> %s", settings.consumer_topic, settings.producer_topics)
+    logger.info("Rule engine started: %s -> %s, dlq: %s",
+                settings.consumer_topic, settings.producer_topics, settings.dlq_topic)
     try:
         for raw_log in consumer.consume():
             try:
                 event = pipeline.process(raw_log)
             except LogValidationError as error:
-                logger.warning("Dropping invalid log message: %s", error)
+                logger.warning("Sending invalid log to DLQ: %s", error)
+                dlq_producer.send_dlq(
+                    original_payload=raw_log if isinstance(raw_log, dict) else {},
+                    failure_reason=str(error),
+                    error=error,
+                    source_topic=settings.consumer_topic,
+                )
                 producer.commit_offset()
                 continue
             except Exception as error:
-                logger.error("Error processing log message: %s", error, exc_info=True)
+                logger.error("Error processing log message, sending to DLQ: %s", error, exc_info=True)
+                dlq_producer.send_dlq(
+                    original_payload=raw_log if isinstance(raw_log, dict) else {},
+                    failure_reason="processing_error",
+                    error=error,
+                    source_topic=settings.consumer_topic,
+                )
+                producer.commit_offset()
                 continue
             if event is not None:
                 producer.send(event)
@@ -55,6 +73,7 @@ def main() -> None:
     finally:
         consumer.close()
         producer.close()
+        dlq_producer.close()
 
 
 if __name__ == "__main__":
