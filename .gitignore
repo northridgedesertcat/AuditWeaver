@@ -29,6 +29,9 @@ venv/
 env/
 ENV/
 
+# Local test dependencies (tenacity vendored for sandbox testing)
+.test_deps/
+
 # IDE
 .vscode/
 .idea/
