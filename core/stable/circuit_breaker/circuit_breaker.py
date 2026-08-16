@@ -128,11 +128,16 @@ class CircuitBreaker:
             )
             # throw_new_error_on_trip=False:熔断瞬间重抛原始异常,
             # 保证 _ResultFailure 桥接异常能正常传播到封装层
+            # exclude 反向换算:白名单外不计失败;_ResultFailure 为内部桥接异常,
+            # 必须始终计为失败,不受用户 exceptions 白名单影响
             self._cb = pybreaker.CircuitBreaker(
                 fail_max=self.config.fail_max,
                 reset_timeout=self.config.reset_timeout,
                 success_threshold=self.config.success_threshold,
-                exclude=[lambda e: not isinstance(e, self.config.exceptions)],
+                exclude=[
+                    lambda e: not isinstance(e, self.config.exceptions)
+                    and not isinstance(e, _ResultFailure)
+                ],
                 listeners=[listener],
                 name=self.config.name,
                 throw_new_error_on_trip=False,
