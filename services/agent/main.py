@@ -11,7 +11,10 @@ _PROJECT_ROOT = os.path.abspath(os.path.join(_AGENT_DIR, '..', '..'))
 sys.path.insert(0, _AGENT_DIR)
 sys.path.insert(0, _PROJECT_ROOT)
 
+from tenacity import retry_if_result
+
 from core.kafka.dlq import DlqProducer
+from core.stable.retry import Retry
 
 from config import KAFKA_CONFIG, DIFY_CONFIG, LOG_CONFIG, PROCESS_CONFIG
 from broker import LogAnalysisConsumer, AnalysisResultProducer
@@ -32,6 +35,23 @@ class AgentMain:
         self.dlq_producer = None
         self.dify_client = None
         self.running = False
+        # 线性退避重试(配置见 agent.yaml process 段,等待序列 2s/4s/6s)
+        # Dify 分析:analyze_log 吞异常返回 {'status': 'failed'},按返回值重试
+        self.dify_retry = Retry(
+            max_retries=PROCESS_CONFIG['retry_times'],
+            base_delay=PROCESS_CONFIG['retry_delay'],
+            max_delay=PROCESS_CONFIG['retry_max_delay'],
+            retry=retry_if_result(lambda r: r.get('status') == 'failed'),
+            retry_error_callback=lambda rs: rs.outcome.result(),
+        )
+        # Kafka 发送:send() 失败返回 False,按返回值重试
+        self.send_retry = Retry(
+            max_retries=PROCESS_CONFIG['retry_times'],
+            base_delay=PROCESS_CONFIG['retry_delay'],
+            max_delay=PROCESS_CONFIG['retry_max_delay'],
+            retry=retry_if_result(lambda sent: sent is False),
+            retry_error_callback=lambda rs: rs.outcome.result(),
+        )
 
     def initialize(self) -> bool:
         logger.info('Initializing Agent module...')
@@ -84,11 +104,11 @@ class AgentMain:
         event_id = raw_message.get('event_id', 'unknown')
 
         try:
-            response = self.dify_client.analyze_log(raw_message)
+            response = self.dify_retry.call(self.dify_client.analyze_log, raw_message)
 
             if response.get('status') == 'success':
                 document = build_elastic_document(raw_message, response.get('response', {}))
-                if self.kafka_producer.send(document, key=event_id):
+                if self.send_retry.call(self.kafka_producer.send, document, key=event_id):
                     logger.info(f'Processed: event_id={event_id}')
                     return True
                 else:

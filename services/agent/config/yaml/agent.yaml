@@ -25,3 +25,4 @@ process:
   poll_interval_ms: 1000
   retry_times: 3
   retry_delay: 2
+  retry_max_delay: 10

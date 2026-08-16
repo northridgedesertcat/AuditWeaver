@@ -48,4 +48,5 @@ PROCESS_CONFIG = {
     'poll_interval_ms': _cfg['process']['poll_interval_ms'],
     'retry_times': _cfg['process']['retry_times'],
     'retry_delay': _cfg['process']['retry_delay'],
+    'retry_max_delay': _cfg['process'].get('retry_max_delay', 10),
 }
