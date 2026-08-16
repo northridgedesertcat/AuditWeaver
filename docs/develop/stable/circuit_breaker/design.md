@@ -293,20 +293,20 @@ result = CircuitBreaker(fail_max=5, reset_timeout=60).call(
 | 参数非法 | `CircuitBreakerConfig` 构造抛 `ValueError` |
 | 并发调用 | PyBreaker 线程安全;同一实例全局复用 |
 | 回调 `on_state_change` 自身抛异常 | 不吞,直接向外抛出(不参与熔断) |
-| 目标函数自身抛 `CircuitBreakerError` | 极罕见;封装层以 `current_state` 预检兜底,避免误判为熔断打开 |
+| 目标函数自身抛 `CircuitBreakerError` | 极罕见;封装层不预检,统一经 `except CircuitBreakerError` 分支处理,不影响失败计数 |
 
 ---
 
-## 9. 依赖变更(落地阶段)
+## 9. 依赖变更(已落地)
 
-- [requirements.txt](file:///d:/tools/ProgrammeTools/python/正规项目/AuditWeaver/requirements.txt) 增加 `pybreaker==1.4.1`。
+- [requirements.txt](file:///d:/tools/ProgrammeTools/python/正规项目/AuditWeaver/requirements.txt) 已增加 `pybreaker==1.4.1`。
 - PyBreaker 要求 Python 3.10+(项目满足)。
 - 纯标准库依赖的独立包,无版本冲突风险。
 - 运行时环境需执行 `pip install pybreaker`。
 
 ---
 
-## 10. 测试方案(落地阶段)
+## 10. 测试方案(已落地)
 
 | 测试 | 内容 | 手段 |
 |---|---|---|
@@ -321,7 +321,7 @@ result = CircuitBreaker(fail_max=5, reset_timeout=60).call(
 | 白名单过滤 | 白名单外异常不计失败、立即抛出 | `raises` + `fail_counter` 不变 |
 | 状态回调 | `on_state_change` 收到正确的 old/new | mock 断言参数 |
 
-> PyBreaker 本身无需测试,只测封装层行为与映射正确性;通过 mock 缩短 `reset_timeout` 避免真实等待。
+> 测试文件已落地至 [core/stable/circuit_breaker/test_circuit_breaker.py](file:///d:/tools/ProgrammeTools/python/正规项目/AuditWeaver/core/stable/circuit_breaker/test_circuit_breaker.py),共 23 个用例全部通过;熔断恢复相关用例通过缩短 `reset_timeout` 避免真实等待。PyBreaker 本身无需测试,只测封装层行为与映射正确性。
 
 ---
 
@@ -329,8 +329,8 @@ result = CircuitBreaker(fail_max=5, reset_timeout=60).call(
 
 - **新增** `core/stable/circuit_breaker`,与 `core/stable/retry` 并列。
 - **组合关系**:重试 = 单次调用节奏(线性退避),熔断 = 整体保护开关,两模块独立、可组合、不互相依赖。
-- **agent 接入改动**(落地阶段,本次只设计):
-  - [services/agent/main.py](file:///d:/tools/ProgrammeTools/python/正规项目/AuditWeaver/services/agent/main.py):`__init__` 新增 `self.dify_breaker`,`process_log` 中把 `self.dify_retry.call(...)` 改为 7.1 的组合调用;
+- **agent 接入改动**(已落地):
+  - [services/agent/main.py](file:///d:/tools/ProgrammeTools/python/正规项目/AuditWeaver/services/agent/main.py):`__init__` 新增 `self.dify_breaker`,`process_log` 中把 `self.dify_retry.call(...)` 改为熔断包重试的组合调用;
   - [services/agent/config/yaml/agent.yaml](file:///d:/tools/ProgrammeTools/python/正规项目/AuditWeaver/services/agent/config/yaml/agent.yaml):新增 `circuit_breaker` 配置段(环境敏感值仍走 `common.env` 注入);
 
 ```yaml
@@ -340,7 +340,7 @@ circuit_breaker:
   success_threshold: 2
 ```
 
-  - [services/agent/config/settings.py](file:///d:/tools/ProgrammeTools/python/正规项目/AuditWeaver/services/agent/config/settings.py):读取新配置段。
+  - [services/agent/config/settings.py](file:///d:/tools/ProgrammeTools/python/正规项目/AuditWeaver/services/agent/config/settings.py) 与 [services/agent/config/__init__.py](file:///d:/tools/ProgrammeTools/python/正规项目/AuditWeaver/services/agent/config/__init__.py):读取并导出 `CIRCUIT_CONFIG`。
 - **不改造**现有 DLQ / Kafka 发送 / 其他模块;后续其他网络调用可复用本模块。
 
 ---
@@ -350,3 +350,4 @@ circuit_breaker:
 | 日期 | 变更 |
 |---|---|
 | 2026-08-16 | V1:确定选型 PyBreaker 1.4.1 + 薄封装;确定"熔断在重试外层"的组合语义;设计返回值失败桥接与熔断打开行为归一;文档待评审 |
+| 2026-08-16 | V2:落地实现。核心模块 + 23 个测试用例全部通过;agent 接入(agent.yaml / settings.py / config __init__ / main.py);requirements 增加 `pybreaker==1.4.1`。落地时修正两点与 PyBreaker 实际的差异:`state_change` 回调收到状态对象(取 `.name` 转字符串)、半开转换由 `calling()` 内部完成(封装层不做 open 预检);`fail_max=0` 实现为禁用熔断直接透传 |

@@ -14,9 +14,10 @@ sys.path.insert(0, _PROJECT_ROOT)
 from tenacity import retry_if_result
 
 from core.kafka.dlq import DlqProducer
+from core.stable.circuit_breaker import CircuitBreaker
 from core.stable.retry import Retry
 
-from config import KAFKA_CONFIG, DIFY_CONFIG, LOG_CONFIG, PROCESS_CONFIG
+from config import KAFKA_CONFIG, DIFY_CONFIG, LOG_CONFIG, PROCESS_CONFIG, CIRCUIT_CONFIG
 from broker import LogAnalysisConsumer, AnalysisResultProducer
 from dify import DifyClient
 from preprocessor import build_elastic_document
@@ -51,6 +52,17 @@ class AgentMain:
             max_delay=PROCESS_CONFIG['retry_max_delay'],
             retry=retry_if_result(lambda sent: sent is False),
             retry_error_callback=lambda rs: rs.outcome.result(),
+        )
+        # Dify 熔断:重试耗尽仍失败连续达到 fail_max 条后熔断,
+        # 熔断期间不再调用 Dify,给其过载时喘息机会(配置见 agent.yaml circuit_breaker 段)
+        self.dify_breaker = CircuitBreaker(
+            fail_max=CIRCUIT_CONFIG['fail_max'],
+            reset_timeout=CIRCUIT_CONFIG['reset_timeout'],
+            success_threshold=CIRCUIT_CONFIG['success_threshold'],
+            name='dify',
+            on_state_change=lambda old, new: logger.warning(
+                f'Dify 熔断器状态变化: {old} -> {new}'
+            ),
         )
 
     def initialize(self) -> bool:
@@ -104,7 +116,13 @@ class AgentMain:
         event_id = raw_message.get('event_id', 'unknown')
 
         try:
-            response = self.dify_retry.call(self.dify_client.analyze_log, raw_message)
+            # 熔断包在重试外层:单条消息走完整线性退避重试,彻底失败计 1 次熔断失败;
+            # 熔断打开时抛 CircuitOpenError(不再调用 Dify),消息快速失败进 DLQ
+            response = self.dify_breaker.call(
+                lambda msg: self.dify_retry.call(self.dify_client.analyze_log, msg),
+                raw_message,
+                result_is_failure=lambda r: r.get('status') == 'failed',
+            )
 
             if response.get('status') == 'success':
                 document = build_elastic_document(raw_message, response.get('response', {}))

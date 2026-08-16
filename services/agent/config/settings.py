@@ -50,3 +50,9 @@ PROCESS_CONFIG = {
     'retry_delay': _cfg['process']['retry_delay'],
     'retry_max_delay': _cfg['process'].get('retry_max_delay', 10),
 }
+
+CIRCUIT_CONFIG = {
+    'fail_max': _cfg['circuit_breaker']['fail_max'],
+    'reset_timeout': _cfg['circuit_breaker']['reset_timeout'],
+    'success_threshold': _cfg['circuit_breaker']['success_threshold'],
+}
