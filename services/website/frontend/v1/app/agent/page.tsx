@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
   Brain,
@@ -310,7 +309,7 @@ export default function AgentPage() {
           </CardHeader>
 
           {/* Messages */}
-          <ScrollArea className="flex-1 p-4" ref={scrollRef}>
+          <div className="flex-1 min-h-0 overflow-y-auto p-4" ref={scrollRef}>
             <div className="space-y-4 max-w-3xl mx-auto">
               {messages.map((message) => (
                 <div
@@ -396,7 +395,7 @@ export default function AgentPage() {
                 </div>
               ))}
             </div>
-          </ScrollArea>
+          </div>
 
           {/* Input */}
           <div className="border-t border-border p-4">
