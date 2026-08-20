@@ -3,8 +3,12 @@
 """
 AuditWeaver - Kafka Topic Initializer
 
-Reads topics.yaml and creates missing Kafka topics via KafkaAdminClient.
+Reads topics.yaml and creates missing Kafka topics via confluent-kafka AdminClient.
 Existing topics are left untouched (no partition/config changes applied).
+
+底层使用 confluent-kafka（librdkafka），规避 Windows 上 kafka-python 的
+SelectSelector 兼容问题。原 kafka-python 的 create_topics 抛 TopicAlreadyExistsError，
+confluent 改为返回 {topic: Future}，逐个 f.result() 取结果，已存在用字符串匹配识别。
 
 Usage:
     python create-init-topics.py
@@ -34,15 +38,10 @@ except ImportError:
     sys.exit(1)
 
 try:
-    from kafka.admin import KafkaAdminClient, NewTopic
-    from kafka.errors import (
-        KafkaError,
-        NoBrokersAvailable,
-        TopicAlreadyExistsError,
-        InvalidTopicError,
-    )
+    from confluent_kafka.admin import AdminClient, NewTopic
+    from confluent_kafka.error import KafkaException
 except ImportError:
-    log.error("kafka-python is required. Install it via: pip install kafka-python")
+    log.error("confluent-kafka is required. Install it via: pip install confluent-kafka")
     sys.exit(1)
 
 
@@ -111,15 +110,17 @@ def load_topics_config(yaml_path: str) -> list:
 # Core operations
 # ---------------------------------------------------------------------------
 
-def list_existing_topics(admin_client: KafkaAdminClient) -> set:
+def list_existing_topics(admin_client: AdminClient) -> set:
     """Return the set of topic names that already exist on the cluster."""
     try:
-        return set(admin_client.list_topics())
-    except KafkaError as e:
+        # confluent-kafka 的 list_topics 参数为 timeout(秒),非 timeout_ms
+        cluster_meta = admin_client.list_topics(timeout=15)
+        return set(cluster_meta.topics.keys())
+    except KafkaException as e:
         raise RuntimeError(f"Failed to list topics: {e}") from e
 
 
-def create_topics(admin_client: KafkaAdminClient, topics: list, dry_run: bool = False):
+def create_topics(admin_client: AdminClient, topics: list, dry_run: bool = False):
     """Create topics that do not already exist. Existing topics are skipped.
     Returns (created_count, failed_count).
     """
@@ -132,10 +133,12 @@ def create_topics(admin_client: KafkaAdminClient, topics: list, dry_run: bool = 
             continue
         to_create.append(
             NewTopic(
-                name=t['name'],
+                topic=t['name'],
                 num_partitions=t['partitions'],
                 replication_factor=t['replication_factor'],
-                topic_configs=t['configs'] or None,
+                # confluent-kafka 要求 config 为 dict of strings，不接受 None；
+                # load_topics_config 已保证 configs 为 dict（无配置时为空 dict）
+                config=t['configs'],
             )
         )
         log.info(
@@ -154,21 +157,31 @@ def create_topics(admin_client: KafkaAdminClient, topics: list, dry_run: bool = 
         return len(to_create), 0
 
     log.info(f"Creating {len(to_create)} topic(s) ...")
-    try:
-        admin_client.create_topics(new_topics=to_create, validate_only=False)
-        log.info(f"Topic creation completed. "
-                 f"{len(to_create)}/{len(to_create)} succeeded.")
-    except TopicAlreadyExistsError:
-        log.info("Some topics already exist (skipped).")
-    except InvalidTopicError as e:
-        raise RuntimeError(f"Invalid topic: {e}") from e
-    except KafkaError as e:
-        raise RuntimeError(f"Failed to create topics: {e}") from e
+    # confluent 的 create_topics 返回 {topic_name: Future}，需逐个取 result
+    future_map = admin_client.create_topics(to_create, validate_only=False)
+    created_count = 0
+    failed_count = 0
+    for topic_name, future in future_map.items():
+        try:
+            future.result()  # 阻塞等待，失败抛 KafkaException
+            created_count += 1
+            log.info(f"[OK] Created topic '{topic_name}'")
+        except KafkaException as e:
+            msg_str = str(e).lower()
+            if 'already exists' in msg_str or 'topicalreadyexists' in msg_str:
+                log.info(f"[SKIP] Topic already exists: {topic_name}")
+            else:
+                log.error(f"[FAIL] Failed to create topic '{topic_name}': {e}")
+                failed_count += 1
+        except Exception as e:
+            log.error(f"[FAIL] Failed to create topic '{topic_name}': {e}")
+            failed_count += 1
 
-    return len(to_create), 0
+    log.info(f"Topic creation completed. created={created_count}, failed={failed_count}")
+    return created_count, failed_count
 
 
-def show_status(admin_client: KafkaAdminClient, topics: list):
+def show_status(admin_client: AdminClient, topics: list):
     """Print status of each configured topic against the cluster."""
     existing = list_existing_topics(admin_client)
     log.info("=" * 60)
@@ -184,23 +197,24 @@ def show_status(admin_client: KafkaAdminClient, topics: list):
     log.info("=" * 60)
 
 
-def connect_brokers(brokers: str) -> KafkaAdminClient:
+def connect_brokers(brokers: str) -> AdminClient:
     """Establish an admin client connection to the Kafka cluster."""
     log.info(f"Connecting to Kafka brokers: {brokers}")
     try:
-        client = KafkaAdminClient(
-            bootstrap_servers=brokers,
-            client_id='auditweaver-init-topics',
-            request_timeout_ms=15000,
-        )
+        admin = AdminClient({
+            'bootstrap.servers': brokers,
+            'request.timeout.ms': 15000,
+        })
+        # AdminClient 构造不立即连接，用 list_topics 探测（模拟原 NoBrokersAvailable 语义）
+        admin.list_topics(timeout=15)
         log.info("Connected successfully.")
-        return client
-    except NoBrokersAvailable:
+        return admin
+    except KafkaException as e:
         raise RuntimeError(
-            f"No brokers available at '{brokers}'. "
+            f"No brokers available at '{brokers}' or failed to connect: {e}. "
             "Make sure Kafka is running and the address is correct."
-        )
-    except KafkaError as e:
+        ) from e
+    except Exception as e:
         raise RuntimeError(f"Failed to connect to Kafka: {e}") from e
 
 
@@ -269,6 +283,7 @@ def main():
         log.error(str(e))
         sys.exit(1)
 
+    # confluent-kafka 的 AdminClient 没有 close()，无需显式关闭
     try:
         if args.list_only:
             show_status(admin, topics)
@@ -280,8 +295,7 @@ def main():
                 log.error(f"{failed} topic(s) failed to be created.")
                 sys.exit(1)
     finally:
-        admin.close()
-        log.info("Admin client closed.")
+        log.info("Admin client done.")
 
 
 if __name__ == '__main__':
