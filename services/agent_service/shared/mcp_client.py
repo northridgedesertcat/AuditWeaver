@@ -41,7 +41,7 @@ class _MCPHolder:
                     }
                 }
             )
-            self.tools = await self.client.get_mcp_tools()
+            self.tools = await self.client.get_tools()
             if self.tools is None:
                 self.tools = []
             return self.tools

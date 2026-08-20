@@ -44,6 +44,20 @@ from datetime import timedelta
 import httpx
 from django.http import StreamingHttpResponse, JsonResponse
 from django.conf import settings as django_settings
+from rest_framework.renderers import BaseRenderer, JSONRenderer
+
+
+class EventStreamRenderer(BaseRenderer):
+    """占位 renderer:仅用于通过 DRF 内容协商。
+
+    AgentProxyView 的响应均为手动构造的 StreamingHttpResponse / JsonResponse,
+    实际不走 renderer 渲染;此处只让 DRF 接受前端 Accept: text/event-stream,
+    否则 DRF 默认 renderer 不支持该媒体类型,会在进入视图前返回 406。
+    """
+
+    media_type = 'text/event-stream'
+    format = 'event-stream'
+
 
 class AgentProxyView(APIView):
     """Django → FastAPI 反代。透传请求体与 SSE 流,保留 agent_type 路径段。
@@ -55,6 +69,7 @@ class AgentProxyView(APIView):
     FastAPI 不可用时返回 502,不抛栈;未知 agent_type 由 FastAPI 返回 404 透传。
     """
     permission_classes = []
+    renderer_classes = [EventStreamRenderer, JSONRenderer]
 
     def _build_target(self, request):
         # request.path_info 形如 /api/v1/agent/analysis_explorer/chat
