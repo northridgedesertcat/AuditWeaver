@@ -40,6 +40,73 @@ from common.time_utils import now_utc, epoch_millis_now
 from common.env import ES_INDEX_ANALYSIS_REPORTS, ES_INDEX_NGINX_RAW
 from datetime import timedelta
 
+# Agent Service 反代所需(透传 SSE 流到内部 FastAPI :8001)
+import httpx
+from django.http import StreamingHttpResponse, JsonResponse
+from django.conf import settings as django_settings
+
+class AgentProxyView(APIView):
+    """Django → FastAPI 反代。透传请求体与 SSE 流,保留 agent_type 路径段。
+
+    - POST  /api/v1/agent/<agent_type>/chat       → 流式透传 SSE
+    - POST  /api/v1/agent/<agent_type>/chat/sync  → 透传 JSON
+    - GET   /api/v1/agent/health | /agent/types    → 透传 JSON
+
+    FastAPI 不可用时返回 502,不抛栈;未知 agent_type 由 FastAPI 返回 404 透传。
+    """
+    permission_classes = []
+
+    def _build_target(self, request):
+        # request.path_info 形如 /api/v1/agent/analysis_explorer/chat
+        # 截掉 /api/v1 前缀,拼到 FastAPI base,完整保留 agent_type 与子路径
+        prefix = "/api/v1"
+        path_info = request.path_info or ""
+        tail = path_info[len(prefix):] if path_info.startswith(prefix) else path_info
+        return f"{django_settings.AGENT_FASTAPI_BASE}{tail}"
+
+    def post(self, request, *args, **kwargs):
+        target = self._build_target(request)
+        body = request.body or b""
+        headers = {"Content-Type": request.content_type or "application/json"}
+
+        client = httpx.Client(timeout=None)
+        try:
+            req = httpx.Request("POST", target, content=body, headers=headers)
+            upstream = client.send(req, stream=True)
+        except httpx.HTTPError:
+            client.close()
+            return Response(
+                {"error": "agent service unavailable"},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        def stream():
+            try:
+                for chunk in upstream.iter_bytes():
+                    yield chunk
+            finally:
+                upstream.close()
+                client.close()
+
+        # 透传上游 content-type:/chat 为 text/event-stream,/chat/sync 为 application/json
+        content_type = upstream.headers.get("content-type", "text/event-stream")
+        resp = StreamingHttpResponse(stream(), content_type=content_type, status=upstream.status_code)
+        resp["X-Accel-Buffering"] = "no"   # 禁用 nginx 缓冲,保证 SSE 实时
+        resp["Cache-Control"] = "no-cache"
+        return resp
+
+    def get(self, request, *args, **kwargs):
+        target = self._build_target(request)
+        try:
+            r = httpx.get(target, timeout=10)
+            return JsonResponse(r.json(), status=r.status_code, safe=False)
+        except httpx.HTTPError:
+            return JsonResponse(
+                {"error": "agent service unavailable"},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+
 class HealthCheckView(APIView):
     def get(self, request):
         es_available = is_es_available()

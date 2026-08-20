@@ -57,6 +57,17 @@ def get_env_bool(key: str, default: bool = False) -> bool:
     return value in ('true', '1', 'yes', 'on')
 
 
+def get_env_float(key: str, default: float = 0.0) -> float:
+    _load_env()
+    value = os.environ.get(key)
+    if value is not None:
+        try:
+            return float(value)
+        except ValueError:
+            pass
+    return default
+
+
 DJANGO_SECRET_KEY = get_env('DJANGO_SECRET_KEY')
 DJANGO_DEBUG = get_env_bool('DJANGO_DEBUG', True)
 DJANGO_ALLOWED_HOSTS = get_env('DJANGO_ALLOWED_HOSTS', 'localhost')
@@ -96,3 +107,10 @@ LOG_LEVEL = get_env('LOG_LEVEL', 'INFO')
 
 ZOOKEEPER_PORT = get_env_int('ZOOKEEPER_PORT', 2181)
 KIBANA_PORT = get_env_int('KIBANA_PORT', 5601)
+
+# Agent Service(FastAPI,对内,只服务 Django)
+AE_BACKEND_HOST = get_env('AE_BACKEND_HOST', '127.0.0.1')
+AE_BACKEND_PORT = get_env_int('AE_BACKEND_PORT', 8001)
+
+# Django 反代目标(Django → FastAPI)
+AGENT_FASTAPI_BASE = get_env('AGENT_FASTAPI_BASE', f'http://{AE_BACKEND_HOST}:{AE_BACKEND_PORT}')
