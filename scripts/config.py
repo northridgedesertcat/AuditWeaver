@@ -7,6 +7,8 @@ if _services_path not in sys.path:
 from common.env import (
     KAFKA_CONNECT_HOST,
     KAFKA_CONNECT_PORT,
+    AE_BACKEND_HOST,
+    AE_BACKEND_PORT,
 )
 
 DEFAULT_CONFIG = {
@@ -122,6 +124,19 @@ DEFAULT_CONFIG = {
             "cwd": os.path.join("services", "agent"),
             "post_delay": 3,
             "description": "AI analysis (input: log.analysis)",
+        },
+        {
+            "id": "agent_service",
+            "name": "Starting Agent Service (FastAPI)",
+            "type": "window",
+            "window_title": "AgentService",
+            # 必须从项目根目录启动:子进程(MCP Skills)需继承项目根为 cwd,
+            # 才能 import common 并解析 services 包
+            "command": f"python -m uvicorn services.agent_service.backend.main:app --host {AE_BACKEND_HOST} --port {AE_BACKEND_PORT}",
+            "cwd": ".",
+            "post_delay": 3,
+            "port": AE_BACKEND_PORT,
+            "description": "Agent Service (FastAPI, 内部 :8001,反代给 Django)",
         },
         {
             "id": "django",

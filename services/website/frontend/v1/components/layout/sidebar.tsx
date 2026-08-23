@@ -52,6 +52,12 @@ const navItems = [
     badge: null,
   },
   {
+    title: "AI 安全智能体",
+    href: "/agent",
+    icon: MessageSquareCode,
+    badge: null,
+  },
+  {
     title: "AI 分析中心",
     href: "/ai-analysis",
     icon: Brain,
@@ -68,12 +74,6 @@ const navItems = [
     href: "/incidents",
     icon: FileWarning,
     badge: "3",
-  },
-  {
-    title: "AI 安全智能体",
-    href: "/agent",
-    icon: MessageSquareCode,
-    badge: null,
   },
   {
     title: "告警中心",
