@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import path, include
 from .views import (
     HealthCheckView,
     DashboardStatsView,
@@ -61,4 +61,9 @@ urlpatterns = [
     path('agent/<str:agent_type>/chat/sync', AgentProxyView.as_view(), name='agent_chat_sync'),
     path('agent/health', AgentProxyView.as_view(), name='agent_health'),
     path('agent/types', AgentProxyView.as_view(), name='agent_types'),
+]
+
+# Accounts(登录鉴权)
+urlpatterns += [
+    path('', include('accounts.urls')),
 ]

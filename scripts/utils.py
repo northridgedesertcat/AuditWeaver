@@ -225,6 +225,21 @@ def run_service(service, project_dir, service_config, docker_manager=None):
             print_success("Script executed successfully!")
             return True
     
+    elif service_type == "shell":
+        script_config_key = service.get("script_config")
+        script_config = service_config.get_script_config(script_config_key)
+        command = script_config.get("command", "")
+        cwd_relative = script_config.get("cwd", "")
+        full_cwd = os.path.join(project_dir, cwd_relative)
+        print(f"          Path: {full_cwd}")
+        print(f"          Cmd:  {command}")
+        success, stdout, stderr = run_command(command, cwd=full_cwd)
+        if not success:
+            print_error(f"Failed to execute: {stderr}")
+            return False
+        print_success("Command executed successfully!")
+        return True
+
     elif service_type == "window":
         window_title = service.get("window_title", "")
         command = service.get("command", "")

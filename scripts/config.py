@@ -47,6 +47,16 @@ DEFAULT_CONFIG = {
             "retry_delay": 5,
             "post_delay": 0,
         },
+        "mysql": {
+            "type": "tcp",
+            "host_env_key": "MYSQL_HOST",
+            "default_host": "localhost",
+            "port_env_key": "MYSQL_PORT",
+            "default_port": "13306",
+            "max_retries": 30,
+            "retry_delay": 2,
+            "post_delay": 3,
+        },
     },
     "scripts": {
         "kafka_topics": {
@@ -58,13 +68,17 @@ DEFAULT_CONFIG = {
         "es_mapping": {
             "path": os.path.join("docker", "config", "elasticsearch", "creatMapping.py"),
         },
+        "django_migrate": {
+            "command": "python manage.py makemigrations accounts && python manage.py migrate && python manage.py init_admin",
+            "cwd": os.path.join("services", "website", "backend", "v1"),
+        },
     },
     "services": [
         {
             "id": "docker",
             "name": "Starting Docker Compose services",
             "type": "docker",
-            "description": "Kafka, Elasticsearch, Kibana, Logstash",
+            "description": "Kafka, Elasticsearch, Kibana, Logstash, MySQL",
         },
         {
             "id": "wait_es",
@@ -137,6 +151,19 @@ DEFAULT_CONFIG = {
             "post_delay": 3,
             "port": AE_BACKEND_PORT,
             "description": "Agent Service (FastAPI, 内部 :8001,反代给 Django)",
+        },
+        {
+            "id": "wait_mysql",
+            "name": "Waiting for MySQL to be ready",
+            "type": "wait",
+            "wait_type": "tcp",
+            "wait_config": "mysql",
+        },
+        {
+            "id": "django_migrate",
+            "name": "Running Django migrations & init admin",
+            "type": "shell",
+            "script_config": "django_migrate",
         },
         {
             "id": "django",

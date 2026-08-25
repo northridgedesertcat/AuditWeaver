@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { apiFetch } from '@/lib/api/client'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -61,9 +62,8 @@ export function ReportDetailModal({ reportId, isOpen, onClose }: ReportDetailMod
     setLoading(true)
     setError(null)
     setDetail(null)
-    const apiBase = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000'
     try {
-      const response = await fetch(`http://localhost:8000/api/v1/reports/${reportId}/`)
+      const response = await apiFetch(`/reports/${reportId}/`)
       if (response.ok) {
         const data = await response.json()
         setDetail(data)

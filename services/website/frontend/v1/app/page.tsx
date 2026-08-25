@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { apiFetch } from '@/lib/api/client'
 import { DashboardLayout } from "@/components/layout"
 import {
   StatCard,
@@ -34,7 +35,7 @@ export default function DashboardPage() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const response = await fetch("http://localhost:8000/api/v1/dashboard/stats/")
+        const response = await apiFetch('/dashboard/stats/')
         const data = await response.json()
         setStats({
           logVolume: data.logVolume || "0",

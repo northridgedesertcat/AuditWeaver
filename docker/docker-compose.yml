@@ -100,6 +100,24 @@ services:
     depends_on:
       - elasticsearch
 
+  mysql:
+    image: mysql:8.0
+    container_name: mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpass}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-auditweaver}
+      MYSQL_USER: ${MYSQL_USER:-auditweaver}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-auditweaver}
+      TZ: ${MYSQL_TZ:-Asia/Shanghai}
+    ports:
+      - "${MYSQL_PORT:-13306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+
 volumes:
   kafka_data:
     name: system_audit_kafka_data
@@ -107,3 +125,5 @@ volumes:
     name: system_audit_es_data
   zk_data:
     name: system_audit_zk_data
+  mysql_data:
+    name: system_audit_mysql_data
