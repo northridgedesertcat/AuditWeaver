@@ -1,6 +1,7 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from .serializers import (
     AlertSerializer,
     AlertRuleSerializer,
@@ -68,7 +69,7 @@ class AgentProxyView(APIView):
 
     FastAPI 不可用时返回 502,不抛栈;未知 agent_type 由 FastAPI 返回 404 透传。
     """
-    permission_classes = []
+    permission_classes = [IsAuthenticated]
     renderer_classes = [EventStreamRenderer, JSONRenderer]
 
     def _build_target(self, request):
@@ -123,6 +124,8 @@ class AgentProxyView(APIView):
 
 
 class HealthCheckView(APIView):
+    permission_classes = [AllowAny]
+
     def get(self, request):
         es_available = is_es_available()
         return Response({

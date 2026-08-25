@@ -1,6 +1,7 @@
 "use client"
 
 import { Bell, User, Moon, RefreshCw } from "lucide-react"
+import { useAuth } from '@/lib/auth'
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -19,6 +20,7 @@ interface HeaderProps {
 }
 
 export function Header({ title, subtitle }: HeaderProps) {
+  const { user, logout } = useAuth()
   return (
     <header className="flex h-16 shrink-0 items-center justify-between border-b border-border bg-card/50 px-6">
       <div>
@@ -77,10 +79,10 @@ export function Header({ title, subtitle }: HeaderProps) {
           <DropdownMenuTrigger className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
             <Avatar className="h-7 w-7">
               <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                管
+                {user?.display_name?.[0] || user?.username?.[0] || 'U'}
               </AvatarFallback>
             </Avatar>
-            <span className="text-sm font-medium">管理员</span>
+            <span className="text-sm font-medium">{user?.display_name || user?.username || '用户'}</span>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
             <DropdownMenuLabel>我的账户</DropdownMenuLabel>
@@ -93,7 +95,7 @@ export function Header({ title, subtitle }: HeaderProps) {
               系统偏好
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive">
+            <DropdownMenuItem className="text-destructive" onClick={logout}>
               退出登录
             </DropdownMenuItem>
           </DropdownMenuContent>

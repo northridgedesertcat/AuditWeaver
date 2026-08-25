@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { apiFetch } from '@/lib/api/client'
 import { DashboardLayout } from "@/components/layout"
 import { StatCard, ReportDetailModal } from "@/components/dashboard"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -248,7 +249,7 @@ export default function ReportsPage() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const response = await fetch('http://localhost:8000/api/v1/reports/stats/')
+        const response = await apiFetch('/reports/stats/')
         if (response.ok) {
           const data = await response.json()
           setStats({
@@ -285,7 +286,7 @@ export default function ReportsPage() {
           params.append('keyword', filters.keyword)
         }
         
-        const response = await fetch(`http://localhost:8000/api/v1/reports/list/?${params.toString()}`)
+        const response = await apiFetch(`/reports/list/?${params.toString()}`)
         if (response.ok) {
           const data = await response.json()
           setReports(data.data || [])

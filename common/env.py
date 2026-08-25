@@ -114,3 +114,23 @@ AE_BACKEND_PORT = get_env_int('AE_BACKEND_PORT', 8001)
 
 # Django 反代目标(Django → FastAPI)
 AGENT_FASTAPI_BASE = get_env('AGENT_FASTAPI_BASE', f'http://{AE_BACKEND_HOST}:{AE_BACKEND_PORT}')
+
+# MySQL
+MYSQL_HOST = get_env('MYSQL_HOST', 'localhost')
+MYSQL_PORT = get_env_int('MYSQL_PORT', 13306)
+MYSQL_DATABASE = get_env('MYSQL_DATABASE', 'auditweaver')
+MYSQL_USER = get_env('MYSQL_USER', 'auditweaver')
+MYSQL_PASSWORD = get_env('MYSQL_PASSWORD', 'auditweaver')
+MYSQL_ROOT_PASSWORD = get_env('MYSQL_ROOT_PASSWORD', 'rootpass')
+
+# JWT
+JWT_SECRET_KEY = get_env('JWT_SECRET_KEY') or DJANGO_SECRET_KEY
+JWT_ACCESS_TTL_MINUTES = get_env_int('JWT_ACCESS_TTL_MINUTES', 15)
+JWT_REFRESH_TTL_DAYS = get_env_int('JWT_REFRESH_TTL_DAYS', 1)
+JWT_ROTATE_REFRESH = get_env_bool('JWT_ROTATE_REFRESH', True)
+JWT_BLACKLIST_AFTER_ROTATE = get_env_bool('JWT_BLACKLIST_AFTER_ROTATE', True)
+
+# 初始管理员账号(首次启动用,后续改密需在 admin 后台)
+INITIAL_ADMIN_USERNAME = get_env('INITIAL_ADMIN_USERNAME', 'admin')
+INITIAL_ADMIN_PASSWORD = get_env('INITIAL_ADMIN_PASSWORD', 'admin123456')
+INITIAL_ADMIN_EMAIL = get_env('INITIAL_ADMIN_EMAIL', 'admin@auditweaver.local')
