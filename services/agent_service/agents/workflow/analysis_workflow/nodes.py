@@ -1,5 +1,8 @@
 """analyze_node:构建 prompt → LLM 结构化输出。
 
+ollama 本地模型不支持 function calling,用 with_structured_output(method='json_schema')
+走 OpenAI structured outputs 格式(ollama 0.24+ 支持),由 ollama grammar 强约束输出。
+
 v2 预留 retrieve_node 的接入位置(仅改 graph.py,不改此文件)。
 """
 import asyncio
@@ -22,10 +25,12 @@ async def _ensure() -> None:
     async with _init_lock:
         if _llm_structured is not None:
             return
-        # 通过 factory overrides 覆盖 temperature / model / base_url / api_key
         llm = get_llm(temperature=TEMPERATURE, model=LLM_MODEL,
-                      base_url=LLM_BASE_URL, api_key=LLM_API_KEY)
-        _llm_structured = llm.with_structured_output(AnalysisSchema)
+                      base_url=LLM_BASE_URL, api_key=LLM_API_KEY,
+                      streaming=False)  # json_schema response_format 不支持 streaming
+        # method='json_schema':ollama 0.24+ / OpenAI 官方均支持,
+        # 用 response_format=json_schema 在推理层强约束输出格式
+        _llm_structured = llm.with_structured_output(AnalysisSchema, method="json_schema")
 
 
 async def analyze_node(state: dict) -> dict:
