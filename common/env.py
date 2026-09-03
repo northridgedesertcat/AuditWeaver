@@ -26,10 +26,14 @@ def _load_env():
                         key, value = line.split('=', 1)
                         key = key.strip()
                         value = value.strip()
-                        if value.startswith('"') and value.endswith('"'):
-                            value = value[1:-1]
-                        elif value.startswith("'") and value.endswith("'"):
-                            value = value[1:-1]
+                        # 剥离行内注释(对齐 python-dotenv:仅引号外的 ' #' 之后为注释)
+                        if value and value[0] in ('"', "'"):
+                            quote = value[0]
+                            end = value.find(quote, 1)
+                            if end != -1:
+                                value = value[1:end]
+                        elif ' #' in value:
+                            value = value[:value.find(' #')].rstrip()
                         os.environ.setdefault(key, value)
     
     _env_loaded = True
@@ -114,6 +118,13 @@ AE_BACKEND_PORT = get_env_int('AE_BACKEND_PORT', 8001)
 
 # Django 反代目标(Django → FastAPI)
 AGENT_FASTAPI_BASE = get_env('AGENT_FASTAPI_BASE', f'http://{AE_BACKEND_HOST}:{AE_BACKEND_PORT}')
+
+# ========== 分析后端切换(services/agent 管线) ==========
+ANALYSIS_BACKEND = get_env('ANALYSIS_BACKEND', 'dify')  # dify | langgraph
+
+# LangGraph 后端 → agent_service 内网地址(默认复用 AGENT_FASTAPI_BASE)
+AGENT_SERVICE_BASE_URL = get_env('AGENT_SERVICE_BASE_URL', AGENT_FASTAPI_BASE)
+AGENT_SERVICE_TIMEOUT = get_env_int('AGENT_SERVICE_TIMEOUT', DIFY_TIMEOUT)
 
 # MySQL
 MYSQL_HOST = get_env('MYSQL_HOST', 'localhost')
