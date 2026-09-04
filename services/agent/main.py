@@ -17,9 +17,10 @@ from core.kafka.dlq import DlqProducer
 from core.stable.circuit_breaker import CircuitBreaker
 from core.stable.retry import Retry
 
-from config import KAFKA_CONFIG, DIFY_CONFIG, LOG_CONFIG, PROCESS_CONFIG, CIRCUIT_CONFIG
+from config import KAFKA_CONFIG, LOG_CONFIG, PROCESS_CONFIG, CIRCUIT_CONFIG
 from broker import LogAnalysisConsumer, AnalysisResultProducer
-from dify import DifyClient
+from analysis import get_analysis_backend
+from common.env import ANALYSIS_BACKEND
 from preprocessor import build_elastic_document
 
 logging.basicConfig(
@@ -34,15 +35,15 @@ class AgentMain:
         self.kafka_consumer = None
         self.kafka_producer = None
         self.dlq_producer = None
-        self.dify_client = None
+        self.analysis_backend = None
         self.running = False
         # 线性退避重试(配置见 agent.yaml process 段,等待序列 2s/4s/6s)
-        # Dify 分析:analyze_log 吞异常返回 {'status': 'failed'},按返回值重试
+        # 分析后端:analyze 吞异常返回 AnalysisResult(status='failed'),按结果重试
         self.dify_retry = Retry(
             max_retries=PROCESS_CONFIG['retry_times'],
             base_delay=PROCESS_CONFIG['retry_delay'],
             max_delay=PROCESS_CONFIG['retry_max_delay'],
-            retry=retry_if_result(lambda r: r.get('status') == 'failed'),
+            retry=retry_if_result(lambda r: r.status == 'failed'),
             retry_error_callback=lambda rs: rs.outcome.result(),
         )
         # Kafka 发送:send() 失败返回 False,按返回值重试
@@ -53,15 +54,15 @@ class AgentMain:
             retry=retry_if_result(lambda sent: sent is False),
             retry_error_callback=lambda rs: rs.outcome.result(),
         )
-        # Dify 熔断:重试耗尽仍失败连续达到 fail_max 条后熔断,
-        # 熔断期间不再调用 Dify,给其过载时喘息机会(配置见 agent.yaml circuit_breaker 段)
+        # 分析后端熔断:重试耗尽仍失败连续达到 fail_max 条后熔断,
+        # 熔断期间不再调用后端,给其过载时喘息机会(配置见 agent.yaml circuit_breaker 段)
         self.dify_breaker = CircuitBreaker(
             fail_max=CIRCUIT_CONFIG['fail_max'],
             reset_timeout=CIRCUIT_CONFIG['reset_timeout'],
             success_threshold=CIRCUIT_CONFIG['success_threshold'],
-            name='dify',
+            name='analysis',
             on_state_change=lambda old, new: logger.warning(
-                f'Dify 熔断器状态变化: {old} -> {new}'
+                f'分析后端熔断器状态变化: {old} -> {new}'
             ),
         )
 
@@ -100,32 +101,27 @@ class AgentMain:
         self.dlq_producer.connect()
         logger.info('DLQ producer connected')
 
-        logger.info('Connecting to Dify API...')
-        self.dify_client = DifyClient(
-            base_url=DIFY_CONFIG['base_url'],
-            api_key=DIFY_CONFIG['api_key'],
-            timeout=DIFY_CONFIG['timeout'],
-            endpoint=DIFY_CONFIG['endpoint']
-        )
-        logger.info('Dify client initialized')
+        logger.info('Initializing analysis backend...')
+        self.analysis_backend = get_analysis_backend()
+        logger.info(f'Analysis backend initialized: {ANALYSIS_BACKEND}')
 
         return True
 
     def process_log(self, raw_message: dict) -> bool:
-        """管道: Dify 分析 → 构建文档 → 发送 Kafka。失败时发送到 DLQ。"""
+        """管道: 分析后端 → 构建文档 → 发送 Kafka。失败时发送到 DLQ。"""
         event_id = raw_message.get('event_id', 'unknown')
 
         try:
             # 熔断包在重试外层:单条消息走完整线性退避重试,彻底失败计 1 次熔断失败;
-            # 熔断打开时抛 CircuitOpenError(不再调用 Dify),消息快速失败进 DLQ
+            # 熔断打开时抛 CircuitOpenError(不再调用后端),消息快速失败进 DLQ
             response = self.dify_breaker.call(
-                lambda msg: self.dify_retry.call(self.dify_client.analyze_log, msg),
+                lambda msg: self.dify_retry.call(self.analysis_backend.analyze, msg),
                 raw_message,
-                result_is_failure=lambda r: r.get('status') == 'failed',
+                result_is_failure=lambda r: r.status == 'failed',
             )
 
-            if response.get('status') == 'success':
-                document = build_elastic_document(raw_message, response.get('response', {}))
+            if response.status == 'success':
+                document = build_elastic_document(raw_message, response)
                 if self.send_retry.call(self.kafka_producer.send, document, key=event_id):
                     logger.info(f'Processed: event_id={event_id}')
                     return True
@@ -139,12 +135,12 @@ class AgentMain:
                     )
                     return False
             else:
-                dify_error = response.get('error', 'unknown')
-                logger.error(f'Dify analysis failed: {dify_error}')
+                error = response.error or 'unknown'
+                logger.error(f'Analysis failed: {error}')
                 self.dlq_producer.send_dlq(
                     original_payload=raw_message,
                     key=event_id,
-                    failure_reason=f'dify_analysis_failed: {dify_error}',
+                    failure_reason=f'analysis_failed: {error}',
                     source_topic=KAFKA_CONFIG['input_topic'],
                 )
                 return False
@@ -200,8 +196,8 @@ class AgentMain:
             self.kafka_producer.close()
         if self.dlq_producer:
             self.dlq_producer.close()
-        if self.dify_client:
-            self.dify_client.close()
+        if self.analysis_backend:
+            self.analysis_backend.close()
         logger.info('Agent module stopped')
 
 

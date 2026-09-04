@@ -12,6 +12,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from common.time_utils import epoch_millis_now, to_epoch_millis
+from analysis.base import AnalysisResult
 
 # ========== 加载 YAML 配置 ==========
 _yaml_dir = Path(__file__).parent.parent / 'config' / 'yaml'
@@ -129,11 +130,13 @@ def extract_dify_fields(dify_response: Dict[str, Any]) -> Dict[str, Any]:
 
 # ========== ES 文档构建（适配规则引擎 v2 输出） ==========
 
-def build_elastic_document(raw_message: Dict[str, Any], dify_response: Dict[str, Any]) -> Dict[str, Any]:
+def build_elastic_document(raw_message: Dict[str, Any], result: AnalysisResult) -> Dict[str, Any]:
+    """组装 ES 文档(适配规则引擎 v2 输出 + 归一化分析结果)。
+
+    入参从原始 Dify 响应 dict 改为 AnalysisResult,下游字段不变。
+    """
     log_data = _extract_log_data(raw_message)
     ctx = log_data.get('log_context', {}) or {}
-
-    dify_fields = extract_dify_fields(dify_response)
 
     attack_type = log_data.get('attack_type', '') or \
                   log_data.get('detection_result', {}).get('attack_type', '')
@@ -152,17 +155,17 @@ def build_elastic_document(raw_message: Dict[str, Any], dify_response: Dict[str,
         'user_agent': ctx.get('user_agent', log_data.get('user_agent', '')),
         'detect_type': attack_type,
 
-        'risk_level':     dify_fields.get('risk_level', 'unknown'),
-        'risk_score':     dify_fields.get('risk_score', 0),
-        'attack_type_ai': dify_fields.get('attack_type_ai', ''),
-        'summary':        dify_fields.get('summary', ''),
-        'reasoning':      dify_fields.get('reasoning', []),
-        'recommendations': dify_fields.get('recommendations', []),
+        'risk_level':     result.risk_level,
+        'risk_score':     result.risk_score,
+        'attack_type_ai': result.attack_type_ai,
+        'summary':        result.summary,
+        'reasoning':      result.reasoning,
+        'recommendations': result.recommendations,
 
         'log_timestamp':      to_epoch_millis(log_ts),
         'analysis_timestamp': epoch_millis_now(),
         'ingestion_time':     to_epoch_millis(log_data.get('ingestion_time')) or epoch_millis_now(),
 
-        'dify_response': dify_response,
+        'dify_response': result.raw_response,  # 字段名保持兼容(内容为后端原始响应)
         'original_log':  raw_message
     }

@@ -4,17 +4,22 @@
 后续如要接 Anthropic / Bedrock / 自部署 vLLM,在此分支即可,
 上层 agent 代码不变。
 """
+from langchain_core.language_models import BaseChatModel
+
 from shared.config.settings import LLM_CONFIG
 from .base import BaseLLMProvider
 from .openai_compat import OpenAICompatProvider
 
 
-def get_llm():
-    """按配置构造一个 BaseChatModel。"""
+def get_llm(**overrides) -> BaseChatModel:
+    """按配置构造一个 BaseChatModel,可覆盖 temperature / model 等。
+
+    无参调用时行为不变(向后兼容 analysis_explorer)。
+    """
     provider = LLM_CONFIG['provider']
     impl: BaseLLMProvider
     if provider == 'openai_compat':
-        impl = OpenAICompatProvider()
+        impl = OpenAICompatProvider(**overrides)
     else:
         raise ValueError(f"Unknown LLM provider: {provider}")
     return impl.build()
