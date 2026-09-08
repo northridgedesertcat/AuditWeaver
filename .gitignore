@@ -38,6 +38,10 @@ ENV/
 *.swp
 *.swo
 
+# Editor backups (draw.io auto-save, etc.)
+*.bkp
+.$*
+
 # # Model files
 # *.pkl
 # *.joblib
