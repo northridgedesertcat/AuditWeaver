@@ -68,6 +68,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'api',
     'accounts',
+    'incident_management',
 ]
 
 AUTH_USER_MODEL = 'accounts.User'
