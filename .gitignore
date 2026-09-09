@@ -69,3 +69,6 @@ services/temporaryDatas/*
 services/test/*
 services/rulesMatching/test/
 devtools/
+
+#temple
+services/temple
