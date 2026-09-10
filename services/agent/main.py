@@ -18,10 +18,11 @@ from core.stable.circuit_breaker import CircuitBreaker
 from core.stable.retry import Retry
 
 from config import KAFKA_CONFIG, LOG_CONFIG, PROCESS_CONFIG, CIRCUIT_CONFIG
-from broker import LogAnalysisConsumer, AnalysisResultProducer
+from broker import LogAnalysisConsumer
+from repository import MySQLReportRepository
 from analysis import get_analysis_backend
 from common.env import ANALYSIS_BACKEND
-from preprocessor import build_elastic_document
+from preprocessor import build_report_record
 
 logging.basicConfig(
     level=getattr(logging, LOG_CONFIG['level']),
@@ -33,7 +34,7 @@ logger = logging.getLogger('agent_main')
 class AgentMain:
     def __init__(self):
         self.kafka_consumer = None
-        self.kafka_producer = None
+        self.report_repo = None
         self.dlq_producer = None
         self.analysis_backend = None
         self.running = False
@@ -46,7 +47,7 @@ class AgentMain:
             retry=retry_if_result(lambda r: r.status == 'failed'),
             retry_error_callback=lambda rs: rs.outcome.result(),
         )
-        # Kafka 发送:send() 失败返回 False,按返回值重试
+        # MySQL 写入:upsert() 失败返回 False,按返回值重试
         self.send_retry = Retry(
             max_retries=PROCESS_CONFIG['retry_times'],
             base_delay=PROCESS_CONFIG['retry_delay'],
@@ -82,15 +83,12 @@ class AgentMain:
             return False
         logger.info('Kafka consumer connected')
 
-        logger.info('Connecting to Kafka producer...')
-        self.kafka_producer = AnalysisResultProducer(
-            bootstrap_servers=KAFKA_CONFIG['brokers'],
-            topic=KAFKA_CONFIG['output_topic']
-        )
-        if not self.kafka_producer.connect():
-            logger.error('Failed to connect Kafka producer')
+        logger.info('Connecting to MySQL report repository...')
+        self.report_repo = MySQLReportRepository()
+        if not self.report_repo.connect():
+            logger.error('Failed to connect MySQL report repository')
             return False
-        logger.info('Kafka producer connected')
+        logger.info('MySQL report repository connected')
 
         logger.info('Connecting to DLQ producer...')
         self.dlq_producer = DlqProducer(
@@ -108,7 +106,7 @@ class AgentMain:
         return True
 
     def process_log(self, raw_message: dict) -> bool:
-        """管道: 分析后端 → 构建文档 → 发送 Kafka。失败时发送到 DLQ。"""
+        """管道: 分析后端 → 构建报告记录 → 写入 MySQL。失败时发送到 DLQ。"""
         event_id = raw_message.get('event_id', 'unknown')
 
         try:
@@ -121,16 +119,16 @@ class AgentMain:
             )
 
             if response.status == 'success':
-                document = build_elastic_document(raw_message, response)
-                if self.send_retry.call(self.kafka_producer.send, document, key=event_id):
+                record = build_report_record(raw_message, response)
+                if self.send_retry.call(self.report_repo.upsert, record):
                     logger.info(f'Processed: event_id={event_id}')
                     return True
                 else:
-                    logger.error(f'Kafka send failed: event_id={event_id}')
+                    logger.error(f'MySQL write failed: event_id={event_id}')
                     self.dlq_producer.send_dlq(
                         original_payload=raw_message,
                         key=event_id,
-                        failure_reason='kafka_send_failed',
+                        failure_reason='db_write_failed',
                         source_topic=KAFKA_CONFIG['input_topic'],
                     )
                     return False
@@ -165,13 +163,20 @@ class AgentMain:
 
         while self.running:
             try:
-                messages = self.kafka_consumer.consume(max_records=batch_size)
+                records = self.kafka_consumer.consume(max_records=batch_size)
 
-                if messages:
-                    logger.info(f'Received {len(messages)} messages')
+                if records:
+                    logger.info(f'Received {len(records)} messages')
 
-                    success_count = sum(1 for m in messages if self.process_log(m))
-                    fail_count = len(messages) - success_count
+                    success_count = 0
+                    for msg, raw_message in records:
+                        # 处理成功（已落库）或失败（已入 DLQ）都属终态，
+                        # 显式提交 offset，避免消息无限重放
+                        ok = self.process_log(raw_message)
+                        self.kafka_consumer.commit(msg)
+                        if ok:
+                            success_count += 1
+                    fail_count = len(records) - success_count
 
                     logger.info(f'Batch complete: success={success_count}, failed={fail_count}')
                 else:
@@ -192,8 +197,8 @@ class AgentMain:
         logger.info('Shutting down Agent module...')
         if self.kafka_consumer:
             self.kafka_consumer.close()
-        if self.kafka_producer:
-            self.kafka_producer.close()
+        if self.report_repo:
+            self.report_repo.close()
         if self.dlq_producer:
             self.dlq_producer.close()
         if self.analysis_backend:

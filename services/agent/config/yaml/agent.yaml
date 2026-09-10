@@ -7,8 +7,7 @@ kafka:
   auto_offset_reset: earliest
   consumer_timeout_ms: 5000
   max_poll_records: 10
-  # 分析结果输出到此 topic，由 Kafka Connect Sink (agent-event-save-sink) 写入 ES
-  output_topic: agent.event.save
+  # 分析结果由 agent 直接写入 MySQL analysis_report 表，不再经 Kafka 中转
   # 处理失败的消息发送到此死信队列
   dlq_topic: log.dlq
 

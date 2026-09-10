@@ -38,7 +38,7 @@ class Incident(models.Model):
         Status.CLOSED: set(),
     }
 
-    # 对应 ES 检测事件的 event_id；一个检测事件最多创建一个处置工单
+    # 对应 AI 分析报告的 event_id；一个检测事件最多创建一个处置工单
     external_event_id = models.CharField(
         '外部事件ID', max_length=128, unique=True, db_index=False,
     )
@@ -50,7 +50,7 @@ class Incident(models.Model):
         '状态', max_length=16, choices=Status.choices, default=Status.OPEN,
     )
 
-    # 从 ES 检测事件冗余的摘要字段，避免列表页回查 ES
+    # 从分析报告冗余的摘要字段，避免列表页回查
     source_ip = models.GenericIPAddressField('源IP', null=True, blank=True)
     source_path = models.CharField('请求路径', max_length=2048, blank=True, default='')
 

@@ -200,10 +200,10 @@ Once started, access:
 | log.structured        | Structured/parsed logs (via Logstash)           |
 | log.audit             | Logs to be processed by the Rule Engine        |
 | log.analysis          | Analysis results from the Rule Engine           |
-| agent.event.save      | Agent AI analysis results (ES sink target)     |
 | rule.event.save       | Rule Engine events (ES sink target)            |
 
 > Topics are auto-initialized via `docker/config/kafka/topics/topics.yaml` and `create-init-topics.py`.
+> Agent AI analysis reports are written directly to the MySQL `analysis_report` table (no Kafka/ES hop).
 
 ### Elasticsearch Indexes
 
@@ -211,7 +211,8 @@ Once started, access:
 | :----------------------- | :--------------------------------------- |
 | nginx-log-raw            | Raw Nginx logs                           |
 | matched_logs             | Logs matched by rules                    |
-| log_analysis_reports     | AI-generated analysis reports            |
+
+> AI-generated analysis reports are stored in MySQL table `analysis_report` (Django app `reports`). The report detail view still reads the raw log line (`event.original`) from `nginx-log-raw`.
 
 ***
 

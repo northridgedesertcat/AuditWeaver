@@ -69,6 +69,7 @@ INSTALLED_APPS = [
     'api',
     'accounts',
     'incident_management',
+    'reports',
 ]
 
 AUTH_USER_MODEL = 'accounts.User'

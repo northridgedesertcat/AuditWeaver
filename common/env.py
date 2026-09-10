@@ -98,7 +98,7 @@ KAFKA_TOPIC_ANALYSIS = get_env('KAFKA_TOPIC_ANALYSIS', 'log.analysis')
 KAFKA_TOPIC_RISK = get_env('KAFKA_TOPIC_RISK', 'log.risk')
 
 ES_INDEX_MATCHED_LOGS = get_env('ES_INDEX_MATCHED_LOGS', 'matched_logs')
-ES_INDEX_ANALYSIS_REPORTS = get_env('ES_INDEX_ANALYSIS_REPORTS', 'log_analysis_reports')
+# 分析报告已迁移至 MySQL analysis_report 表，不再使用 log_analysis_reports ES 索引
 ES_INDEX_NGINX_RAW = get_env('ES_INDEX_NGINX_RAW', 'nginx-log-raw')
 
 DIFY_BASE_URL = get_env('DIFY_BASE_URL', 'http://localhost/v1')
