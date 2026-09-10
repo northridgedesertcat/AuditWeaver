@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, type ComponentType } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
@@ -21,10 +21,12 @@ import {
   Search,
   Sparkles,
   BarChart3,
+  Users,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { useAuth } from "@/lib/auth"
 import {
   Tooltip,
   TooltipContent,
@@ -32,7 +34,15 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 
-const navItems = [
+type NavItem = {
+  title: string
+  href: string
+  icon: ComponentType<{ className?: string }>
+  badge: string | null
+  rootOnly?: boolean
+}
+
+const navItems: NavItem[] = [
   {
     title: "执行概览",
     href: "/",
@@ -94,6 +104,13 @@ const navItems = [
     badge: null,
   },
   {
+    title: "用户管理",
+    href: "/admin",
+    icon: Users,
+    badge: null,
+    rootOnly: true,
+  },
+  {
     title: "系统设置",
     href: "/settings",
     icon: Settings,
@@ -104,6 +121,11 @@ const navItems = [
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false)
   const pathname = usePathname()
+  const { user } = useAuth()
+  // rootOnly 入口仅 Root Admin 可见;真正鉴权在后端 IsRootAdmin,此处仅做入口隐藏
+  const visibleItems = navItems.filter(
+    (item) => !item.rootOnly || user?.is_root_admin
+  )
 
   return (
     <TooltipProvider>
@@ -148,7 +170,7 @@ export function Sidebar() {
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto p-2">
           <ul className="space-y-1">
-            {navItems.map((item) => {
+            {visibleItems.map((item) => {
               const isActive = pathname === item.href
               const Icon = item.icon
 

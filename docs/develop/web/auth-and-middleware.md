@@ -4,17 +4,18 @@
 
 | 维度 | 配置 |
 | --- | --- |
-| 认证类 | `rest_framework_simplejwt.authentication.JWTAuthentication` |
-| 默认权限 | `rest_framework.permissions.IsAuthenticated` |
+| 认证类 | `accounts.authentication.ActiveUserJWTAuthentication`（继承 SimpleJWT，额外校验 `is_active`） |
+| 默认权限 | `rest_framework.permissions.IsAuthenticated`；用户管理接口为自定义 `IsRootAdmin` |
 | Token 类型 | JWT access + refresh |
-| 用户模型 | `accounts.User` (extends `AbstractUser`) |
+| 用户模型 | `accounts.User` (extends `AbstractUser`)，角色 `root_admin` / `admin` |
 | 黑名单 | `rest_framework_simplejwt.token_blacklist` |
-| 配置位置 | [backend/settings.py:153-172](../../../services/website/backend/v1/backend/settings.py) |
+| 配置位置 | [backend/settings.py:156-176](../../../services/website/backend/v1/backend/settings.py) |
 
 ```python
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        # 自定义:在 SimpleJWT 基础上额外校验 is_active,禁用用户旧 JWT 立即失效
+        'accounts.authentication.ActiveUserJWTAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
@@ -40,19 +41,31 @@ SIMPLE_JWT = {
 ```python
 class User(AbstractUser):
     class Role(models.TextChoices):
-        ADMIN    = 'admin',    '管理员'
-        ANALYST  = 'analyst',  '分析师'
-        VIEWER   = 'viewer',   '只读'
+        ROOT_ADMIN = 'root_admin', 'Root Admin'
+        ADMIN      = 'admin',      'Admin'
 
     role         = CharField(max_length=16, choices=Role.choices, default=Role.ADMIN)
     display_name = CharField(max_length=64, blank=True)
     updated_at   = DateTimeField(auto_now=True)
+
+    @property
+    def is_root_admin(self) -> bool:
+        return self.role == self.Role.ROOT_ADMIN
 ```
 
-- 在 [settings.py:73](../../../services/website/backend/v1/backend/settings.py) 设置 `AUTH_USER_MODEL = 'accounts.User'`
-- 初始管理员由管理命令幂等创建: [accounts/management/commands/init_admin.py](../../../services/website/backend/v1/accounts/management/commands/init_admin.py)
-  - 默认账号: `admin` / `admin123456`（来自 `common.env` 的 `INITIAL_ADMIN_*` 环境变量）
-  - 重复执行会跳过已存在的账号
+- 在 [settings.py:75](../../../services/website/backend/v1/backend/settings.py) 设置 `AUTH_USER_MODEL = 'accounts.User'`
+- 角色仅两类：`root_admin`（唯一主管理员）/ `admin`（普通管理员），不引入 RBAC 权限树
+- Root Admin 由管理命令交互式创建（密码经 Django 哈希入库，不写明文、不读 `.env`）:
+  [accounts/management/commands/create_root_admin.py](../../../services/website/backend/v1/accounts/management/commands/create_root_admin.py)
+
+  ```bash
+  python manage.py create_root_admin
+  # 可选 --username root --email r@x.com;密码用 getpass 输入两次,不回显
+  ```
+
+  - 幂等：已存在任意 Root Admin 时拒绝创建，从源头保证单 Root
+  - 密码走 Django 标准 `AUTH_PASSWORD_VALIDATORS` 强度校验
+- 普通 Admin 由 Root Admin 登录后通过 `/api/v1/auth/admins/` 接口创建
 
 ## 3. 匿名放行清单
 
@@ -60,11 +73,32 @@ class User(AbstractUser):
 
 | 路径 | 视图 | 位置 |
 | --- | --- | --- |
-| `GET /api/v1/health/` | `HealthCheckView` | [api/views.py:126](../../../services/website/backend/v1/api/views.py) |
-| `POST /api/v1/auth/login/` | `LoginView` | [accounts/views.py:10](../../../services/website/backend/v1/accounts/views.py) |
-| `POST /api/v1/auth/refresh/` | `TokenRefreshView` (simplejwt 内置) | [accounts/urls.py:8](../../../services/website/backend/v1/accounts/urls.py) |
+| `GET /api/v1/health/` | `HealthCheckView` | [api/views.py:146](../../../services/website/backend/v1/api/views.py) |
+| `POST /api/v1/auth/login/` | `LoginView` | [accounts/views.py](../../../services/website/backend/v1/accounts/views.py) |
+| `POST /api/v1/auth/refresh/` | `ActiveTokenRefreshView`（二次校验 `is_active`） | [accounts/views.py](../../../services/website/backend/v1/accounts/views.py) |
 
-> 其余所有接口（含全部 `/dashboard/*`、`/logs/*`、`/reports/*`、`/agent/*`）均强制 `IsAuthenticated`。
+> 其余所有接口（含全部 `/dashboard/*`、`/logs/*`、`/reports/*`、`/agent/*`）均强制 `IsAuthenticated`；其中 `/auth/admins/*` 为 `IsRootAdmin`。
+
+### 3.1 账户自助接口（`IsAuthenticated`）
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/api/v1/auth/me/` | 当前用户信息（含 `role`、`is_root_admin`，不含密码） |
+| POST | `/api/v1/auth/logout/` | 黑名单当前 refresh |
+| POST | `/api/v1/auth/change-password/` | 改自己的密码（校验旧密码 + 强度），成功后作废其全部 refresh |
+
+### 3.2 管理员管理接口（`IsRootAdmin`，Root Admin 专用）
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/api/v1/auth/admins/` | 列出普通 Admin（不含 Root） |
+| POST | `/api/v1/auth/admins/` | 创建 Admin；角色强制 `admin`，外部无法伪造 `role=root_admin` |
+| PATCH | `/api/v1/auth/admins/<id>/disable/` | 禁用（其所有 refresh 立即作废，旧 access 即时失效） |
+| PATCH | `/api/v1/auth/admins/<id>/enable/` | 启用 |
+| POST | `/api/v1/auth/admins/<id>/reset-password/` | 重置密码（走强度校验，作废其全部 refresh） |
+| DELETE | `/api/v1/auth/admins/<id>/` | 删除（推荐优先禁用） |
+
+保护规则：目标为 Root Admin 一律 400；Root 不可对自己执行禁用/删除；目标不存在 404。
 
 ## 4. JWT 生命周期
 
@@ -72,15 +106,19 @@ class User(AbstractUser):
 1. 登录
    POST /api/v1/auth/login/  { username, password }
      → 返回 { access, refresh }
+     → ModelBackend 已校验 is_active,禁用用户无法登录
      → access TTL:  JWT_ACCESS_TTL_MINUTES (默认分钟级)
      → refresh TTL: JWT_REFRESH_TTL_DAYS   (默认天级)
 
 2. 携带 access 访问业务接口
    GET /api/v1/xxx
    Authorization: Bearer <access>
+     → ActiveUserJWTAuthentication.get_user 查库:
+       用户不存在或 is_active=False → 401(禁用即时生效,无需等 token 过期)
 
 3. access 过期 → 401
    POST /api/v1/auth/refresh/  { refresh }
+     → ActiveUserTokenRefreshSerializer 再查一次 is_active
      → 返回 { access }（若 ROTATE_REFRESH_TOKENS=true，旧 refresh 进黑名单，同时返回新 refresh）
 
 4. 主动登出
@@ -88,7 +126,9 @@ class User(AbstractUser):
      → RefreshToken(refresh).blacklist()  → 205
 ```
 
-环境变量（位于 `services/common/env.py`，由 `.env` 注入）：
+JWT payload 只保留 SimpleJWT 默认 claim（`user_id`、`username`、`exp`、`jti` 等），**不含 role 与密码**；角色每次从数据库用户实例读取。
+
+环境变量（位于 `common/env.py`，由 `.env` 注入）：
 
 | 变量 | 说明 |
 | --- | --- |
@@ -96,7 +136,9 @@ class User(AbstractUser):
 | `JWT_ACCESS_TTL_MINUTES` | access 有效期（分钟） |
 | `JWT_REFRESH_TTL_DAYS` | refresh 有效期（天） |
 | `JWT_ROTATE_REFRESH` | 刷新时是否签发新 refresh |
-| `JWT_BLACKLIST_AFTER_ROTATE` | 旧 refresh 是否加入黑名单 |
+| `JWT_BLACKLIST_AFTER_ROTATION` | 旧 refresh 是否加入黑名单 |
+
+> 管理员账号密码不再放在 `.env`（`INITIAL_ADMIN_*` 已移除）。Root 由 `create_root_admin` 命令创建，Admin 由 Root 通过接口创建。
 
 ## 5. Django 中间件链
 
@@ -333,7 +375,9 @@ class EventStreamRenderer(BaseRenderer):
 
 | 现象 | 排查方向 |
 | --- | --- |
-| 401 Unauthorized | access 过期 → 前端应自动 refresh；若 refresh 也过期则跳登录 |
+| 401 Unauthorized | access 过期 → 前端应自动 refresh；若 refresh 也过期则跳登录；或用户已被 Root 禁用（`ActiveUserJWTAuthentication` 校验 `is_active`） |
+| 401 `user_inactive` / 用户已被禁用 | 该账号被 Root Admin 禁用，其旧 access/refresh 均立即失效；启用后需重新登录 |
+| 403 `需要 Root Admin 权限` | 普通 Admin 访问了 `/api/v1/auth/admins/*` 用户管理接口 |
 | 401 且未自动 refresh | 检查 `JWT_SECRET_KEY` 是否为空（应回退 `DJANGO_SECRET_KEY`）；检查 `aw_refresh` 是否还在 localStorage |
 | 500 RuntimeError on POST | 检查 `ApiTrailingSlashMiddleware` 是否生效（中间件顺序、`/api/v1/agent` 排除规则） |
 | 406 Not Acceptable | Agent 路径缺少 `EventStreamRenderer` 占位（仅 agent 路由会出现） |
