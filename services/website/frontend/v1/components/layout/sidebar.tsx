@@ -1,9 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState, type ComponentType } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
+import { apiFetch } from "@/lib/api/client"
 import {
   Shield,
   LayoutDashboard,
@@ -21,10 +22,13 @@ import {
   Search,
   Sparkles,
   BarChart3,
+  ClipboardCheck,
+  Users,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { useAuth } from "@/lib/auth"
 import {
   Tooltip,
   TooltipContent,
@@ -32,7 +36,17 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 
-const navItems = [
+type NavItem = {
+  title: string
+  href: string
+  icon: ComponentType<{ className?: string }>
+  badge: string | null
+  rootOnly?: boolean
+  /** 子路径（如处理页）也视为激活 */
+  activePrefix?: boolean
+}
+
+const navItems: NavItem[] = [
   {
     title: "执行概览",
     href: "/",
@@ -50,6 +64,13 @@ const navItems = [
     href: "/reports",
     icon: BarChart3,
     badge: null,
+  },
+  {
+    title: "审核工作台",
+    href: "/reports/review",
+    icon: ClipboardCheck,
+    badge: null, // 动态：待处理数（pendingReview）
+    activePrefix: true,
   },
   {
     title: "AI 安全智能体",
@@ -94,6 +115,13 @@ const navItems = [
     badge: null,
   },
   {
+    title: "用户管理",
+    href: "/admin",
+    icon: Users,
+    badge: null,
+    rootOnly: true,
+  },
+  {
     title: "系统设置",
     href: "/settings",
     icon: Settings,
@@ -103,7 +131,42 @@ const navItems = [
 
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false)
+  const [pendingReview, setPendingReview] = useState<number | null>(null)
   const pathname = usePathname()
+  const { user } = useAuth()
+  // rootOnly 入口仅 Root Admin 可见;真正鉴权在后端 IsRootAdmin,此处仅做入口隐藏
+  const visibleItems = navItems.filter(
+    (item) => !item.rootOnly || user?.is_root_admin
+  )
+
+  // 审核工作台徽标：待处理报告数（拉取失败静默，不影响导航）
+  useEffect(() => {
+    let cancelled = false
+    const fetchPending = async () => {
+      try {
+        const resp = await apiFetch('/reports/stats/')
+        if (resp.ok && !cancelled) {
+          const data = await resp.json()
+          setPendingReview(typeof data.pendingReview === 'number' ? data.pendingReview : 0)
+        }
+      } catch {
+        /* 静默 */
+      }
+    }
+    fetchPending()
+    const timer = setInterval(fetchPending, 60_000)
+    return () => {
+      cancelled = true
+      clearInterval(timer)
+    }
+  }, [])
+
+  // 将动态待处理数注入导航徽标
+  const itemsWithBadge = visibleItems.map((item) =>
+    item.href === "/reports/review"
+      ? { ...item, badge: pendingReview && pendingReview > 0 ? String(pendingReview) : null }
+      : item
+  )
 
   return (
     <TooltipProvider>
@@ -148,8 +211,10 @@ export function Sidebar() {
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto p-2">
           <ul className="space-y-1">
-            {navItems.map((item) => {
-              const isActive = pathname === item.href
+            {itemsWithBadge.map((item) => {
+              const isActive =
+                pathname === item.href ||
+                (item.activePrefix && pathname.startsWith(item.href))
               const Icon = item.icon
 
               const navLink = (
@@ -171,7 +236,7 @@ export function Sidebar() {
                           variant="secondary"
                           className={cn(
                             "h-5 px-1.5 text-xs",
-                            item.href === "/anomaly" || item.href === "/incidents" || item.href === "/alerts"
+                            item.href === "/anomaly" || item.href === "/incidents" || item.href === "/alerts" || item.href === "/reports/review"
                               ? "bg-destructive/20 text-destructive"
                               : "bg-muted text-muted-foreground"
                           )}

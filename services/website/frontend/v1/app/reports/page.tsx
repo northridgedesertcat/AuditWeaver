@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { apiFetch } from '@/lib/api/client'
 import { DashboardLayout } from "@/components/layout"
 import { StatCard, ReportDetailModal } from "@/components/dashboard"
@@ -29,13 +30,17 @@ import {
   Globe,
   Route,
   Brain,
-  CheckCircle2,
   Loader2,
-  XCircle,
+  ClipboardCheck,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { formatRelative } from "@/lib/time"
 import { getRiskConfig, getConfidenceColor } from "@/lib/risk-level"
+import {
+  getReviewStatusConfig,
+  parseLocalDateTime,
+  type ReviewStatusKey,
+} from "@/lib/review-options"
 
 interface Report {
   id: string
@@ -44,9 +49,11 @@ interface Report {
   attackType: string
   sourceIp: string
   targetPath: string
-  generatedAt: number
+  generatedAt: string
   aiConfidence: number
-  status: "pending" | "processing" | "resolved"
+  reviewStatus: ReviewStatusKey
+  reviewedBy: string | null
+  claimedBy: string | null
 }
 
 interface ReportStats {
@@ -54,31 +61,16 @@ interface ReportStats {
   highRisk: number
   mediumRisk: number
   todayNew: number
+  pendingReview: number
 }
 
-const statusConfig = {
-  pending: {
-    icon: Clock,
-    color: "text-warning",
-    bg: "bg-warning/10",
-    badge: "bg-warning/20 text-warning",
-    label: "待处理",
-  },
-  processing: {
-    icon: Loader2,
-    color: "text-info",
-    bg: "bg-info/10",
-    badge: "bg-info/20 text-info",
-    label: "处理中",
-  },
-  resolved: {
-    icon: CheckCircle2,
-    color: "text-success",
-    bg: "bg-success/10",
-    badge: "bg-success/20 text-success",
-    label: "已处理",
-  },
-}
+// 处理状态筛选下拉项（值与后端 review_status 对齐；徽标样式统一走 lib/review-options）
+const reviewStatuses = [
+  { value: "all", label: "全部状态" },
+  { value: "pending", label: "待处理" },
+  { value: "claimed", label: "处理中" },
+  { value: "processed", label: "已处理" },
+]
 
 const attackTypes = [
   { value: "all", label: "全部类型" },
@@ -110,126 +102,14 @@ const timeRanges = [
   { value: "all", label: "全部时间" },
 ]
 
-// 模拟数据
-const mockReports: Report[] = [
-  {
-    id: "1",
-    title: "检测到SQL注入攻击尝试",
-    riskLevel: "critical",
-    attackType: "SQL注入",
-    sourceIp: "192.168.1.105",
-    targetPath: "/api/users?id=1",
-    generatedAt: Date.now() - 1000 * 60 * 30,
-    aiConfidence: 98,
-    status: "pending",
-  },
-  {
-    id: "2",
-    title: "异常登录行为检测",
-    riskLevel: "high",
-    attackType: "暴力破解",
-    sourceIp: "10.0.0.45",
-    targetPath: "/auth/login",
-    generatedAt: Date.now() - 1000 * 60 * 60 * 1,
-    aiConfidence: 92,
-    status: "processing",
-  },
-  {
-    id: "3",
-    title: "可疑的XSS攻击载荷",
-    riskLevel: "high",
-    attackType: "XSS攻击",
-    sourceIp: "172.16.0.88",
-    targetPath: "/search?q=test",
-    generatedAt: Date.now() - 1000 * 60 * 60 * 3,
-    aiConfidence: 87,
-    status: "pending",
-  },
-  {
-    id: "4",
-    title: "敏感文件访问尝试",
-    riskLevel: "medium",
-    attackType: "未授权访问",
-    sourceIp: "192.168.2.201",
-    targetPath: "/admin/config",
-    generatedAt: Date.now() - 1000 * 60 * 60 * 4,
-    aiConfidence: 75,
-    status: "resolved",
-  },
-  {
-    id: "5",
-    title: "DDoS攻击流量模式识别",
-    riskLevel: "critical",
-    attackType: "DDoS攻击",
-    sourceIp: "203.0.113.0/24",
-    targetPath: "/api/endpoint",
-    generatedAt: Date.now() - 1000 * 60 * 60 * 5,
-    aiConfidence: 95,
-    status: "processing",
-  },
-  {
-    id: "6",
-    title: "恶意软件通信检测",
-    riskLevel: "high",
-    attackType: "恶意软件",
-    sourceIp: "198.51.100.23",
-    targetPath: "/api/callback",
-    generatedAt: Date.now() - 1000 * 60 * 60 * 6,
-    aiConfidence: 91,
-    status: "pending",
-  },
-  {
-    id: "7",
-    title: "钓鱼页面访问警告",
-    riskLevel: "medium",
-    attackType: "钓鱼攻击",
-    sourceIp: "192.168.1.78",
-    targetPath: "/redirect?url=...",
-    generatedAt: Date.now() - 1000 * 60 * 60 * 7,
-    aiConfidence: 82,
-    status: "resolved",
-  },
-  {
-    id: "8",
-    title: "数据泄露风险警告",
-    riskLevel: "high",
-    attackType: "数据泄露",
-    sourceIp: "10.0.1.15",
-    targetPath: "/export?format=csv",
-    generatedAt: Date.now() - 1000 * 60 * 60 * 16,
-    aiConfidence: 88,
-    status: "pending",
-  },
-  {
-    id: "9",
-    title: "端口扫描活动检测",
-    riskLevel: "medium",
-    attackType: "未授权访问",
-    sourceIp: "172.16.0.100",
-    targetPath: "Multiple Ports",
-    generatedAt: Date.now() - 1000 * 60 * 60 * 17,
-    aiConfidence: 79,
-    status: "processing",
-  },
-  {
-    id: "10",
-    title: "API滥用行为检测",
-    riskLevel: "low",
-    attackType: "未授权访问",
-    sourceIp: "192.168.3.45",
-    targetPath: "/api/v1/data",
-    generatedAt: Date.now() - 1000 * 60 * 60 * 18,
-    aiConfidence: 68,
-    status: "resolved",
-  },
-]
-
 export default function ReportsPage() {
+  const router = useRouter()
   const [stats, setStats] = useState<ReportStats>({
     total: 0,
     highRisk: 0,
     mediumRisk: 0,
     todayNew: 0,
+    pendingReview: 0,
   })
   const [reports, setReports] = useState<Report[]>([])
   const [totalReports, setTotalReports] = useState(0)
@@ -240,6 +120,7 @@ export default function ReportsPage() {
     timeRange: "all",
     riskLevel: "all",
     attackType: "all",
+    reviewStatus: "all",
     keyword: "",
   })
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -257,13 +138,14 @@ export default function ReportsPage() {
             highRisk: data.highRisk || 0,
             mediumRisk: data.mediumRisk || 0,
             todayNew: data.todayNew || 0,
+            pendingReview: data.pendingReview || 0,
           })
         }
       } catch (error) {
         console.error('获取报告统计失败:', error)
       }
     }
-    
+
     fetchStats()
   }, [])
 
@@ -282,10 +164,13 @@ export default function ReportsPage() {
         if (filters.attackType !== 'all') {
           params.append('attack_type', filters.attackType)
         }
+        if (filters.reviewStatus !== 'all') {
+          params.append('review_status', filters.reviewStatus)
+        }
         if (filters.keyword) {
           params.append('keyword', filters.keyword)
         }
-        
+
         const response = await apiFetch(`/reports/list/?${params.toString()}`)
         if (response.ok) {
           const data = await response.json()
@@ -298,9 +183,9 @@ export default function ReportsPage() {
         setLoading(false)
       }
     }
-    
+
     fetchReports()
-  }, [currentPage, pageSize, filters.riskLevel, filters.attackType, filters.keyword])
+  }, [currentPage, pageSize, filters.riskLevel, filters.attackType, filters.reviewStatus, filters.keyword])
 
   // 分页 - 使用后端返回的总数
   const totalPages = Math.ceil(totalReports / pageSize)
@@ -331,13 +216,20 @@ export default function ReportsPage() {
     >
       <div className="space-y-6">
         {/* 统计卡片 */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
           <StatCard
             title="总报告数"
             value={stats.total}
             iconName="file-text"
             iconColor="text-primary"
             description="累计生成"
+          />
+          <StatCard
+            title="待处理报告"
+            value={stats.pendingReview}
+            iconName="clock"
+            iconColor="text-warning"
+            description="等待人工审核"
           />
           <StatCard
             title="高危报告"
@@ -377,13 +269,13 @@ export default function ReportsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
               {/* 时间范围 */}
               <div className="space-y-2">
                 <Label htmlFor="time-range">时间范围</Label>
                 <Select
                   value={filters.timeRange}
-                  onValueChange={(value) => handleFilterChange("timeRange", value)}
+                  onValueChange={(value) => handleFilterChange("timeRange", value ?? "all")}
                 >
                   <SelectTrigger id="time-range">
                     <SelectValue placeholder="选择时间范围" />
@@ -403,7 +295,7 @@ export default function ReportsPage() {
                 <Label htmlFor="risk-level">风险等级</Label>
                 <Select
                   value={filters.riskLevel}
-                  onValueChange={(value) => handleFilterChange("riskLevel", value)}
+                  onValueChange={(value) => handleFilterChange("riskLevel", value ?? "all")}
                 >
                   <SelectTrigger id="risk-level">
                     <SelectValue placeholder="选择风险等级" />
@@ -423,7 +315,7 @@ export default function ReportsPage() {
                 <Label htmlFor="attack-type">攻击类型</Label>
                 <Select
                   value={filters.attackType}
-                  onValueChange={(value) => handleFilterChange("attackType", value)}
+                  onValueChange={(value) => handleFilterChange("attackType", value ?? "all")}
                 >
                   <SelectTrigger id="attack-type">
                     <SelectValue placeholder="选择攻击类型" />
@@ -432,6 +324,26 @@ export default function ReportsPage() {
                     {attackTypes.map((type) => (
                       <SelectItem key={type.value} value={type.value}>
                         {type.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* 处理状态 */}
+              <div className="space-y-2">
+                <Label htmlFor="review-status">处理状态</Label>
+                <Select
+                  value={filters.reviewStatus}
+                  onValueChange={(value) => handleFilterChange("reviewStatus", value ?? "all")}
+                >
+                  <SelectTrigger id="review-status">
+                    <SelectValue placeholder="选择处理状态" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {reviewStatuses.map((status) => (
+                      <SelectItem key={status.value} value={status.value}>
+                        {status.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -482,8 +394,16 @@ export default function ReportsPage() {
               <div className="space-y-4">
                 {reports.map((report) => {
                   const riskCfg = getRiskConfig(report.riskLevel)
-                  const statusCfg = statusConfig[report.status]
+                  const statusCfg = getReviewStatusConfig(report.reviewStatus)
                   const StatusIcon = statusCfg.icon
+                  // 徽标文案：已处理 · 张三 / 张三处理中 / 待处理
+                  const statusLabel =
+                    report.reviewStatus === "processed"
+                      ? `已处理${report.reviewedBy ? ` · ${report.reviewedBy}` : ""}`
+                      : report.reviewStatus === "claimed"
+                        ? `${report.claimedBy ?? ""}处理中`
+                        : statusCfg.label
+                  const genMs = parseLocalDateTime(report.generatedAt)?.getTime()
 
                   return (
                     <div
@@ -504,12 +424,12 @@ export default function ReportsPage() {
                             <Badge className={cn("border", riskCfg.twBadge)}>
                               {riskCfg.label}
                             </Badge>
-                            <Badge className={cn(statusCfg.badge)}>
+                            <Badge className={cn("border", statusCfg.twBadge)}>
                               <StatusIcon className={cn(
                                 "mr-1 h-3 w-3",
-                                report.status === "processing" && "animate-spin"
+                                report.reviewStatus === "claimed" && "animate-spin"
                               )} />
-                              {statusCfg.label}
+                              {statusLabel}
                             </Badge>
                           </div>
 
@@ -544,21 +464,32 @@ export default function ReportsPage() {
                           {/* 生成时间 */}
                           <div className="flex items-center gap-2 text-xs text-muted-foreground">
                             <Clock className="h-3.5 w-3.5" />
-                            <span>生成时间: {formatRelative(report.generatedAt)}</span>
+                            <span>生成时间: {genMs ? formatRelative(genMs) : report.generatedAt || "未知时间"}</span>
                           </div>
                         </div>
 
-                        {/* 右侧操作按钮 */}
+                        {/* 右侧操作按钮：pending/claimed → 去处理；processed → 查看详情（弹窗内可去改判） */}
                         <div className="flex items-center gap-2 lg:flex-col lg:items-end">
-                          <Button
-                            onClick={() => handleViewDetails(report.id)}
-                            variant="outline"
-                            size="sm"
-                            className="gap-2"
-                          >
-                            <Eye className="h-4 w-4" />
-                            查看详情
-                          </Button>
+                          {report.reviewStatus === "processed" ? (
+                            <Button
+                              onClick={() => handleViewDetails(report.id)}
+                              variant="outline"
+                              size="sm"
+                              className="gap-2"
+                            >
+                              <Eye className="h-4 w-4" />
+                              查看详情
+                            </Button>
+                          ) : (
+                            <Button
+                              onClick={() => router.push(`/reports/review/${report.id}`)}
+                              size="sm"
+                              className="gap-2"
+                            >
+                              <ClipboardCheck className="h-4 w-4" />
+                              去处理
+                            </Button>
+                          )}
                         </div>
                       </div>
                     </div>

@@ -1,5 +1,7 @@
 # Logs
 logs/
+# Frontend route dir is page source, not log output
+!services/website/frontend/v1/app/logs/
 *.log
 
 # Python
@@ -17,6 +19,8 @@ eggs/
 # 锚定仓库根:避免误伤前端源码目录 services/website/frontend/v1/lib/
 /lib/
 lib64/
+# Frontend source dir, not a Python build 'lib'
+!services/website/frontend/v1/lib/
 parts/
 sdist/
 var/
@@ -70,3 +74,6 @@ services/temporaryDatas/*
 services/test/*
 services/rulesMatching/test/
 devtools/
+
+#temple
+services/temple

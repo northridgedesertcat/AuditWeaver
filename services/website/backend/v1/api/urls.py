@@ -2,7 +2,6 @@ from django.urls import path, include
 from .views import (
     HealthCheckView,
     DashboardStatsView,
-    ThreatDistributionView,
     LogsView,
     LogStatsView,
     LogTrendView,
@@ -17,17 +16,12 @@ from .views import (
     ThreatFeedsView,
     AIModelsView,
     RecentAnalysesView,
-    RecentAlertsView,
-    ReportStatsView,
-    ReportListView,
-    ReportDetailView,
     AgentProxyView,
 )
 
 urlpatterns = [
     path('health/', HealthCheckView.as_view(), name='health_check'),
     path('dashboard/stats/', DashboardStatsView.as_view(), name='dashboard_stats'),
-    path('dashboard/threat-distribution/', ThreatDistributionView.as_view(), name='threat_distribution'),
 
     path('logs/', LogsView.as_view(), name='logs'),
     path('logs/stats/', LogStatsView.as_view(), name='log_stats'),
@@ -50,10 +44,9 @@ urlpatterns = [
     path('ai/models/', AIModelsView.as_view(), name='ai_models'),
     path('ai/analyses/', RecentAnalysesView.as_view(), name='recent_analyses'),
 
-    path('dashboard/recent-alerts/', RecentAlertsView.as_view(), name='recent_alerts'),
-    path('reports/stats/', ReportStatsView.as_view(), name='report_stats'),
-    path('reports/list/', ReportListView.as_view(), name='report_list'),
-    path('reports/<str:report_id>/', ReportDetailView.as_view(), name='report_detail'),
+    # AI 分析报告（threat-distribution / recent-alerts / reports/*）
+    # 数据已迁至 MySQL reports 应用，路径保持不变
+    path('', include('reports.urls')),
 
     # Agent Service 反代(Django → 内部 FastAPI :8001)
     # agent_type 作为路径变量,一版合法值:analysis_explorer;新增 agent 无需改此路由

@@ -1,7 +1,7 @@
 """结构化输出 Schema,字段与 Dify 逐字一致。
 
 字段均设默认值:本地小模型(如 qwen2.5:7b)tool calling 不稳,
-漏字段时降级而非校验崩溃,与下游 build_elastic_document 默认值处理一致。
+漏字段时降级而非校验崩溃,与下游 build_report_record 默认值处理一致。
 """
 from pydantic import BaseModel, Field
 

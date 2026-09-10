@@ -69,6 +69,8 @@ INSTALLED_APPS = [
     'corsheaders',
     'api',
     'accounts',
+    'incident_management',
+    'reports',
 ]
 
 AUTH_USER_MODEL = 'accounts.User'
@@ -189,7 +191,8 @@ CORS_ALLOW_ALL_ORIGINS = DJANGO_CORS_ALLOW_ALL_ORIGINS
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        # 自定义:在 SimpleJWT 基础上额外校验 is_active,禁用用户旧 JWT 立即失效
+        'accounts.authentication.ActiveUserJWTAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
@@ -204,7 +207,7 @@ SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=JWT_ACCESS_TTL_MINUTES),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=JWT_REFRESH_TTL_DAYS),
     'ROTATE_REFRESH_TOKENS': JWT_ROTATE_REFRESH,
-    'BLACKLIST_AFTER_ROTATION': JWT_BLACKLIST_AFTER_ROTATE,
+    'BLACKLIST_AFTER_ROTATION': JWT_BLACKLIST_AFTER_ROTATION,
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
 

@@ -71,7 +71,7 @@ DEFAULT_CONFIG = {
             "path": os.path.join("docker", "config", "elasticsearch", "creatMapping.py"),
         },
         "django_migrate": {
-            "command": "python manage.py makemigrations accounts && python manage.py migrate && python manage.py init_admin",
+            "command": "python manage.py migrate",
             "cwd": os.path.join("services", "website", "backend", "v1"),
         },
     },

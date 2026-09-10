@@ -83,15 +83,8 @@ topics:
     description: >
       isolation produce.Consumed by the Elasticsearch.
 
-  - name: agent.event.save
-    partitions: 2
-    replication_factor: 1
-    configs:
-      retention.ms: "259200000"
-    description: >
-      agent produce.Consumed by the Elasticsearch.
-
-
+  # 注：agent.event.save 已废弃 —— Agent 分析结果改为直接写入 MySQL
+  # analysis_report 表，不再经 Kafka Connect 落 ES。
 
   # ---------------------------------------------------------------------------
   # DLQ (Dead Letter Queue)
