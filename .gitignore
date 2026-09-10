@@ -1,5 +1,7 @@
 # Logs
 logs/
+# Frontend route dir is page source, not log output
+!services/website/frontend/v1/app/logs/
 *.log
 
 # Python
@@ -16,6 +18,8 @@ eggs/
 .eggs/
 lib/
 lib64/
+# Frontend source dir, not a Python build 'lib'
+!services/website/frontend/v1/lib/
 parts/
 sdist/
 var/
