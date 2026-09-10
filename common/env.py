@@ -152,6 +152,6 @@ JWT_SECRET_KEY = get_env('JWT_SECRET_KEY') or DJANGO_SECRET_KEY
 JWT_ACCESS_TTL_MINUTES = get_env_int('JWT_ACCESS_TTL_MINUTES', 15)
 JWT_REFRESH_TTL_DAYS = get_env_int('JWT_REFRESH_TTL_DAYS', 1)
 JWT_ROTATE_REFRESH = get_env_bool('JWT_ROTATE_REFRESH', True)
-JWT_BLACKLIST_AFTER_ROTATION = get_env_bool('JWT_BLACKLIST_AFTER_ROTATION', True)
+JWT_BLACKLIST_AFTER_ROTATE = get_env_bool('JWT_BLACKLIST_AFTER_ROTATE', True)
 
 # Root Admin 不从 .env 读取,由 `python manage.py create_root_admin` 交互式创建
