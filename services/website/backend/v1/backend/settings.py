@@ -46,6 +46,7 @@ from common.env import (
     JWT_REFRESH_TTL_DAYS,
     JWT_ROTATE_REFRESH,
     JWT_BLACKLIST_AFTER_ROTATE,
+    REDIS_URL,
 )
 
 SECRET_KEY = DJANGO_SECRET_KEY
@@ -118,6 +119,41 @@ DATABASES = {
         },
     }
 }
+
+
+# ========== Django Cache(Redis) ==========
+# 方案 §7:Cache 是可丢失的软依赖 —— Redis 不可用 / 缓存丢失时降级为 cache miss,
+# 业务回源 MySQL/ES,不影响正确性(与 Agent checkpoint 的硬依赖 fast-fail 不同)。
+# - 配置了 REDIS_URL → django-redis,IGNORE_EXCEPTIONS 让连接异常静默降级为 miss。
+# - 未配置 REDIS_URL → 进程内 LocMemCache,Django 仍可正常启动/运行(缓存不跨进程)。
+# key namespace:auditweaver:cache:*;TTL 300s;不做压缩/warming/永久缓存(方案 §1.1)。
+if REDIS_URL:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django_redis.cache.RedisCache',
+            'LOCATION': REDIS_URL,
+            'KEY_PREFIX': 'auditweaver:cache',
+            'TIMEOUT': 300,  # 5 分钟
+            'OPTIONS': {
+                'SOCKET_CONNECT_TIMEOUT': 5,
+                'SOCKET_TIMEOUT': 5,
+                # Redis 异常时不抛错:读 → miss 回源,写 → noop,保证业务正确性
+                'IGNORE_EXCEPTIONS': True,
+            },
+        }
+    }
+    # 记录被忽略的缓存异常,便于排查(不影响请求)
+    DJANGO_REDIS_IGNORE_EXCEPTIONS = True
+    DJANGO_REDIS_LOG_IGNORED_EXCEPTIONS = True
+else:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'auditweaver-locmem',
+            'KEY_PREFIX': 'auditweaver:cache',
+            'TIMEOUT': 300,
+        }
+    }
 
 
 AUTH_PASSWORD_VALIDATORS = [

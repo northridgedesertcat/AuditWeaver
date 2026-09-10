@@ -134,6 +134,12 @@ MYSQL_USER = get_env('MYSQL_USER', 'auditweaver')
 MYSQL_PASSWORD = get_env('MYSQL_PASSWORD', 'auditweaver')
 MYSQL_ROOT_PASSWORD = get_env('MYSQL_ROOT_PASSWORD', 'rootpass')
 
+# Redis(Docker 单容器,对外端口 16379)
+# ⚠️ 密码无默认值:redis 模式下未配置 REDIS_URL/REDIS_PASSWORD 时应 fast fail,不静默使用弱密码
+REDIS_URL = get_env('REDIS_URL')
+REDIS_PASSWORD = get_env('REDIS_PASSWORD')
+REDIS_PORT = get_env_int('REDIS_PORT', 16379)
+
 # JWT
 JWT_SECRET_KEY = get_env('JWT_SECRET_KEY') or DJANGO_SECRET_KEY
 JWT_ACCESS_TTL_MINUTES = get_env_int('JWT_ACCESS_TTL_MINUTES', 15)

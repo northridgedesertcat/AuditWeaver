@@ -118,6 +118,27 @@ services:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
 
+  redis:
+    image: redis:8.0-alpine
+    container_name: redis
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --requirepass
+      - ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+      - --appendonly
+      - "yes"
+      - --appendfsync
+      - everysec
+      - --maxmemory
+      - 512mb
+      - --maxmemory-policy
+      - noeviction
+    ports:
+      - "${REDIS_PORT:-16379}:6379"
+    volumes:
+      - redis_data:/data
+
 volumes:
   kafka_data:
     name: system_audit_kafka_data
@@ -127,3 +148,5 @@ volumes:
     name: system_audit_zk_data
   mysql_data:
     name: system_audit_mysql_data
+  redis_data:
+    name: system_audit_redis_data

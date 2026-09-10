@@ -26,3 +26,9 @@ mcp>=1.7
 sse-starlette==2.1.3
 elasticsearch==8.15.0
 httpx==0.27.2
+
+# Redis(Django Cache + LangGraph RedisSaver)
+# redis 版本范围与 langgraph-checkpoint-redis==0.1.3 依赖一致(>=5.2.1,<7.0.0)
+redis>=5.2.1,<7.0.0
+django-redis==7.0.0
+langgraph-checkpoint-redis==0.1.3
