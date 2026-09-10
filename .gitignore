@@ -16,7 +16,8 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+# 锚定仓库根:避免误伤前端源码目录 services/website/frontend/v1/lib/
+/lib/
 lib64/
 # Frontend source dir, not a Python build 'lib'
 !services/website/frontend/v1/lib/

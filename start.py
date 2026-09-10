@@ -49,7 +49,7 @@ def main():
         
         if not success:
             service_type = service.get("type")
-            if service_type in ("docker", "script"):
+            if service_type in ("docker", "script", "redis_check"):
                 print_error(f"Critical service '{service_name}' failed to start. Aborting.")
                 input("Press Enter to exit...")
                 return

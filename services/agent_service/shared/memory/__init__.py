@@ -5,8 +5,10 @@ from common.env import get_env
 def get_checkpointer():
     """返回会话历史 checkpointer。
 
-    一版进程内 ``MemorySaver``;在 ``.env`` 设 ``AE_MEMORY_BACKEND=redis``
-    即切换到 Redis(预留)。
+    按 ``.env`` 的 ``AE_MEMORY_BACKEND`` 切换后端:
+    - ``memory``(默认):进程内 ``MemorySaver``,重启丢历史,不依赖 Redis。
+    - ``redis``:``RedisSaver`` singleton,checkpoint 持久化到 Redis;
+      Redis 不可用则快速失败,**不** fallback 到 MemorySaver(避免 session state 不一致)。
     """
     backend = get_env('AE_MEMORY_BACKEND', 'memory')
     if backend == 'redis':
