@@ -107,7 +107,7 @@ async def stream_agent_chat(
                     "summary": _summarize_tool_output(data.get("output")),
                 })
     except Exception as e:
-        yield sse_line({"type": "error", "content": f"agent stream error: {e}"})
+        yield sse_line({"type": "error", "content": f"agent stream error: {type(e).__name__}: {e}"})
 
     yield sse_line({"type": "done"})
 
