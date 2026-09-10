@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { apiFetch } from '@/lib/api/client'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -18,10 +19,18 @@ import {
   Shield,
   Zap,
   Target,
+  ClipboardCheck,
   ChevronRight,
+  User,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { getRiskConfig, getConfidenceColor } from "@/lib/risk-level"
+import {
+  getReviewStatusConfig,
+  getVerdictLabel,
+  getCategoryLabel,
+  getActionLabel,
+} from "@/lib/review-options"
 
 interface OriginalRiskData {
   event_id: string
@@ -31,6 +40,17 @@ interface OriginalRiskData {
   status: number
   path: string
   original_log: string
+}
+
+interface ReviewData {
+  verdict: string
+  category: string
+  actions: string[]
+  comment: string
+  reviewerDisplayName: string | null
+  createdAt: string
+  updatedAt: string
+  changeType: string
 }
 
 interface ReportDetail {
@@ -45,6 +65,12 @@ interface ReportDetail {
   reasoning: string[]
   recommendations: string[]
   originalRiskData: OriginalRiskData
+  reviewStatus: "pending" | "claimed" | "processed"
+  claimedBy: string | null
+  claimedAt: string | null
+  reviewedBy: string | null
+  reviewedAt: string | null
+  review: ReviewData | null
 }
 
 interface ReportDetailModalProps {
@@ -57,6 +83,7 @@ export function ReportDetailModal({ reportId, isOpen, onClose }: ReportDetailMod
   const [loading, setLoading] = useState(true)
   const [detail, setDetail] = useState<ReportDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const router = useRouter()
 
   const fetchDetail = async () => {
     setLoading(true)
@@ -118,6 +145,12 @@ export function ReportDetailModal({ reportId, isOpen, onClose }: ReportDetailMod
 
   const riskCfg = getRiskConfig(detail.riskLevel)
   const RiskIcon = riskCfg.icon
+  const statusCfg = getReviewStatusConfig(detail.reviewStatus)
+  const StatusIcon = statusCfg.icon
+  const gotoReview = () => {
+    onClose()
+    router.push(`/reports/review/${detail.id}`)
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -140,10 +173,30 @@ export function ReportDetailModal({ reportId, isOpen, onClose }: ReportDetailMod
               </div>
             </div>
           </div>
-          <Badge className={cn("border", riskCfg.twBadge)}>
-            <RiskIcon className="h-3 w-3 mr-1" />
-            {riskCfg.label}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge className={cn("border", statusCfg.twBadge)}>
+              <StatusIcon
+                className={cn(
+                  "h-3 w-3 mr-1",
+                  detail.reviewStatus === "claimed" && "animate-spin",
+                )}
+              />
+              {statusCfg.label}
+              {detail.reviewStatus === "claimed" && detail.claimedBy
+                ? ` · ${detail.claimedBy}`
+                : ""}
+            </Badge>
+            <Badge className={cn("border", riskCfg.twBadge)}>
+              <RiskIcon className="h-3 w-3 mr-1" />
+              {riskCfg.label}
+            </Badge>
+            {/* 快速桥接：浏览模式 → 处理页（弹窗内不做表单） */}
+            <Button size="sm" className="gap-1.5" onClick={gotoReview}>
+              <ClipboardCheck className="h-4 w-4" />
+              {detail.reviewStatus === "processed" ? "去改判" : "去处理"}
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
 
         <div className="overflow-y-auto max-h-[calc(90vh-72px)]">
@@ -249,6 +302,63 @@ export function ReportDetailModal({ reportId, isOpen, onClose }: ReportDetailMod
               </CardContent>
             </Card>
           </div>
+
+          {/* 审核结论（只读摘要，操作在处理页完成） */}
+          {detail.review && (
+            <div className="px-6 pb-6">
+              <Card>
+                <CardHeader className="flex flex-row items-center gap-2">
+                  <ClipboardCheck className="h-5 w-5 text-success" />
+                  <CardTitle className="text-base">审核结论</CardTitle>
+                  <Badge
+                    className={cn(
+                      "border",
+                      detail.review.changeType === "revised"
+                        ? "bg-info/20 text-info border-info/30"
+                        : "bg-primary/10 text-primary border-primary/30",
+                    )}
+                  >
+                    {detail.review.changeType === "revised" ? "已改判" : "首次审核"}
+                  </Badge>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                    <div className="rounded-lg border border-border p-3">
+                      <p className="text-xs text-muted-foreground mb-1">报告正确性</p>
+                      <p className="font-semibold">
+                        {getVerdictLabel(detail.review.verdict)}
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-border p-3">
+                      <p className="text-xs text-muted-foreground mb-1">实际情况</p>
+                      <p className="font-semibold">
+                        {getCategoryLabel(detail.review.category)}
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-border p-3">
+                      <p className="text-xs text-muted-foreground mb-1">处置动作</p>
+                      <p className="font-semibold">
+                        {detail.review.actions?.length > 0
+                          ? detail.review.actions.map((a) => getActionLabel(a)).join("、")
+                          : "未选择"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-3 rounded-lg border border-border bg-muted/50 p-3">
+                    <p className="text-xs text-muted-foreground mb-1">处理说明</p>
+                    <p className="text-sm">{detail.review.comment}</p>
+                  </div>
+                  <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+                    <User className="h-3.5 w-3.5" />
+                    <span>
+                      {detail.review.reviewerDisplayName ?? "未知用户"} · 最近结论{" "}
+                      {detail.review.updatedAt}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
 
           <div className="px-6 pb-6">
             <Card>
