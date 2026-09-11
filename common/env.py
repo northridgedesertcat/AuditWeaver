@@ -134,6 +134,19 @@ MYSQL_USER = get_env('MYSQL_USER', 'auditweaver')
 MYSQL_PASSWORD = get_env('MYSQL_PASSWORD', 'auditweaver')
 MYSQL_ROOT_PASSWORD = get_env('MYSQL_ROOT_PASSWORD', 'rootpass')
 
+# Redis(Docker 单容器,对外端口 16379)
+# ⚠️ 密码无默认值:redis 模式下未配置 REDIS_URL/REDIS_PASSWORD 时应 fast fail,不静默使用弱密码
+REDIS_URL = get_env('REDIS_URL')
+REDIS_PASSWORD = get_env('REDIS_PASSWORD')
+REDIS_PORT = get_env_int('REDIS_PORT', 16379)
+
+# Agent Service 会话历史(LangGraph checkpointer)
+# memory(默认):进程内 MemorySaver,不依赖 Redis;redis:使用 RedisSaver 持久化到 Redis。
+# AE_MEMORY_REDIS_URL 不给弱默认值:redis 模式下未配置时由启动检查 / redis.py fast fail,
+# 不静默连到无密码的 localhost:6379。
+AE_MEMORY_BACKEND = get_env('AE_MEMORY_BACKEND', 'memory')
+AE_MEMORY_REDIS_URL = get_env('AE_MEMORY_REDIS_URL')
+
 # JWT
 JWT_SECRET_KEY = get_env('JWT_SECRET_KEY') or DJANGO_SECRET_KEY
 JWT_ACCESS_TTL_MINUTES = get_env_int('JWT_ACCESS_TTL_MINUTES', 15)

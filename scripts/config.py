@@ -9,6 +9,8 @@ from common.env import (
     KAFKA_CONNECT_PORT,
     AE_BACKEND_HOST,
     AE_BACKEND_PORT,
+    AE_MEMORY_BACKEND,
+    AE_MEMORY_REDIS_URL,
 )
 
 DEFAULT_CONFIG = {
@@ -78,7 +80,13 @@ DEFAULT_CONFIG = {
             "id": "docker",
             "name": "Starting Docker Compose services",
             "type": "docker",
-            "description": "Kafka, Elasticsearch, Kibana, Logstash, MySQL",
+            "description": "Kafka, Elasticsearch, Kibana, Logstash, MySQL, Redis",
+        },
+        {
+            "id": "redis_check",
+            "name": "Checking Redis readiness",
+            "type": "redis_check",
+            "description": "Agent session state dependency (skipped in memory mode)",
         },
         {
             "id": "wait_es",

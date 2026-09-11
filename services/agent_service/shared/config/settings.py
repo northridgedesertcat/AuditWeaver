@@ -2,7 +2,13 @@
 
 所有 Agent 共用;按 ``.env`` 的 ``AE_*`` 切换,不改代码。
 """
-from common.env import get_env, get_env_float, get_env_int
+from common.env import (
+    get_env,
+    get_env_float,
+    get_env_int,
+    AE_MEMORY_BACKEND,
+    AE_MEMORY_REDIS_URL,
+)
 
 # LLM(OpenAI 兼容,覆盖 DeepSeek / Qwen / GLM / Kimi / OpenAI 官方)
 LLM_CONFIG = {
@@ -13,10 +19,11 @@ LLM_CONFIG = {
     'temperature': get_env_float('AE_LLM_TEMPERATURE', 0.2),
 }
 
-# 会话历史(一版进程内 MemorySaver,预留 Redis)
+# 会话历史:memory=进程内 MemorySaver(默认,不依赖 Redis);redis=RedisSaver 持久化
+# 常量来自 common.env;redis 模式下 AE_MEMORY_REDIS_URL 未配置时为 None,由 redis.py fast fail
 MEMORY_CONFIG = {
-    'backend': get_env('AE_MEMORY_BACKEND', 'memory'),
-    'redis_url': get_env('AE_MEMORY_REDIS_URL', 'redis://localhost:6379/0'),
+    'backend': AE_MEMORY_BACKEND,
+    'redis_url': AE_MEMORY_REDIS_URL,
 }
 
 # Agent 行为默认值(可在 agents/<name>/config 中覆盖)
