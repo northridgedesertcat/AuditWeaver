@@ -2,16 +2,75 @@
 
 把 LangGraph 的 astream_events / ainvoke 转成前端可逐 token 渲染的 SSE。
 FastAPI 只做转发,不做业务判断。
+
+v2.1 升级(对齐 §3.3 + §3.9):
+- SSE 新事件:plan_generated / gate_evaluated / decision_made / compact_done,
+  从 on_chain_end 的 metadata.langgraph_node + 节点 output 提取(对齐
+  langgraph 0.2.x astream_events v2 契约)。契约只增不改(兼容现有前端)。
+- Tracing:get_trace_callback() 启用时,挂到 graph config 的 callbacks,
+  节点/LLM/工具调用落盘 logs/agent_trace.jsonl(对齐 §3.9 轻量 Tracing)。
 """
 import json
 from typing import AsyncIterator
 
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
+from .trace import get_trace_callback
+
 
 def sse_line(data: dict) -> str:
     """SSE 单行:data: {...}\\n\\n"""
     return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
+# Agent 升级后需要发 SSE 事件的节点(对齐 §3.3 "plan/decision/compact" + gate)
+_NODE_SSE_NODES = {"plan", "deterministic_gate", "decision_llm", "compact"}
+
+
+def _node_event_to_sse(node_name: str, output) -> dict | None:
+    """从节点 on_chain_end 的 output 提取 Agent 升级后的新 SSE 事件。
+
+    设计要点:
+    - 用 metadata.langgraph_node 判定节点名(astream_events v2 契约,对齐
+      langgraph 0.2.x);node_name 不在 _NODE_SSE_NODES 则返回 None(忽略)。
+    - 节点 output 是节点返回的 state delta dict;按节点名提取关键字段
+      组装 SSE 事件,字段精简(前端只展示思考过程,不传整 state)。
+    - 返回 None 表示该 on_chain_end 不是目标节点事件(由调用方跳过)。
+
+    纯函数,无副作用,便于单测(见 tests/test_api_stream.py)。
+    """
+    if node_name not in _NODE_SSE_NODES:
+        return None
+    if not isinstance(output, dict):
+        output = {}
+    if node_name == "plan":
+        plan = output.get("current_plan") or {}
+        return {
+            "type": "plan_generated",
+            "hypotheses": plan.get("hypotheses") or [],
+            "steps": plan.get("steps") or [],
+            "budget": output.get("budget"),
+        }
+    if node_name == "deterministic_gate":
+        return {
+            "type": "gate_evaluated",
+            "triggered": bool(output.get("gate_triggered")),
+            "reasons": output.get("gate_reasons") or [],
+        }
+    if node_name == "decision_llm":
+        d = output.get("decision_result") or {}
+        return {
+            "type": "decision_made",
+            "action": d.get("action"),
+            "reason": d.get("reason"),
+            "next_step": d.get("next_step"),
+        }
+    # compact
+    return {
+        "type": "compact_done",
+        "compact_count": output.get("compact_count"),
+        "summary_preview": (output.get("investigation_summary") or "")[-200:],
+    }
 
 
 def _parse_tool_content(content):
@@ -70,6 +129,21 @@ def _namespaced_thread(agent_type: str, thread_id: str | None) -> str | None:
     return f"{agent_type}:{thread_id}"
 
 
+def _build_config(ns_thread: str | None) -> dict:
+    """构造 graph config:thread_id(会话隔离)+ trace callback(若启用)。
+
+    - ns_thread 为 None 时单次无状态(不挂 thread_id)
+    - trace callback 未启用(AE_TRACE_LOG 未设)时跳过,不传 callbacks
+    """
+    config: dict = {}
+    if ns_thread:
+        config["configurable"] = {"thread_id": ns_thread}
+    cb = get_trace_callback()
+    if cb is not None:
+        config["callbacks"] = [cb]
+    return config
+
+
 async def stream_agent_chat(
     graph,
     agent_type: str,
@@ -77,9 +151,14 @@ async def stream_agent_chat(
     thread_id: str | None,
     history: list[dict] | None,
 ) -> AsyncIterator[str]:
-    """流式跑 graph,逐 token / 工具事件产出 SSE 行。"""
+    """流式跑 graph,逐 token / 工具 / 节点事件产出 SSE 行。
+
+    v2.1 升级(对齐 §3.3):新增 plan_generated / gate_evaluated /
+    decision_made / compact_done 事件,从 on_chain_end 的
+    metadata.langgraph_node 提取(对齐 langgraph 0.2.x v2 契约)。
+    """
     ns_thread = _namespaced_thread(agent_type, thread_id)
-    config = {"configurable": {"thread_id": ns_thread}} if ns_thread else {}
+    config = _build_config(ns_thread)
     inputs = _build_inputs(message, history, thread_id)
 
     try:
@@ -106,6 +185,14 @@ async def stream_agent_chat(
                     "tool": event.get("name"),
                     "summary": _summarize_tool_output(data.get("output")),
                 })
+
+            elif kind == "on_chain_end":
+                # 节点名从 metadata.langgraph_node 取(astream_events v2 契约)
+                metadata = event.get("metadata") or {}
+                node_name = metadata.get("langgraph_node") or ""
+                sse = _node_event_to_sse(node_name, data.get("output"))
+                if sse:
+                    yield sse_line(sse)
     except Exception as e:
         yield sse_line({"type": "error", "content": f"agent stream error: {type(e).__name__}: {e}"})
 
@@ -121,7 +208,7 @@ async def run_agent_sync(
 ) -> dict:
     """非流式:一次跑完,返回完整 answer + 工具调用清单。"""
     ns_thread = _namespaced_thread(agent_type, thread_id)
-    config = {"configurable": {"thread_id": ns_thread}} if ns_thread else {}
+    config = _build_config(ns_thread)
     inputs = _build_inputs(message, history, thread_id)
 
     try:
