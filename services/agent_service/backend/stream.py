@@ -2,16 +2,92 @@
 
 把 LangGraph 的 astream_events / ainvoke 转成前端可逐 token 渲染的 SSE。
 FastAPI 只做转发,不做业务判断。
+
+v2.1 升级(对齐 §3.3 + §3.9):
+- SSE 新事件:plan_generated / gate_evaluated / decision_made / compact_done,
+  从 on_chain_end 的 metadata.langgraph_node + 节点 output 提取(对齐
+  langgraph 0.2.x astream_events v2 契约)。契约只增不改(兼容现有前端)。
+- Tracing:get_trace_callback() 启用时,挂到 graph config 的 callbacks,
+  节点/LLM/工具调用落盘 logs/agent_trace.jsonl(对齐 §3.9 轻量 Tracing)。
 """
 import json
+import time
 from typing import AsyncIterator
 
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
+from .trace import get_trace_callback
+
 
 def sse_line(data: dict) -> str:
-    """SSE 单行:data: {...}\\n\\n"""
-    return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+    """SSE 单行:data: {...}\\n\\n
+
+    自动注入 ts(毫秒时间戳),用于跨层(8001/8000/3000)比对事件到达时间,
+    精准定位哪一层发生缓冲(纯加性,不改事件语义,前端可忽略此字段)。
+    """
+    payload = {"ts": int(time.time() * 1000), **data}
+    return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+
+# Agent 升级后需要发 SSE 事件的节点(对齐 §3.3 "plan/decision/compact" + gate)
+_NODE_SSE_NODES = {"plan", "deterministic_gate", "decision_llm", "compact"}
+
+# 节点中文名:on_chain_start 时发 node_start 事件,前端 loading 态即时显示"正在做什么"
+# 避免 plan/decision/compact 等结构化节点(非流式)执行期间前端只看到"正在分析..."
+_NODE_LABELS: dict[str, str] = {
+    "plan": "生成调查计划",
+    "agent": "分析中",
+    "tools": "执行工具",
+    "deterministic_gate": "评估门控",
+    "decision_llm": "决策下一步",
+    "compact": "压缩上下文",
+}
+
+
+def _node_event_to_sse(node_name: str, output) -> dict | None:
+    """从节点 on_chain_end 的 output 提取 Agent 升级后的新 SSE 事件。
+
+    设计要点:
+    - 用 metadata.langgraph_node 判定节点名(astream_events v2 契约,对齐
+      langgraph 0.2.x);node_name 不在 _NODE_SSE_NODES 则返回 None(忽略)。
+    - 节点 output 是节点返回的 state delta dict;按节点名提取关键字段
+      组装 SSE 事件,字段精简(前端只展示思考过程,不传整 state)。
+    - 返回 None 表示该 on_chain_end 不是目标节点事件(由调用方跳过)。
+
+    纯函数,无副作用,便于单测(见 tests/test_api_stream.py)。
+    """
+    if node_name not in _NODE_SSE_NODES:
+        return None
+    if not isinstance(output, dict):
+        output = {}
+    if node_name == "plan":
+        plan = output.get("current_plan") or {}
+        return {
+            "type": "plan_generated",
+            "hypotheses": plan.get("hypotheses") or [],
+            "steps": plan.get("steps") or [],
+            "budget": output.get("budget"),
+        }
+    if node_name == "deterministic_gate":
+        return {
+            "type": "gate_evaluated",
+            "triggered": bool(output.get("gate_triggered")),
+            "reasons": output.get("gate_reasons") or [],
+        }
+    if node_name == "decision_llm":
+        d = output.get("decision_result") or {}
+        return {
+            "type": "decision_made",
+            "action": d.get("action"),
+            "reason": d.get("reason"),
+            "next_step": d.get("next_step"),
+        }
+    # compact
+    return {
+        "type": "compact_done",
+        "compact_count": output.get("compact_count"),
+        "summary_preview": (output.get("investigation_summary") or "")[-200:],
+    }
 
 
 def _parse_tool_content(content):
@@ -70,6 +146,21 @@ def _namespaced_thread(agent_type: str, thread_id: str | None) -> str | None:
     return f"{agent_type}:{thread_id}"
 
 
+def _build_config(ns_thread: str | None) -> dict:
+    """构造 graph config:thread_id(会话隔离)+ trace callback(若启用)。
+
+    - ns_thread 为 None 时单次无状态(不挂 thread_id)
+    - trace callback 未启用(AE_TRACE_LOG 未设)时跳过,不传 callbacks
+    """
+    config: dict = {}
+    if ns_thread:
+        config["configurable"] = {"thread_id": ns_thread}
+    cb = get_trace_callback()
+    if cb is not None:
+        config["callbacks"] = [cb]
+    return config
+
+
 async def stream_agent_chat(
     graph,
     agent_type: str,
@@ -77,21 +168,47 @@ async def stream_agent_chat(
     thread_id: str | None,
     history: list[dict] | None,
 ) -> AsyncIterator[str]:
-    """流式跑 graph,逐 token / 工具事件产出 SSE 行。"""
+    """流式跑 graph,逐 token / 工具 / 节点事件产出 SSE 行。
+
+    v2.1 升级(对齐 §3.3):新增 plan_generated / gate_evaluated /
+    decision_made / compact_done 事件,从 on_chain_end 的
+    metadata.langgraph_node 提取(对齐 langgraph 0.2.x v2 契约)。
+    """
     ns_thread = _namespaced_thread(agent_type, thread_id)
-    config = {"configurable": {"thread_id": ns_thread}} if ns_thread else {}
+    config = _build_config(ns_thread)
     inputs = _build_inputs(message, history, thread_id)
+
+    # 跟踪当前节点 + 本轮 LLM 是否已发过"正在生成工具调用"状态
+    # (function_calling 结构化输出 / bind_tools 工具调用都走 tool_call_chunks,
+    #  不产出文本 token,期间前端需要知道 LLM 在做什么,否则只看到"分析中"无反馈)
+    current_node: str = ""
+    tool_call_status_sent: bool = False
 
     try:
         async for event in graph.astream_events(inputs, config=config, version="v2"):
             kind = event.get("event")
             data = event.get("data", {}) or {}
 
-            if kind == "on_chat_model_stream":
+            if kind == "on_chat_model_start":
+                # 新一轮 LLM 调用开始,重置"工具调用状态已通知"标记
+                tool_call_status_sent = False
+
+            elif kind == "on_chat_model_stream":
                 chunk = data.get("chunk")
                 content = getattr(chunk, "content", None)
                 if isinstance(content, str) and content:
                     yield sse_line({"type": "token", "content": content})
+                else:
+                    # 无文本 content:可能在生成 tool_call_chunks(结构化输出或工具调用)
+                    tc = getattr(chunk, "tool_call_chunks", None)
+                    if tc and not tool_call_status_sent:
+                        tool_call_status_sent = True
+                        # agent 节点调工具 vs plan/decision/compact 结构化输出,文案区分
+                        if current_node == "agent":
+                            label = "正在决定调用哪个工具"
+                        else:
+                            label = _NODE_LABELS.get(current_node, "正在生成结构化结果")
+                        yield sse_line({"type": "status", "label": label})
 
             elif kind == "on_tool_start":
                 yield sse_line({
@@ -106,6 +223,23 @@ async def stream_agent_chat(
                     "tool": event.get("name"),
                     "summary": _summarize_tool_output(data.get("output")),
                 })
+
+            elif kind == "on_chain_start":
+                # 节点开始执行:发 node_start,让前端 loading 态显示当前步骤
+                metadata = event.get("metadata") or {}
+                node_name = metadata.get("langgraph_node") or ""
+                current_node = node_name
+                label = _NODE_LABELS.get(node_name)
+                if label:
+                    yield sse_line({"type": "node_start", "node": node_name, "label": label})
+
+            elif kind == "on_chain_end":
+                # 节点名从 metadata.langgraph_node 取(astream_events v2 契约)
+                metadata = event.get("metadata") or {}
+                node_name = metadata.get("langgraph_node") or ""
+                sse = _node_event_to_sse(node_name, data.get("output"))
+                if sse:
+                    yield sse_line(sse)
     except Exception as e:
         yield sse_line({"type": "error", "content": f"agent stream error: {type(e).__name__}: {e}"})
 
@@ -121,7 +255,7 @@ async def run_agent_sync(
 ) -> dict:
     """非流式:一次跑完,返回完整 answer + 工具调用清单。"""
     ns_thread = _namespaced_thread(agent_type, thread_id)
-    config = {"configurable": {"thread_id": ns_thread}} if ns_thread else {}
+    config = _build_config(ns_thread)
     inputs = _build_inputs(message, history, thread_id)
 
     try:

@@ -51,5 +51,29 @@ _holder = _MCPHolder()
 
 
 async def get_mcp_tools() -> list[BaseTool]:
-    """返回共享的 MCP 工具列表(LangChain BaseTool)。"""
+    """返回共享的 MCP 工具列表(LangChain BaseTool,原始未包装)。
+
+    v2 推荐:Agent 用 get_wrapped_mcp_tools() 取带 spec(timeout/retry/audit/ToolResult)
+    的版本,见 §3.6。本函数保留向后兼容(不破坏旧调用方)。
+    """
     return await _holder.load()
+
+
+async def get_wrapped_mcp_tools(caller: str | None = None) -> list[BaseTool]:
+    """返回经过 §3.6 spec 包装的 MCP 工具列表。
+
+    包装内容:
+    - 统一 ToolResult 输出(ok/data/error/source_ids)
+    - 超时(默认 30s,可由 AGENT_CONFIG 配置)
+    - 瞬时错误重试(指数退避,默认 2 次)
+    - 审计(JSONL 落盘 logs/tool_audit.jsonl)
+
+    Args:
+        caller: 调用方标识(节点名/agent 名),写入审计日志便于追溯
+
+    Returns:
+        包装后的 BaseTool 列表,bind_tools / ToolNode 无感知
+    """
+    from shared.tools.wrapper import wrap_mcp_tools
+    raw = await _holder.load()
+    return wrap_mcp_tools(raw, caller=caller)

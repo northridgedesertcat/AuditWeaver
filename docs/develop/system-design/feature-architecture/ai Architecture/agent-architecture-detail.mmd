@@ -1,0 +1,143 @@
+%% ============================================================
+%% AuditWeaver Agent 架构详解图（技术面试讲解版）
+%% 全部节点/事件/规则均取自实际代码：
+%%   services/agent_service/backend/main.py                 FastAPI 入口 :8001（127.0.0.1）
+%%   services/agent_service/backend/routes/agent.py         chat（SSE）/ chat/sync（同步）
+%%   services/agent_service/backend/stream.py               astream_events v2 → SSE 事件
+%%   services/agent_service/agents/react/analysis_explorer/graph.py   六节点图与条件边
+%%   services/agent_service/agents/workflow/analysis_workflow/graph.py 五节点流水线与质量门控
+%%   services/agent_service/shared/mcp_client.py            MultiServerMCPClient（stdio）+ 工具包装
+%%   services/agent_service/skills/server.py                FastMCP 三个只读技能
+%%   services/agent_service/shared/llm/factory.py           analysis / light 双角色 + fallback 链
+%%   services/agent_service/shared/rag/retriever.py         BM25 + kNN + RRF → EvidencePack
+%%   services/agent_service/shared/memory/__init__.py       MemorySaver / RedisSaver 切换
+%% ============================================================
+flowchart TB
+
+    %% ---------- 样式 ----------
+    classDef chain fill:#E3F2FD,stroke:#1565C0,color:#0D47A1
+    classDef graphnode fill:#E8F5E9,stroke:#2E7D32,color:#1B5E20
+    classDef gate fill:#FFF9C4,stroke:#F9A825,color:#F57F17
+    classDef mcp fill:#F3E5F5,stroke:#6A1B9A,color:#4A148C
+    classDef shared fill:#E0F7FA,stroke:#00838F,color:#006064
+    classDef store fill:#FFEBEE,stroke:#C62828,color:#B71C1C
+    classDef ext fill:#ECEFF1,stroke:#455A64,color:#263238
+
+    %% ==================== 一、在线请求链路 ====================
+    subgraph CHAIN["一、SSE 全链路（浏览器 → Next.js → Django → FastAPI，逐行透传不缓冲）"]
+        direction TB
+        BROWSER["浏览器 · AI 安全智能体页<br/>app/agent/page.tsx<br/>onToken / onToolCall / onToolResult /<br/>onNodeStart / onStatus / onDone"]
+        NEXTJS["Next.js :3000<br/>lib/api/agent.ts · streamAgentChat<br/>fetch + Accept: text/event-stream<br/>trailingSlash=true · compress=false（防 gzip 缓冲）"]
+        DJANGO["Django :8000 · api/urls.py<br/>re_path /?$ 同时接受有/无尾斜杠（防 308 缓冲）<br/>AgentProxyView：httpx.stream 流式转发<br/>StreamingHttpResponse"]
+        FAPI["FastAPI Agent Service :8001（仅 127.0.0.1 对内）<br/>routes/agent.py<br/>POST /:agent_type/chat → StreamingResponse（SSE）<br/>POST /:agent_type/chat/sync → 同步返回"]
+        STREAMPY["backend/stream.py<br/>graph.astream_events（version=v2）<br/>逐事件转 SSE 行协议"]
+        SSEEV["SSE 事件契约：token · status · tool_call ·<br/>tool_result · node_start · error · done"]
+
+        BROWSER -->|"HTTPS"| NEXTJS
+        NEXTJS -->|"rewrites /api/v1/:path*<br/>JWT Bearer · 401 自动 refresh"| DJANGO
+        DJANGO -->|"反代 + 用户鉴权后转发"| FAPI
+        FAPI --> STREAMPY
+        STREAMPY -.->|"SSE 逐行 yield 回传"| BROWSER
+    end
+
+    %% ==================== 二、LangGraph 双 Agent ====================
+    subgraph GRAPHS["二、LangGraph 双 Agent（agents/ 按形态注册：react/ 对话型 · workflow/ 流水线型）"]
+
+        %% ---------- Graph A：analysis_explorer（Plan/ReAct + 确定性门控） ----------
+        subgraph GA["Graph A · analysis_explorer（ReAct 扩展：六节点）"]
+            direction TB
+            PLAN["plan_node（入口）<br/>Plan-and-Solve 生成调查计划"]
+            AGENTN["agent_node · ReAct 内核<br/>bind_tools（MCP 工具）<br/>流式产出 token"]
+            TOOLS["tools_node<br/>执行 MCP 工具调用"]
+            GATE{"deterministic_gate_node<br/>纯代码规则 · 零 LLM 成本<br/>工具失败 / 证据不足 / 证据冲突<br/>预算临界 / 重复停滞"}
+            DEC["decision_llm_node<br/>light 弱模型四选一"]
+            COMPACT["compact_node<br/>结构化上下文压缩<br/>产出 investigation_summary（不重写历史）"]
+            FIN(("END"))
+
+            PLAN -->|"计划注入"| AGENTN
+            AGENTN -->|"有 tool_calls"| TOOLS
+            AGENTN -->|"无 tool_calls：直接给结论"| FIN
+            TOOLS -->|"每轮工具后必过门控"| GATE
+            GATE -->|"未命中（省一次 LLM）"| AGENTN
+            GATE -->|"命中"| DEC
+            DEC -->|"continue"| AGENTN
+            DEC -->|"replan：清空当前计划"| PLAN
+            DEC -->|"compact"| COMPACT
+            DEC -->|"finish"| FIN
+            COMPACT -->|"新摘要继续 ReAct"| AGENTN
+        end
+
+        %% ---------- Graph B：analysis_workflow（质量门控流水线） ----------
+        subgraph GB["Graph B · analysis_workflow（五节点流水线 · 无 checkpointer 单次执行）"]
+            direction TB
+            RETRIEVE["retrieve_node（入口 · 纯代码不进 LLM）<br/>RAG：BM25 + kNN 向量检索<br/>RRF 融合 → EvidencePack（含融合来源）"]
+            ANALYZEN["analyze_node<br/>基于证据包 LLM 结构化分析"]
+            VALIDATE{"validate_node<br/>质量门控（证据充分性校验）"}
+            ENRICH["enrich_node<br/>补检索词 / 扩时间窗<br/>enrich_count 计数"]
+            REPORT["report_node<br/>产出结构化报告"]
+
+            RETRIEVE --> ANALYZEN
+            ANALYZEN --> VALIDATE
+            VALIDATE -->|"pass=true"| REPORT
+            VALIDATE -->|"pass=false 且未达上限"| ENRICH
+            ENRICH -->|"合并证据重新分析"| ANALYZEN
+            VALIDATE -->|"达 MAX_ENRICH_COUNT 强制降级出报告（防死循环）"| REPORT
+        end
+    end
+
+    %% ==================== 三、MCP Skills 工具层 ====================
+    subgraph MCP["三、MCP Skills 工具层（stdio 子进程 · 任何 Agent 共用同一套技能）"]
+        direction LR
+        MCPCLIENT["shared/mcp_client.py<br/>MultiServerMCPClient（langchain-mcp-adapters）<br/>stdio 拉起子进程 · 单例连接缓存"]
+        WRAPPER["shared/tools/wrapper.py<br/>统一 ToolResult（ok/data/error/source_ids）<br/>超时 30s · 瞬时错误指数退避重试 2 次<br/>审计落盘 logs/tool_audit.jsonl"]
+        MCPSEVER["skills/server.py · FastMCP「agent-service-skills」<br/>python -m services.agent_service.skills.server"]
+        T1["query_ip_logs<br/>ES 索引 nginx-log-raw"]
+        T2["query_security_events<br/>ES 索引 matched_logs"]
+        T3["query_analysis_results<br/>MySQL analysis_report（只读）"]
+
+        MCPCLIENT --> WRAPPER
+        WRAPPER --> MCPSEVER
+        MCPSEVER --> T1
+        MCPSEVER --> T2
+        MCPSEVER --> T3
+    end
+
+    %% ==================== 四、共享基础设施 ====================
+    subgraph SHARED["四、共享基础设施（shared/）"]
+        direction LR
+        LLMGW["LLM Gateway · shared/llm<br/>openai_compat Provider<br/>analysis 强模型：分析 / 规划<br/>light 弱模型：门控 / 摘要 / 压缩<br/>fallback 链 + 重试 + token 统计<br/>配置缺失显式报错不静默降级"]
+        RAG["RAG · shared/rag<br/>BM25 + kNN + RRF 融合<br/>降级语义显式（单路/空包）<br/>embed 配置错直接抛错"]
+        MEM["Memory · shared/memory<br/>AE_MEMORY_BACKEND=memory → MemorySaver（进程内）<br/>=redis → RedisSaver（Redis 不可用快速失败）"]
+        CKPT[("Checkpointer<br/>thread_id 会话持久化<br/>支撑 SSE 断线续接")]
+
+        MEM --- CKPT
+    end
+
+    %% ==================== 五、外部依赖 ====================
+    subgraph DEP["五、外部依赖"]
+        direction LR
+        LLMEXT["OpenAI 兼容 LLM API<br/>DeepSeek / Qwen / GLM / Kimi / OpenAI<br/>仅改 .env 三项即可切换厂商"]
+        ESDB[("Elasticsearch :19200<br/>nginx-log-raw · matched_logs<br/>auditweaver-rag-corpus")]
+        MYDB[("MySQL :13306<br/>analysis_report")]
+        REDISDB[("Redis :16379<br/>Checkpointer（可选）")]
+    end
+
+    %% ==================== 跨层连线 ====================
+    STREAMPY ==>|"按 agent_type 路由到对应 graph"| GRAPHS
+    TOOLS -->|"工具调用"| MCPCLIENT
+    RETRIEVE -->|"检索语料"| RAG
+    RAG -->|"ES 查询"| ESDB
+    AGENTN & PLAN & DEC & ANALYZEN -->|"ChatOpenAI 兼容调用"| LLMGW
+    LLMGW --> LLMEXT
+    T1 & T2 --> ESDB
+    T3 --> MYDB
+    CKPT -.-> REDISDB
+
+    %% ---------- 应用样式 ----------
+    class BROWSER,NEXTJS,DJANGO,FAPI,STREAMPY,SSEEV chain
+    class PLAN,AGENTN,TOOLS,DEC,COMPACT,FIN,RETRIEVE,ANALYZEN,ENRICH,REPORT graphnode
+    class GATE,VALIDATE gate
+    class MCPCLIENT,WRAPPER,MCPSEVER,T1,T2,T3 mcp
+    class LLMGW,RAG,MEM,CKPT shared
+    class ESDB,MYDB,REDISDB store
+    class LLMEXT ext

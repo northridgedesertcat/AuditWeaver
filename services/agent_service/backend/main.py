@@ -23,6 +23,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .routes import agent as agent_routes
 from .routes import health as health_routes
+from .routes import threads as threads_routes
 from .routes import workflow as workflow_routes
 
 # 触发所有 agent 注册(agents/__init__.py 会调用 register_agent)
@@ -41,6 +42,7 @@ app.add_middleware(
 app.include_router(health_routes.router)
 app.include_router(agent_routes.router)
 app.include_router(workflow_routes.router)
+app.include_router(threads_routes.router)
 
 
 @app.get("/")
