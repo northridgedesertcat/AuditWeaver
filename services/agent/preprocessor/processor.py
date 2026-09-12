@@ -227,3 +227,34 @@ def build_report_record(raw_message: Dict[str, Any], result: AnalysisResult) -> 
         'raw_response': result.raw_response,
         'original_log': raw_message,
     }
+
+
+def build_degraded_result(raw_message: Dict[str, Any]) -> AnalysisResult:
+    """熔断打开期的降级结果:仅保留规则匹配字段,AI 字段全空。
+
+    由 CircuitBreaker.call(fallback=...) 在熔断打开时调用,不调用分析后端。
+    build_report_record 会用 raw_message 补齐规则字段(detect_type/ip 等),
+    AI 字段留空,raw_response 内嵌降级标记便于下游查询。
+
+    注意 risk_score=0:analysis_report.risk_score 列为 NOT NULL DEFAULT 0,
+    无法用 NULL 表示"无评分"。0 在此是 NOT NULL 约束下的占位符,语义为
+    "未评估",不代表"低风险"。消费者必须先查 raw_response.degraded 再用
+    risk_score,详见方案 2.5 节消费者契约。
+    """
+    # 延迟导入,规避 preprocessor ↔ analysis 循环(analysis.dify_backend 导入 preprocessor)
+    from analysis.base import AnalysisResult as _AnalysisResult
+
+    log_data = _extract_log_data(raw_message)
+    log_id = log_data.get('event_id', 'unknown')
+    return _AnalysisResult(
+        status='degraded',
+        log_id=log_id,
+        risk_level='unknown',
+        risk_score=0,  # NOT NULL 占位,语义"未评估";非"低风险",见方案 2.5
+        attack_type_ai='',
+        summary='',
+        reasoning=[],
+        recommendations=[],
+        raw_response={'degraded': True, 'reason': 'circuit_open'},
+        error=None,
+    )

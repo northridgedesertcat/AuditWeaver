@@ -22,7 +22,7 @@ from broker import LogAnalysisConsumer
 from repository import MySQLReportRepository
 from analysis import get_analysis_backend
 from common.env import ANALYSIS_BACKEND
-from preprocessor import build_report_record
+from preprocessor import build_report_record, build_degraded_result
 
 logging.basicConfig(
     level=getattr(logging, LOG_CONFIG['level']),
@@ -38,12 +38,13 @@ class AgentMain:
         self.dlq_producer = None
         self.analysis_backend = None
         self.running = False
-        # 线性退避重试(配置见 agent.yaml process 段,等待序列 2s/4s/6s)
+        # 线性退避重试(配置见 agent.yaml process 段,等待序列 2s/4s/6s + jitter)
         # 分析后端:analyze 吞异常返回 AnalysisResult(status='failed'),按结果重试
         self.dify_retry = Retry(
             max_retries=PROCESS_CONFIG['retry_times'],
             base_delay=PROCESS_CONFIG['retry_delay'],
             max_delay=PROCESS_CONFIG['retry_max_delay'],
+            jitter=PROCESS_CONFIG['retry_jitter'],
             retry=retry_if_result(lambda r: r.status == 'failed'),
             retry_error_callback=lambda rs: rs.outcome.result(),
         )
@@ -52,6 +53,7 @@ class AgentMain:
             max_retries=PROCESS_CONFIG['retry_times'],
             base_delay=PROCESS_CONFIG['retry_delay'],
             max_delay=PROCESS_CONFIG['retry_max_delay'],
+            jitter=PROCESS_CONFIG['retry_jitter'],
             retry=retry_if_result(lambda sent: sent is False),
             retry_error_callback=lambda rs: rs.outcome.result(),
         )
@@ -110,18 +112,24 @@ class AgentMain:
         event_id = raw_message.get('event_id', 'unknown')
 
         try:
-            # 熔断包在重试外层:单条消息走完整线性退避重试,彻底失败计 1 次熔断失败;
-            # 熔断打开时抛 CircuitOpenError(不再调用后端),消息快速失败进 DLQ
+            # 熔断包在重试外层:单条消息走完整线性退避重试(含 jitter),彻底失败计 1 次熔断失败;
+            # 熔断打开时走 fallback 产出降级报告(仅规则匹配),不调用后端,落库后 offset 正常提交;
+            # 半开探测期放行真实 analyze(走重试,不走 fallback),探测恢复见 CircuitBreaker 状态机
             response = self.dify_breaker.call(
                 lambda msg: self.dify_retry.call(self.analysis_backend.analyze, msg),
                 raw_message,
                 result_is_failure=lambda r: r.status == 'failed',
+                fallback=lambda msg: build_degraded_result(msg),
             )
 
-            if response.status == 'success':
+            # 降级(status='degraded')与成功(status='success')同走落库路径:
+            # 降级报告 AI 字段全空、规则字段完整,走成功路径不进 DLQ(降级是"产出报告",非"失败")
+            if response.status in ('success', 'degraded'):
+                if response.status == 'degraded':
+                    logger.warning(f'降级产出(仅规则匹配): event_id={event_id}')
                 record = build_report_record(raw_message, response)
                 if self.send_retry.call(self.report_repo.upsert, record):
-                    logger.info(f'Processed: event_id={event_id}')
+                    logger.info(f'Processed: event_id={event_id}, status={response.status}')
                     return True
                 else:
                     logger.error(f'MySQL write failed: event_id={event_id}')

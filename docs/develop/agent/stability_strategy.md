@@ -57,7 +57,8 @@ log.analysis
 
 - `retry_times=3` → 最多重试 3 次(首次 + 3 次重试 = 最多 4 次真实调用)
 - `base_delay=2` → 第 n 次重试前等待 `2n` 秒,封顶 `max_delay=10`
-- 实际等待序列:**2s → 4s → 6s**(单条消息最坏额外 12s)
+- `retry_jitter=0.5` → 叠加 `wait_random(0, base×jitter=1)`,防多消费者并发重试惊群
+- 实际等待序列:**2s+jitter → 4s+jitter → 6s+jitter**(jitter ∈ [0,1),单条最坏 ≈13s)
 
 ### 2.3 关键语义(易踩坑)
 
@@ -87,16 +88,18 @@ response = self.dify_breaker.call(
 
 | 配置(agent.yaml) | 默认值 | 含义 |
 |---|---|---|
-| `fail_max` | 5 | 连续失败条数阈值,达到即熔断 |
+| `fail_max` | 3 | 连续失败条数阈值(每条重试耗尽计 1 次),达到即熔断 |
 | `reset_timeout` | 30 | 冷却秒数,熔断 30s 后才放行探测 |
 | `success_threshold` | 2 | 半开状态连续成功 2 条才恢复(防抖动) |
 
 ```
-CLOSED ──连续 5 条失败──► OPEN(拒绝调用,快速失败)
-OPEN   ──30s 后下一次调用──► HALF_OPEN(放行 1 条真实调用)
+CLOSED ──连续 3 条彻底失败(每条重试耗尽)──► OPEN(走 fallback 降级落库)
+OPEN   ──30s 后下一次调用──► HALF_OPEN(放行 1 条真实调用,含重试,不走 fallback)
 HALF_OPEN ──连续 2 条成功──► CLOSED
-HALF_OPEN ──1 条失败──► OPEN(重新计时)
+HALF_OPEN ──1 条最终失败──► OPEN(重新计时,继续降级)
 ```
+
+> 计数语义:熔断器按"一次完整 analyze 调用最终结果"计 1 次,不按 Retry 内部每次尝试计数。单条消息 Retry 3 次全失败只计 1 次熔断失败,需 3 条消息连续彻底失败才 OPEN。
 
 状态变化经 `on_state_change` 回调打 warning 日志(`Dify 熔断器状态变化: closed -> open`),便于监控。
 
@@ -104,15 +107,22 @@ HALF_OPEN ──1 条失败──► OPEN(重新计时)
 
 `analyze_log` 吞异常返回 `{'status': 'failed'}`,而 PyBreaker 只认"抛异常"为失败。封装层用内部桥接异常实现:`result_is_failure` 命中 → 计 1 次熔断失败,**但返回值仍原样返回**,`process_log` 既有分支零改动。
 
-熔断打开时抛项目统一 `CircuitOpenError`(是 `Exception` 子类,可被 `process_log` 的 `except Exception` 捕获)→ 消息快速失败进 DLQ。
+熔断打开时走 `fallback=build_degraded_result` 返回降级结果(不抛 `CircuitOpenError`),降级报告走落库路径不进 DLQ(见 3.4)。仅在未传 `fallback` 时才抛 `CircuitOpenError`。
 
-### 3.4 熔断期消息去向(落地决策)
+### 3.4 熔断期消息去向(降级落库)
 
-当前实现:熔断打开期每条消息快速失败进 DLQ(`failure_reason='processing_exception'`)。**已知副作用**:30s 熔断期内消息会持续进 DLQ,量可能激增。备选方案(未实施,记录备查):
+熔断打开期消息**照常消费**,走 `dify_breaker.call(fallback=...)` 的降级路径:不调用分析后端,由 `build_degraded_result` 产出**仅规则匹配**的降级报告(`AnalysisResult(status='degraded')`,AI 字段全空,`raw_response={'degraded': True, 'reason': 'circuit_open'}`),经 `build_report_record` 落 MySQL,offset 正常提交。
 
-1. 熔断期暂停消费(pause consumer),恢复后重新消费(**推荐**,offset 天然支持);
+- **不丢数据**:降级报告进了 `analysis_report` 表(规则字段完整,AI 字段空缺);
+- **不积压 offset**:降级走成功路径,offset 天然推进;
+- **DLQ 不激增**:降级报告不进 DLQ(降级是"产出报告",非"失败")。
+
+> 取代了旧方案"熔断期快速失败进 DLQ"。降级已覆盖"熔断期仍产出报告"的诉求,且实现更简单,无需 pause/resume 消费者。降级唯一标识:`raw_response.degraded=True`(risk_score=0 是 NOT NULL 占位,非"低风险",消费者须先查 degraded 标记再用 risk_score)。
+
+备选方案(已被降级取代,记录备查):
+1. 熔断期暂停消费(pause consumer)——降级方案更简单,无需 pause/resume;
 2. 熔断期消息送回原 topic 延迟重投;
-3. 维持现状进 DLQ,配合 DLQ 监控告警兜底。
+3. 维持快速失败进 DLQ——已被降级取代。
 
 ---
 
@@ -147,14 +157,15 @@ msg-1 首次 failed → 重试 2s → 成功
 → 熔断计成功,消息正常入库。无 DLQ、无熔断。
 ```
 
-### 场景 B:Dify 持续过载(熔断全流程)
+### 场景 B:Dify 持续过载(熔断 + 降级全流程)
 
 ```
-msg-1..5 每条重试 3 次全失败 → 熔断计 5 次失败 → OPEN(真实调用 5×4=20 次)
-msg-6..N 熔断期:每条直接 CircuitOpenError → 快速失败进 DLQ(Dify 零调用)
-30s 后 HALF_OPEN:放行 1 条真实调用
-   ├─ 成功 → 再放行 1 条,连续 2 条成功 → CLOSED 恢复
-   └─ 失败 → 重新 OPEN,再等 30s
+msg-1..3 每条重试 3 次(jitter)全失败 → 熔断计 3 次失败 → OPEN(真实调用 3×4=12 次)
+msg-4..N 熔断 OPEN 期:走 fallback → 降级报告(仅规则匹配)落库 → offset 正常提交
+                     (后端零调用,DLQ 不激增)
+30s 后 HALF_OPEN:放行 1 条真实探测调用(走重试,不走 fallback)
+   ├─ 成功 → 再放行 1 条,连续 2 条成功 → CLOSED(恢复全量 AI)
+   └─ 最终失败 → 重新 OPEN,继续降级,再等 30s
 ```
 
 ### 场景 C:Kafka 不可用
@@ -177,9 +188,10 @@ process:
   retry_times: 3        # → 重试次数(不含首次)
   retry_delay: 2        # → 线性退避基数(s)
   retry_max_delay: 10   # → 单次等待上限(s)
+  retry_jitter: 0.5     # → 抖动比例 [0,1),叠加 wait_random(0, base×jitter)
 
 circuit_breaker:
-  fail_max: 5           # → 连续失败条数阈值
+  fail_max: 3           # → 连续失败条数阈值(每条重试耗尽计 1 次)
   reset_timeout: 30     # → 冷却秒数
   success_threshold: 2  # → 半开恢复所需连续成功条数
 ```
@@ -195,7 +207,7 @@ circuit_breaker:
 | 3 | **kafka-python 内部 retries** | `connect()`/`send_dlq` 底层 `retries=3` 是 broker 层重试,与应用层重试是两层语义,不冲突 |
 | 4 | **熔断白名单语义** | 若给熔断器配 `exceptions` 白名单,注意 PyBreaker 对白名单外异常是**重置失败计数**(视为业务异常/服务健康),而非简单忽略 |
 | 5 | **熔断器生成器限制** | 封装层 `call()` 面向普通同步函数;传入生成器函数时其内容不会被消费(设计目标内不适用 agent) |
-| 6 | **熔断期 DLQ 激增** | 见 3.4,落地了"熔断期快速失败进 DLQ"选项,监控上需关注 DLQ 量 |
+| 6 | **熔断期降级产出** | 见 3.4,熔断打开期走 fallback 产出降级报告(仅规则匹配)落库,不进 DLQ;监控上需关注降级报告占比(查 `raw_response.degraded=True`) |
 | 7 | **`Retry`/`CircuitBreaker` 实例复用** | 均在 `__init__` 预构建,线程安全,可全局单例复用 |
 
 ---
@@ -205,7 +217,7 @@ circuit_breaker:
 | 现象 | 日志/字段 | 原因与处置 |
 |---|---|---|
 | 消息持续进 DLQ 且 `failure_reason=dify_analysis_failed` | 前有 `第 N/M 次重试` warning | Dify 业务/网络失败,重试耗尽。查 Dify 服务状态 |
-| 消息快速进 DLQ 且 `failure_reason=processing_exception` | `Dify 熔断器状态变化: closed -> open` + `CircuitOpenError` | 熔断打开中,等待 30s 冷却或人工检查 Dify 健康 |
+| 消息落库但 `raw_response.degraded=True` | `熔断器状态变化: closed -> open` + `降级产出(仅规则匹配)` | 熔断打开中走 fallback 降级,等待 30s 冷却后半开探测恢复,或人工检查 Dify 健康 |
 | 消息进 DLQ 且 `failure_reason=kafka_send_failed` | `Kafka send failed` | Kafka broker 不可达,查 broker / 网络 |
 | 重试耗尽却报 `RetryError` | `RetryError` 堆栈 | 新增的重试接入点**漏了 `retry_error_callback`**,补上(见 2.3) |
 | 熔断从不触发 | `fail_counter` 恒 0 | 检查 `result_is_failure` 是否配置(返回值桥接),或 exceptions 白名单误排除了桥接异常 |
@@ -219,6 +231,7 @@ circuit_breaker:
 | 单元测试 | [test_circuit_breaker.py](../../../core/stable/circuit_breaker/test_circuit_breaker.py) | 熔断器 23 用例(unittest) |
 | 单元测试 | [test_retry.py](../../../core/stable/retry/test_retry.py) | 重试 22 用例(unittest) |
 | agent 集成 | [test_main_retry.py](../../../services/agent/tests/test_main_retry.py) | 重试接入 process_log(6 用例) |
+| agent 集成 | [test_main_degradation.py](../../../services/agent/tests/test_main_degradation.py) | 降级 + 熔断计数语义 + Half-Open + risk_score 契约(21 用例) |
 | 场景脚本 | [test_circuit_breaker_scenarios.py](../../../devtools/test/stable/test_circuit_breaker_scenarios.py) | 状态机全流程 34 项 |
 | 场景脚本 | [test_breaker_retry_integration.py](../../../devtools/test/stable/test_breaker_retry_integration.py) | 重试+熔断组合(agent 场景)18 项 |
 | 场景脚本 | [test_edge_cases.py](../../../devtools/test/stable/test_edge_cases.py) | 边界与缺陷回归 15 项 |
@@ -235,3 +248,4 @@ circuit_breaker:
 | 2026-08-16 | 接入 Dify 熔断:dify_breaker 包在重试外层,agent.yaml 新增 `circuit_breaker` 段,settings.py 新增 `CIRCUIT_CONFIG` |
 | 2026-08-16 | 修复熔断缺陷:`exceptions` 白名单不含 Exception 时 `result_is_failure` 桥接失效(桥接异常被误排除);补充 devtools 场景测试 |
 | 2026-08-16 | 本文档创建,汇总三层稳定性策略 |
+| 2026-09-11 | 接入熔断降级:`dify_breaker.call` 传 `fallback=build_degraded_result`,熔断打开期产出仅规则匹配的降级报告落库(不进 DLQ);`fail_max` 5→3;重试启用 `jitter=0.5` 防惊群;3.4 节熔断期去向改"降级落库";新增 [test_main_degradation.py](../../../services/agent/tests/test_main_degradation.py)(21 用例,含熔断计数语义、Half-Open+Retry、risk_score 消费者契约)。详见 [agent_degradation_plan.md](../stable/agent_degradation_plan.md) |

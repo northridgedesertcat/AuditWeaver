@@ -108,8 +108,14 @@ class AgentRetryIntegrationTests(unittest.TestCase):
         with mock.patch('time.sleep') as sleep_mock:
             self.agent.process_log(self.raw)
 
-        # 线性退避:2s -> 4s -> 6s(config: retry_delay=2, retry_max_delay=10)
-        self.assertEqual([c.args[0] for c in sleep_mock.call_args_list], [2.0, 4.0, 6.0])
+        # 线性退避基数 2s -> 4s -> 6s(config: retry_delay=2, retry_max_delay=10)
+        # 启用 jitter=0.5 后叠加 wait_random(0, base*jitter=1),实际等待 = 基数 + [0,1)
+        # 断言基数线性递增,且 jitter 叠加量在 [0, 1) 区间
+        delays = [c.args[0] for c in sleep_mock.call_args_list]
+        self.assertEqual(len(delays), 3)
+        for i, (actual, base) in enumerate(zip(delays, [2.0, 4.0, 6.0]), 1):
+            self.assertGreaterEqual(actual, base, f'第 {i} 次重试等待不应低于线性基数 {base}')
+            self.assertLess(actual, base + 1.0, f'第 {i} 次重试等待应 < {base + 1.0}(基数+jitter上限)')
 
     def test_upsert_retries_then_succeeds(self) -> None:
         self.agent.analysis_backend.analyze.return_value = _success_result()

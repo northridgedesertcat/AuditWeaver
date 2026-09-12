@@ -25,10 +25,13 @@ process:
   retry_times: 3
   retry_delay: 2
   retry_max_delay: 10
+  # 抖动比例 [0,1),叠加随机等待 [0, 2×0.5)=1s,防多消费者并发重试惊群
+  retry_jitter: 0.5
 
 # Dify 熔断策略:连续 fail_max 条消息处理失败后熔断 reset_timeout 秒,
 # 半开状态下连续 success_threshold 条成功才恢复(给 Dify 过载时喘息机会)
 circuit_breaker:
-  fail_max: 5
+  # 连续 3 条彻底失败(每条重试耗尽)即熔断:3 条 × 4 次真实调用 = 最多 12 次真实失败
+  fail_max: 3
   reset_timeout: 30
   success_threshold: 2

@@ -48,6 +48,7 @@ PROCESS_CONFIG = {
     'retry_times': _cfg['process']['retry_times'],
     'retry_delay': _cfg['process']['retry_delay'],
     'retry_max_delay': _cfg['process'].get('retry_max_delay', 10),
+    'retry_jitter': _cfg['process'].get('retry_jitter', 0.0),  # 默认 0 兼容旧配置
 }
 
 CIRCUIT_CONFIG = {
