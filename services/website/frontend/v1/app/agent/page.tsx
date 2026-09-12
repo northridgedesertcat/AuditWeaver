@@ -36,6 +36,7 @@ interface Message {
   content: string
   timestamp: number
   isLoading?: boolean
+  status?: string
   actions?: { label: string; action: string }[]
   data?: {
     type: "threat" | "logs" | "analysis" | "code"
@@ -153,6 +154,22 @@ export default function AgentPage() {
               msg.id === assistantId
                 ? { ...msg, content: msg.content + `[${tool}: ${summary}]\n` }
                 : msg
+            )
+          )
+        },
+        onNodeStart: (_node, label) => {
+          // 节点开始执行:更新 loading 态的状态文案(token 到达后仍保留最近一次状态)
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === assistantId ? { ...msg, status: label } : msg
+            )
+          )
+        },
+        onStatus: (label) => {
+          // LLM 正在生成工具调用/结构化结果(无文本 token 期间的状态更新)
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === assistantId ? { ...msg, status: label } : msg
             )
           )
         },
@@ -351,7 +368,15 @@ export default function AgentPage() {
                       {message.isLoading && !message.content ? (
                         <div className="flex items-center gap-2">
                           <Loader2 className="h-4 w-4 animate-spin" />
-                          <span className="text-sm">正在分析...</span>
+                          <span className="text-sm">
+                            {message.status || "正在分析..."}
+                          </span>
+                        </div>
+                      ) : message.isLoading ? (
+                        // 已收到 token 但仍在生成:保留 spinner + 最新步骤状态
+                        <div className="flex items-center gap-2 mb-2 text-xs text-muted-foreground">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          <span>{message.status || "生成中..."}</span>
                         </div>
                       ) : (
                         <div className="text-sm whitespace-pre-wrap prose prose-sm dark:prose-invert max-w-none">

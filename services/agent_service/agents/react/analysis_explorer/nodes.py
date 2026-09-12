@@ -44,7 +44,7 @@ import logging
 from typing import Any
 
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import AIMessage, BaseMessage, SystemMessage
+from langchain_core.messages import AIMessage, AIMessageChunk, BaseMessage, SystemMessage
 from langgraph.prebuilt import ToolNode
 
 from shared.llm.factory import get_llm
@@ -447,6 +447,8 @@ async def agent_node(state: dict) -> dict:
       "保留最近 N 轮"),靠结构化字段(summary+evidence)承载历史,省 token
     - compact_count == 0 时用全部 messages(首轮或未压缩,完整历史)
     - 保留 v1 的 bind_tools ReAct 内核(LLM 自主决定调工具还是直接回答)
+    - 用 astream 逐 chunk 累积(替代 ainvoke):让 graph.astream_events 能收到
+      on_chat_model_stream 事件,前端逐 token 渲染最终回答,避免"卡很久才一次性返回"
 
     返回 {"messages": [response]}(对齐 v1,LanguagesGraph messages reducer 累加)。
     """
@@ -466,7 +468,26 @@ async def agent_node(state: dict) -> dict:
     else:
         recent = messages
     full_messages = [SystemMessage(content=system_text)] + recent
-    response = await llm_with_tools.ainvoke(full_messages)
+
+    # 流式累积:astream 触发 on_chat_model_stream 回调,沿 graph.astream_events 上抛;
+    # 合并所有 chunk 得到完整 AIMessage(content + tool_calls),对齐原 ainvoke 返回类型。
+    full: AIMessageChunk | None = None
+    async for chunk in llm_with_tools.astream(full_messages):
+        if full is None:
+            full = chunk
+        else:
+            full = full + chunk
+    if full is None:
+        response = AIMessage(content="")
+    else:
+        # AIMessageChunk + AIMessageChunk 仍是 AIMessageChunk;转为 AIMessage
+        # 确保 graph state 的 messages 类型与原 ainvoke 一致(避免下游 isinstance 判断偏差)
+        response = AIMessage(
+            content=full.content,
+            tool_calls=full.tool_calls,
+            id=full.id,
+            response_metadata=getattr(full, "response_metadata", {}),
+        )
     return {"messages": [response]}
 
 

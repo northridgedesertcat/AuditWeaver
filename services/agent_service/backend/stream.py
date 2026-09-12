@@ -11,6 +11,7 @@ v2.1 升级(对齐 §3.3 + §3.9):
   节点/LLM/工具调用落盘 logs/agent_trace.jsonl(对齐 §3.9 轻量 Tracing)。
 """
 import json
+import time
 from typing import AsyncIterator
 
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
@@ -19,12 +20,28 @@ from .trace import get_trace_callback
 
 
 def sse_line(data: dict) -> str:
-    """SSE 单行:data: {...}\\n\\n"""
-    return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+    """SSE 单行:data: {...}\\n\\n
+
+    自动注入 ts(毫秒时间戳),用于跨层(8001/8000/3000)比对事件到达时间,
+    精准定位哪一层发生缓冲(纯加性,不改事件语义,前端可忽略此字段)。
+    """
+    payload = {"ts": int(time.time() * 1000), **data}
+    return f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
 
 
 # Agent 升级后需要发 SSE 事件的节点(对齐 §3.3 "plan/decision/compact" + gate)
 _NODE_SSE_NODES = {"plan", "deterministic_gate", "decision_llm", "compact"}
+
+# 节点中文名:on_chain_start 时发 node_start 事件,前端 loading 态即时显示"正在做什么"
+# 避免 plan/decision/compact 等结构化节点(非流式)执行期间前端只看到"正在分析..."
+_NODE_LABELS: dict[str, str] = {
+    "plan": "生成调查计划",
+    "agent": "分析中",
+    "tools": "执行工具",
+    "deterministic_gate": "评估门控",
+    "decision_llm": "决策下一步",
+    "compact": "压缩上下文",
+}
 
 
 def _node_event_to_sse(node_name: str, output) -> dict | None:
@@ -161,16 +178,37 @@ async def stream_agent_chat(
     config = _build_config(ns_thread)
     inputs = _build_inputs(message, history, thread_id)
 
+    # 跟踪当前节点 + 本轮 LLM 是否已发过"正在生成工具调用"状态
+    # (function_calling 结构化输出 / bind_tools 工具调用都走 tool_call_chunks,
+    #  不产出文本 token,期间前端需要知道 LLM 在做什么,否则只看到"分析中"无反馈)
+    current_node: str = ""
+    tool_call_status_sent: bool = False
+
     try:
         async for event in graph.astream_events(inputs, config=config, version="v2"):
             kind = event.get("event")
             data = event.get("data", {}) or {}
 
-            if kind == "on_chat_model_stream":
+            if kind == "on_chat_model_start":
+                # 新一轮 LLM 调用开始,重置"工具调用状态已通知"标记
+                tool_call_status_sent = False
+
+            elif kind == "on_chat_model_stream":
                 chunk = data.get("chunk")
                 content = getattr(chunk, "content", None)
                 if isinstance(content, str) and content:
                     yield sse_line({"type": "token", "content": content})
+                else:
+                    # 无文本 content:可能在生成 tool_call_chunks(结构化输出或工具调用)
+                    tc = getattr(chunk, "tool_call_chunks", None)
+                    if tc and not tool_call_status_sent:
+                        tool_call_status_sent = True
+                        # agent 节点调工具 vs plan/decision/compact 结构化输出,文案区分
+                        if current_node == "agent":
+                            label = "正在决定调用哪个工具"
+                        else:
+                            label = _NODE_LABELS.get(current_node, "正在生成结构化结果")
+                        yield sse_line({"type": "status", "label": label})
 
             elif kind == "on_tool_start":
                 yield sse_line({
@@ -185,6 +223,15 @@ async def stream_agent_chat(
                     "tool": event.get("name"),
                     "summary": _summarize_tool_output(data.get("output")),
                 })
+
+            elif kind == "on_chain_start":
+                # 节点开始执行:发 node_start,让前端 loading 态显示当前步骤
+                metadata = event.get("metadata") or {}
+                node_name = metadata.get("langgraph_node") or ""
+                current_node = node_name
+                label = _NODE_LABELS.get(node_name)
+                if label:
+                    yield sse_line({"type": "node_start", "node": node_name, "label": label})
 
             elif kind == "on_chain_end":
                 # 节点名从 metadata.langgraph_node 取(astream_events v2 契约)

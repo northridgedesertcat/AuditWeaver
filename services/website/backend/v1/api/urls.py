@@ -1,4 +1,4 @@
-from django.urls import path, include
+from django.urls import path, re_path, include
 from .views import (
     HealthCheckView,
     DashboardStatsView,
@@ -50,10 +50,12 @@ urlpatterns = [
 
     # Agent Service 反代(Django → 内部 FastAPI :8001)
     # agent_type 作为路径变量,一版合法值:analysis_explorer;新增 agent 无需改此路由
-    path('agent/<str:agent_type>/chat', AgentProxyView.as_view(), name='agent_chat'),
-    path('agent/<str:agent_type>/chat/sync', AgentProxyView.as_view(), name='agent_chat_sync'),
-    path('agent/health', AgentProxyView.as_view(), name='agent_health'),
-    path('agent/types', AgentProxyView.as_view(), name='agent_types'),
+    # 用 re_path + /?$ 同时接受有/无尾斜杠:避免 next.config trailingSlash=true
+    # 与前端 URL 斜杠不一致时触发 308 重定向(SSE 流跟随重定向会被缓冲)
+    re_path(r'^agent/(?P<agent_type>\w+)/chat/?$', AgentProxyView.as_view(), name='agent_chat'),
+    re_path(r'^agent/(?P<agent_type>\w+)/chat/sync/?$', AgentProxyView.as_view(), name='agent_chat_sync'),
+    re_path(r'^agent/health/?$', AgentProxyView.as_view(), name='agent_health'),
+    re_path(r'^agent/types/?$', AgentProxyView.as_view(), name='agent_types'),
 ]
 
 # Accounts(登录鉴权)

@@ -7,6 +7,8 @@ export type AgentEventType =
   | "token"
   | "tool_call"
   | "tool_result"
+  | "node_start"
+  | "status"
   | "done"
   | "error"
 
@@ -16,12 +18,16 @@ export interface AgentEvent {
   tool?: string
   args?: Record<string, unknown>
   summary?: string
+  node?: string
+  label?: string
 }
 
 export interface StreamAgentChatOptions {
   onToken?: (text: string) => void
   onToolCall?: (tool: string, args: Record<string, unknown>) => void
   onToolResult?: (tool: string, summary: string) => void
+  onNodeStart?: (node: string, label: string) => void
+  onStatus?: (label: string) => void
   onDone?: () => void
   onError?: (message: string) => void
   signal?: AbortSignal
@@ -39,6 +45,12 @@ function dispatch(evt: AgentEvent, opts: StreamAgentChatOptions) {
       break
     case "tool_result":
       opts.onToolResult?.(evt.tool || "", evt.summary || "")
+      break
+    case "node_start":
+      opts.onNodeStart?.(evt.node || "", evt.label || "")
+      break
+    case "status":
+      opts.onStatus?.(evt.label || "")
       break
     case "error":
       opts.onError?.(evt.content || "unknown error")
@@ -73,7 +85,9 @@ export async function streamAgentChat(
   // 走 apiFetch:自动带 Bearer token;401 时自动 refresh 并重试一次。
   // SSE 同样适用——apiFetch 返回的是最终 Response,拿到后再开始读流。
   // 若 refresh 也失败,apiFetch 会清空 token 并跳转登录页。
-  const resp = await apiFetch(`/agent/${agentType}/chat`, {
+  // 注意:尾斜杠不可省。next.config trailingSlash=true 会把无斜杠 URL 308 重定向到带斜杠,
+  // 浏览器跟随 308 时 SSE 流会被缓冲,导致"转半天才一次性返回"。
+  const resp = await apiFetch(`/agent/${agentType}/chat/`, {
     method: "POST",
     headers: { Accept: "text/event-stream" },
     body: JSON.stringify({ message, thread_id: threadId, history: [] }),
@@ -118,7 +132,7 @@ export async function chatSync(
   toolCalls: { tool: string; args: Record<string, unknown>; summary: string }[]
   threadId: string | null
 }> {
-  const resp = await apiFetch(`/agent/${agentType}/chat/sync`, {
+  const resp = await apiFetch(`/agent/${agentType}/chat/sync/`, {
     method: "POST",
     body: JSON.stringify({ message, thread_id: threadId, history: [] }),
   })
