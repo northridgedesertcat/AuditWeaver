@@ -1,0 +1,63 @@
+%% ============================================================
+%% AuditWeaver 简化版架构图（适合简历 / 项目介绍）
+%% 与完整版同一套代码事实，仅做信息压缩
+%% ============================================================
+flowchart LR
+
+    classDef pub fill:#E3F2FD,stroke:#1565C0,color:#0D47A1
+    classDef app fill:#E8F5E9,stroke:#2E7D32,color:#1B5E20
+    classDef pipe fill:#F3E5F5,stroke:#6A1B9A,color:#4A148C
+    classDef store fill:#FFEBEE,stroke:#C62828,color:#B71C1C
+
+    USER["用户 / 浏览器"]
+
+    subgraph WEB["Web 应用层"]
+        direction LR
+        NEXT["Next.js 16<br/>SSE 逐行渲染"]
+        DJANGO["Django REST<br/>JWT 鉴权 · SSE 反代"]
+    end
+
+    subgraph AI["AI Agent 服务（内网 :8001）"]
+        direction LR
+        AGENT["FastAPI + LangGraph<br/>Plan/ReAct + 确定性门控<br/>decision_llm + Compact 压缩"]
+        SKILLS["MCP Skills<br/>查日志 / 查事件 / 查报告"]
+    end
+
+    subgraph PIPE["Kafka 实时日志管道"]
+        direction LR
+        RAW(("log.raw")) --> LS["Logstash"] --> ST(("log.structured"))
+        ST --> RULE["RuleEngine<br/>正则规则检测"] --> AN(("log.analysis"))
+        AN --> DIFY["Agent Module<br/>Dify AI 分析"]
+    end
+
+    subgraph DATA["数据与中间件"]
+        direction LR
+        ES[("Elasticsearch<br/>日志 / 告警事件 / RAG 语料")]
+        MYSQL[("MySQL<br/>AI 报告 / 工单 / 用户")]
+        REDIS[("Redis<br/>缓存 / Agent 记忆")]
+    end
+
+    LLM["OpenAI 兼容 LLM<br/>DeepSeek / Qwen / GLM / Kimi"]
+
+    USER -->|"HTTPS"| NEXT
+    NEXT -->|"REST + SSE"| DJANGO
+    DJANGO -->|"httpx 流式反代"| AGENT
+
+    AGENT <==> SKILLS
+    AGENT <==>|"Function Calling"| LLM
+
+    DJANGO --> ES
+    DJANGO --> MYSQL
+    DJANGO --> REDIS
+    SKILLS -->|"只读"| ES
+    SKILLS -->|"只读"| MYSQL
+    AGENT -.->|"Checkpointer（可选）"| REDIS
+
+    ST -->|"Kafka Connect"| ES
+    RULE -->|"rule.event.save → Connect"| ES
+    DIFY -->|"报告落库"| MYSQL
+
+    class USER,NEXT pub
+    class DJANGO,AGENT,SKILLS,LLM app
+    class RAW,ST,AN,LS,RULE,DIFY pipe
+    class ES,MYSQL,REDIS store

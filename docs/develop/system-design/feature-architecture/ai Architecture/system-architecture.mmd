@@ -1,0 +1,134 @@
+%% ============================================================
+%% AuditWeaver 系统总体架构图（完整版）
+%% 逆向还原自实际代码，非 README 猜测。依据文件：
+%%   docker/docker-compose.yml                      基础设施容器定义
+%%   scripts/config.py                              start.py 启动编排（顺序/端口/命令）
+%%   docker/config/logstash/pipeline/logstash.conf  log.raw 消费 → log.structured（失败进 log.dlq）
+%%   docker/config/kafka-connect/connectors/        三个 ES Sink 连接器
+%%   docker/config/kafka/topics/topics.yaml         全部 topic 定义与说明
+%%   services/website/frontend/v1/next.config.mjs   trailingSlash=true / compress=false / rewrites
+%%   services/website/backend/v1/api/urls.py        Django 路由表 + Agent 反代 re_path /?$
+%%   services/agent_service/                        FastAPI :8001 + LangGraph + MCP Skills
+%%   services/ruleEngine/config/app.licationyaml    消费 log.structured → 生产 log.analysis / rule.event.save
+%%   services/agent/config/yaml/agent.yaml          消费 log.analysis → MySQL analysis_report（UPSERT）
+%% ============================================================
+flowchart TB
+
+    %% ---------- 样式 ----------
+    classDef public fill:#E3F2FD,stroke:#1565C0,color:#0D47A1
+    classDef internal fill:#E8F5E9,stroke:#2E7D32,color:#1B5E20
+    classDef offline fill:#FFF3E0,stroke:#EF6C00,color:#E65100
+    classDef mq fill:#F3E5F5,stroke:#6A1B9A,color:#4A148C
+    classDef store fill:#FFEBEE,stroke:#C62828,color:#B71C1C
+    classDef ext fill:#ECEFF1,stroke:#455A64,color:#263238
+
+    %% ==================== 公网接入层 ====================
+    subgraph PUB["公网接入层"]
+        direction TB
+        USER["用户浏览器"]
+        NEXT["Next.js Frontend :3000<br/>services/website/frontend<br/>Next 16 + React 19<br/>trailingSlash=true · compress=false（防 SSE 缓冲）"]
+    end
+
+    %% ==================== 应用服务层 ====================
+    subgraph APP["应用服务层（宿主机进程）"]
+        direction TB
+        DJANGO["Django Backend :8000<br/>services/website/backend<br/>DRF + SimpleJWT + corsheaders<br/>re_path /?$ 双斜杠兼容（防 308 缓冲 SSE）"]
+
+        subgraph AGENTSVC["Agent Service (FastAPI) :8001 — 仅绑定 127.0.0.1，对内服务<br/>services/agent_service"]
+            direction TB
+            APIROUTE["backend/routes/agent.py<br/>POST /:agent_type/chat（SSE 流式）<br/>POST /:agent_type/chat/sync（同步）"]
+            STREAM["backend/stream.py<br/>graph.astream_events v2 → SSE<br/>token / status / tool_call / tool_result<br/>node_start / error / done"]
+            LGRAPH["LangGraph 双 Agent（按 agent_type 注册）<br/>· analysis_explorer：Plan → ReAct ⇄ Tools → deterministic_gate → decision_llm → compact<br/>· analysis_workflow：retrieve → analyze → validate → enrich ⇄ → report"]
+            MCP["MCP Skills Server（stdio 子进程）<br/>python -m services.agent_service.skills.server<br/>FastMCP「agent-service-skills」<br/>query_ip_logs / query_security_events / query_analysis_results"]
+        end
+    end
+
+    %% ==================== 离线日志分析层 ====================
+    subgraph OFFLINE["离线日志分析层（宿主机常驻 Kafka 消费进程）"]
+        direction LR
+        RULE["RuleEngine<br/>services/ruleEngine<br/>YAML 正则规则：SQL注入/XSS/命令注入/路径穿越/敏感访问"]
+        DIFYMOD["Agent Module（Dify 管线）<br/>services/agent<br/>Dify workflows/run + 重试/熔断 + DLQ"]
+    end
+
+    %% ==================== 消息队列与流处理 ====================
+    subgraph MQD["消息队列与流处理（Docker Compose）"]
+        direction LR
+        ZK["ZooKeeper :2181"]
+        KAFKA["Kafka :29092（宿主）/:9092（容器内）"]
+        LOGSTASH["Logstash 8.12<br/>grok 解析 nginx combined"]
+        CONNECT["Kafka Connect :8083<br/>log-structured-sink（INSERT）<br/>rule-event-save-sink（UPSERT）<br/>logs-dead-letter-sink"]
+        TRAW(("topic<br/>log.raw"))
+        TSTRUCT(("topic<br/>log.structured"))
+        TANALYSIS(("topic<br/>log.analysis"))
+        TRULE(("topic<br/>rule.event.save"))
+        TDLQ(("topic<br/>log.dlq"))
+        TRISK(("topic log.risk<br/>预留：RiskAssessment 仅有测试脚本"))
+        TISO(("topic isolation.event.save<br/>预留：isolationForest 离线模型模块"))
+    end
+
+    %% ==================== 数据存储 ====================
+    subgraph STORE["数据存储（Docker Compose）"]
+        direction LR
+        MYSQL[("MySQL 8.0 :13306<br/>analysis_report（AI 报告）<br/>incident（处置工单）<br/>用户/角色（ROOT_ADMIN/ADMIN）")]
+        REDIS[("Redis :16379<br/>Django Cache（django-redis，可降级）<br/>LangGraph RedisSaver（可选）")]
+        ES[("Elasticsearch 8.12 :19200<br/>nginx-log-raw（结构化原始日志）<br/>matched_logs（规则命中事件）<br/>auditweaver-rag-corpus（RAG 语料）<br/>logs_dead_letter（死信）")]
+        KIBANA["Kibana :5601"]
+    end
+
+    %% ==================== 外部依赖 ====================
+    EXTLOG["外部 Nginx 日志采集端<br/>（仓库内无 log.raw 生产者代码，需外部接入）"]
+    LLM["外部 LLM（OpenAI 兼容 API）<br/>DeepSeek / Qwen / GLM / Kimi / OpenAI<br/>AE_LLM_BASE_URL / AE_LLM_MODEL 切换"]
+    DIFY["Dify 平台<br/>POST workflows/run（blocking）"]
+
+    %% ==================== 在线请求链路 ====================
+    USER -->|"HTTPS 页面访问 + SSE 逐行渲染"| NEXT
+    NEXT -->|"next.config rewrites：/api/v1/:path* → :8000<br/>JWT Bearer（401 自动 refresh）"| DJANGO
+    DJANGO -->|"AgentProxyView httpx 流式转发<br/>/agent/:agent_type/chat（SSE）"| AGENTSVC
+
+    %% ==================== Django 数据访问 ====================
+    DJANGO -->|"ORM：AnalysisReport / Incident / 用户"| MYSQL
+    DJANGO -->|"Cache"| REDIS
+    DJANGO -->|"日志查询/统计/趋势（LogsView 等）"| ES
+
+    %% ==================== Agent Service 内部与依赖 ====================
+    APIROUTE --> STREAM
+    STREAM --> LGRAPH
+    AGENTSVC -->|"stdio 拉起 MCP 子进程"| MCP
+    LGRAPH -->|"OpenAI 兼容 API<br/>analysis 强模型 / light 弱模型（门控·摘要·压缩）"| LLM
+    LGRAPH -->|"RAG 检索：BM25 + kNN + RRF 融合"| ES
+    LGRAPH -.->|"AE_MEMORY_BACKEND=redis 时<br/>RedisSaver Checkpointer"| REDIS
+    MCP -->|"query_ip_logs（只读）"| ES
+    MCP -->|"query_security_events（只读）"| ES
+    MCP -->|"query_analysis_results（只读）"| MYSQL
+
+    %% ==================== 离线日志数据管道 ====================
+    EXTLOG -->|"生产原始日志"| TRAW
+    TRAW -->|"消费 group=logstash-group"| LOGSTASH
+    LOGSTASH -->|"结构化消息"| TSTRUCT
+    LOGSTASH -->|"grok 解析失败"| TDLQ
+    TSTRUCT -->|"消费 group=rule-engine-group"| RULE
+    RULE -->|"规则命中事件"| TRULE
+    RULE -->|"待 AI 分析事件"| TANALYSIS
+    RULE -->|"处理失败"| TDLQ
+    TANALYSIS -->|"消费 group=agent_analysis_group_v10022"| DIFYMOD
+    DIFYMOD -->|"AI 分析结果 UPSERT analysis_report"| MYSQL
+    DIFYMOD -->|"处理失败"| TDLQ
+    DIFYMOD -->|"Dify Workflow API"| DIFY
+
+    %% ==================== Kafka Connect 落 ES ====================
+    TSTRUCT -->|"log-structured-sink（INSERT）"| CONNECT
+    TRULE -->|"rule-event-save-sink（UPSERT）"| CONNECT
+    TDLQ -->|"logs-dead-letter-sink"| CONNECT
+    CONNECT -->|"批量写入"| ES
+
+    %% ==================== 辅助 ====================
+    ZK ==>|"集群协调"| KAFKA
+    KIBANA -->|"可视化查询"| ES
+
+    %% ---------- 应用样式 ----------
+    class USER,NEXT public
+    class DJANGO,AGENTSVC,APIROUTE,STREAM,LGRAPH,MCP internal
+    class RULE,DIFYMOD offline
+    class ZK,KAFKA,LOGSTASH,CONNECT,TRAW,TSTRUCT,TANALYSIS,TRULE,TDLQ,TRISK,TISO mq
+    class MYSQL,REDIS,ES,KIBANA store
+    class EXTLOG,LLM,DIFY ext

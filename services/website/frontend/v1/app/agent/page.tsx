@@ -29,6 +29,7 @@ import {
 import { cn } from "@/lib/utils"
 import { formatRelative } from "@/lib/time"
 import { streamAgentChat, DEFAULT_AGENT_TYPE } from "@/lib/api/agent"
+import { Markdown } from "@/components/markdown"
 
 interface Message {
   id: string
@@ -373,15 +374,16 @@ export default function AgentPage() {
                           </span>
                         </div>
                       ) : message.isLoading ? (
-                        // 已收到 token 但仍在生成:保留 spinner + 最新步骤状态
-                        <div className="flex items-center gap-2 mb-2 text-xs text-muted-foreground">
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                          <span>{message.status || "生成中..."}</span>
+                        // 流式生成中:状态条 + 已收到内容的增量 Markdown 渲染
+                        <div>
+                          <div className="flex items-center gap-2 mb-2 text-xs text-muted-foreground">
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                            <span>{message.status || "生成中..."}</span>
+                          </div>
+                          <Markdown content={message.content} />
                         </div>
                       ) : (
-                        <div className="text-sm whitespace-pre-wrap prose prose-sm dark:prose-invert max-w-none">
-                          {message.content}
-                        </div>
+                        <Markdown content={message.content} />
                       )}
                     </div>
 
