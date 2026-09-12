@@ -72,8 +72,14 @@ AGENT_CONFIG = {
 RAG_CONFIG: dict = {
     # RAG 语料 ES 索引名(由 evals/build_rag_index.py 创建 + 灌数据)
     'es_index_corpus': get_env('AE_RAG_ES_INDEX', 'auditweaver-rag-corpus'),
-    # embedding 模型:走 light 角色的 base_url/api_key,OpenAI 兼容 embeddings endpoint
+    # embedding 模型:OpenAI 兼容 embeddings endpoint
     'embedding_model': get_env('AE_RAG_EMBEDDING_MODEL', 'text-embedding-3-small'),
+    # embedding 独立 endpoint(chat 厂商可能不提供 embeddings,如 DeepSeek 官方无 /embeddings):
+    # 配了就走专用 embedding 服务商(如硅基流动 BAAI/bge-m3);
+    # 两项都留空 → 回退 light 角色的 base_url/api_key(向后兼容);
+    # 只配一项 → embed.py 显式抛 LLMConfigError(配置不完整不静默)
+    'embedding_base_url': get_env('AE_RAG_EMBEDDING_BASE_URL', ''),
+    'embedding_api_key': get_env('AE_RAG_EMBEDDING_API_KEY', ''),
     # 向量维度(text-embedding-3-small=1536, bge-m3=1024, nomic=768)
     'embedding_dim': get_env_int('AE_RAG_EMBEDDING_DIM', 1536),
     # RRF 融合参数 k:score = 1/(k + rank),k 越大各路排名差异越平滑

@@ -1,9 +1,11 @@
 """Query Embedding —— 走 LLM Gateway light 角色调 OpenAI 兼容 embeddings endpoint。
 
 设计要点(对齐 §3.4 / §3.7):
-- 复用 light 角色的 api_key / base_url(省钱,弱模型足够)
+- embedding 专用 endpoint:AE_RAG_EMBEDDING_BASE_URL / AE_RAG_EMBEDDING_API_KEY
+  (chat 与 embedding 可走不同厂商,如 chat=DeepSeek + embedding=硅基流动 bge-m3);
+  两项都留空时回退 light 角色配置(向后兼容)
 - 不走 ChatOpenAI(那是对话模型),用 openai 库直调 embeddings API
-- 配置缺失(api_key/base_url)显式抛 LLMConfigError,不静默降级(对齐项目原则)
+- 配置缺失/不完整(api_key/base_url)显式抛 LLMConfigError,不静默降级(对齐项目原则)
 - 进程内 LRU 缓存:同 query 文本复用 embedding,避免重复调 API
 - 批量接口 embed_batch:建索引时一次批量多文本,省 API 调用次数
 
@@ -28,20 +30,37 @@ _embed_cache: dict[str, list[float]] = {}
 _client: Any = None  # openai.OpenAI 实例,懒加载
 
 
-def _get_embed_client() -> Any:
-    """懒加载 openai.OpenAI 客户端,复用 light 角色配置。
+def _resolve_embed_credentials() -> tuple[str, str]:
+    """解析 embedding endpoint 凭证,返回 (api_key, base_url)。
 
-    配置缺失显式报错,不静默降级(对齐项目原则)。
+    优先级(对齐 §3.4 / §3.7):
+    1. RAG_CONFIG 的 AE_RAG_EMBEDDING_API_KEY / AE_RAG_EMBEDDING_BASE_URL
+       (embedding 专用服务商,如硅基流动;chat 与 embedding 可走不同厂商)
+    2. 两项都未配 → 回退 light 角色(再回退 analysis),向后兼容
+       (OpenAI 官方等同时提供 chat + embeddings 的厂商无需重复配置)
+
+    只配了其中一项 → 显式抛 LLMConfigError(配置不完整不静默,对齐项目原则)。
     """
-    global _client
-    if _client is not None:
-        return _client
+    emb_api_key = (RAG_CONFIG.get("embedding_api_key") or "").strip()
+    emb_base_url = (RAG_CONFIG.get("embedding_base_url") or "").strip()
+    if emb_api_key or emb_base_url:
+        missing = []
+        if not emb_api_key:
+            missing.append("AE_RAG_EMBEDDING_API_KEY")
+        if not emb_base_url:
+            missing.append("AE_RAG_EMBEDDING_BASE_URL")
+        if missing:
+            raise LLMConfigError(
+                f"RAG embedding 配置不完整,缺少: {missing}。"
+                f"embedding 的 base_url 与 api_key 必须同时配置(或同时留空回退 light 角色)。"
+            )
+        return emb_api_key, emb_base_url
 
-    # 优先从 light 角色取,fallback 到 analysis(对齐 LLM Gateway 设计)
+    # 回退:light 角色 → analysis 角色(向后兼容)
     config = LLM_CONFIGS.get("light") or LLM_CONFIGS.get("analysis") or {}
     api_key = config.get("api_key")
     base_url = config.get("base_url")
-    missing: list[str] = []
+    missing = []
     if not api_key:
         missing.append("api_key")
     if not base_url:
@@ -49,9 +68,25 @@ def _get_embed_client() -> Any:
     if missing:
         raise LLMConfigError(
             f"RAG embedding 配置缺失字段: {missing}。"
-            f"请在 .env 中配置 AE_LLM_API_KEY / AE_LLM_BASE_URL"
-            f"(或角色专用 AE_LLM_LIGHT_API_KEY / AE_LLM_LIGHT_BASE_URL)。"
+            f"请在 .env 中配置 AE_RAG_EMBEDDING_API_KEY / AE_RAG_EMBEDDING_BASE_URL"
+            f"(embedding 专用服务商,推荐);"
+            f"或配置 AE_LLM_API_KEY / AE_LLM_BASE_URL 回退 light 角色。"
+            f"注意:DeepSeek 官方 API 不提供 /embeddings,必须使用专用 embedding endpoint。"
         )
+    return api_key, base_url
+
+
+def _get_embed_client() -> Any:
+    """懒加载 openai.OpenAI 客户端。
+
+    凭证解析见 _resolve_embed_credentials(优先 RAG 专用配置,回退 light 角色)。
+    配置缺失/不完整显式报错,不静默降级(对齐项目原则)。
+    """
+    global _client
+    if _client is not None:
+        return _client
+
+    api_key, base_url = _resolve_embed_credentials()
 
     try:
         # openai 库是 langchain_openai 的传递依赖,这里直接用

@@ -139,7 +139,10 @@ async def _ensure_plan_llm() -> BaseChatModel:
             api_key=LLM_API_KEY,
             streaming=False,
         )
-        _llm_plan = llm.with_structured_output(PlanSchema, method="json_schema")
+        # method="function_calling":schema 走 tools 参数由模型 tool_calls 回填,
+        # 不用 response_format=json_schema(DeepSeek 实测 400:
+        # "This response_format type is unavailable now";function calling 全厂商支持)
+        _llm_plan = llm.with_structured_output(PlanSchema, method="function_calling")
         return _llm_plan
 
 
@@ -159,7 +162,7 @@ async def _ensure_decision_llm() -> BaseChatModel:
             temperature=DECISION_TEMPERATURE,
             streaming=False,
         )
-        _llm_decision = llm.with_structured_output(DecisionSchema, method="json_schema")
+        _llm_decision = llm.with_structured_output(DecisionSchema, method="function_calling")
         return _llm_decision
 
 
@@ -180,7 +183,7 @@ async def _ensure_compact_llm() -> BaseChatModel:
             streaming=False,
         )
         _llm_compact = llm.with_structured_output(
-            CompactSummarySchema, method="json_schema"
+            CompactSummarySchema, method="function_calling"
         )
         return _llm_compact
 

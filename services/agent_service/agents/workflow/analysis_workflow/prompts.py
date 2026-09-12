@@ -284,7 +284,7 @@ def render_prompt(log_data: dict, evidence_pack: Any = None) -> list:
     把检索证据(带 source_id)注入 prompt,供 LLM 引用溯源。
 
     Dify 原始 prompt 是单一 system role,这里保持一致:整个 prompt 作为 SystemMessage。
-    结构化输出由 nodes.py 的 with_structured_output(method='json_schema') 强约束,
+    结构化输出由 nodes.py 的 with_structured_output(method='function_calling') 强约束,
     不在 prompt 内指示 JSON 格式。
     """
     log_text = json.dumps(log_data, ensure_ascii=False)

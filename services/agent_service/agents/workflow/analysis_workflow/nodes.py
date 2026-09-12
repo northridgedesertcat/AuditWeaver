@@ -48,19 +48,20 @@ logger = logging.getLogger(__name__)
 
 # ============ LLM 懒加载缓存(进程内单例,避免每次节点调用重新初始化)============
 
-_llm_structured: BaseChatModel | None = None  # analyze 节点用(强模型 + json_schema)
+_llm_structured: BaseChatModel | None = None  # analyze 节点用(强模型 + function_calling)
 _llm_validate: BaseChatModel | None = None     # validate 节点用(light 模型)
-_llm_report: BaseChatModel | None = None       # report 节点用(强模型 + json_schema)
+_llm_report: BaseChatModel | None = None       # report 节点用(强模型 + function_calling)
 _init_lock = asyncio.Lock()
 
 
 async def _ensure_analyze_llm() -> BaseChatModel:
     """懒加载 analyze 节点的结构化输出 LLM,只初始化一次。
 
-    使用 with_structured_output(method='json_schema'):
-    - ollama 0.24+ / OpenAI 官方均支持
-    - 在推理层强约束输出格式,优于 prompt 内指示 JSON
-    - 不支持 streaming(json_schema response_format 与 streaming 不兼容)
+    使用 with_structured_output(method='function_calling'):
+    - schema 转为 tool 定义由模型 tool_calls 回填,不依赖 response_format
+    - DeepSeek 实测不支持 response_format json_schema(400 "This response_format
+      type is unavailable now"),function calling 则全厂商(DeepSeek/OpenAI/ollama)支持
+    - 不支持 streaming(结构化输出与 streaming 不兼容)
     """
     global _llm_structured
     if _llm_structured is not None:
@@ -77,7 +78,7 @@ async def _ensure_analyze_llm() -> BaseChatModel:
             streaming=False,
         )
         _llm_structured = llm.with_structured_output(
-            AnalysisSchema, method="json_schema"
+            AnalysisSchema, method="function_calling"
         )
         return _llm_structured
 
@@ -99,7 +100,7 @@ async def _ensure_validate_llm() -> BaseChatModel:
             streaming=False,
         )
         _llm_validate = llm.with_structured_output(
-            ValidateSchema, method="json_schema"
+            ValidateSchema, method="function_calling"
         )
         return _llm_validate
 
@@ -124,7 +125,7 @@ async def _ensure_report_llm() -> BaseChatModel:
             streaming=False,
         )
         _llm_report = llm.with_structured_output(
-            ReportSchema, method="json_schema"
+            ReportSchema, method="function_calling"
         )
         return _llm_report
 

@@ -314,7 +314,7 @@ def render_plan_prompt(user_query: str) -> list:
     """渲染 plan 节点 prompt,返回 LangChain 消息列表。
 
     单一 system role(对齐 workflow 风格),结构化输出由 nodes.py 的
-    with_structured_output(method='json_schema') 强约束,不在 prompt 内指示 JSON 格式。
+    with_structured_output(method='function_calling') 强约束,不在 prompt 内指示 JSON 格式。
     """
     query = user_query or "(用户问题为空)"
     prompt = _PLAN_PROMPT.replace("{{USER_QUERY}}", query)

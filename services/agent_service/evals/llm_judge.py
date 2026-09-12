@@ -67,7 +67,8 @@ async def judge_report(
     """
     try:
         llm = get_llm(role="light", temperature=0.0, streaming=False)
-        llm_structured = llm.with_structured_output(JudgeSchema, method="json_schema")
+        # function_calling:DeepSeek 不支持 response_format json_schema(实测 400)
+        llm_structured = llm.with_structured_output(JudgeSchema, method="function_calling")
         messages = _render_judge_prompt(user_input, report, rubric)
         result = await invoke_structured_with_retry(
             llm_structured, messages, JudgeSchema, role="light",
