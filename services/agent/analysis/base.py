@@ -11,7 +11,7 @@ from typing import Protocol
 class AnalysisResult:
     """归一化分析结果,字段对齐 extract_dify_fields 输出与 analysis_report 列。"""
 
-    status: str               # 'success' | 'failed'
+    status: str               # 'success' | 'failed' | 'degraded'(熔断打开期降级,AI 字段全空,仅保留规则匹配)
     log_id: str
     risk_level: str = 'unknown'
     risk_score: int = 0

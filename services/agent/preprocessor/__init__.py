@@ -4,6 +4,7 @@ from .processor import (
     extract_log_fields,
     extract_dify_fields,
     build_report_record,
+    build_degraded_result,
     RESPONSE_MODE,
 )
 
@@ -12,5 +13,6 @@ __all__ = [
     'extract_log_fields',
     'extract_dify_fields',
     'build_report_record',
+    'build_degraded_result',
     'RESPONSE_MODE',
 ]
