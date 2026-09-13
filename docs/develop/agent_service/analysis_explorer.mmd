@@ -1,0 +1,28 @@
+%% analysis_explorer · 对话型 ReAct Agent(六节点)
+%% 代码:agents/react/analysis_explorer/graph.py
+%% 入口:POST /agent/analysis_explorer/chat(SSE 流式)
+flowchart TB
+    START([用户消息]) --> PLAN["plan 生成调查计划<br/>(强模型 · PlanSchema)"]
+    PLAN --> AGENT["agent ReAct 决策<br/>bind_tools · 流式输出"]
+
+    AGENT -->|"无 tool_calls:直接回答"| END([结束])
+    AGENT -->|"有 tool_calls"| TOOLS["tools 执行 MCP 技能"]
+
+    TOOLS --> GATE{"deterministic_gate<br/>纯代码门控(零 LLM)<br/>失败 / 证据不足 / 冲突 / 预算 / 停滞"}
+    GATE -->|"未命中"| AGENT
+    GATE -->|"命中"| DECISION["decision_llm 四选一<br/>(弱模型)"]
+
+    DECISION -->|continue| AGENT
+    DECISION -->|replan 重置计划| PLAN
+    DECISION -->|compact 压缩上下文| COMPACT["compact 摘要压缩"] --> AGENT
+    DECISION -->|finish| END
+
+    classDef strong fill:#E3F2FD,stroke:#1565C0,color:#0D47A1
+    classDef tool fill:#F3E5F5,stroke:#6A1B9A,color:#4A148C
+    classDef gate fill:#FFF9C4,stroke:#F9A825,color:#F57F17
+    classDef light fill:#E8F5E9,stroke:#2E7D32,color:#1B5E20
+
+    class PLAN,AGENT strong
+    class TOOLS tool
+    class GATE gate
+    class DECISION,COMPACT light

@@ -1,0 +1,20 @@
+%% analysis_workflow · 批处理分析流水线(五节点)
+%% 代码:agents/workflow/analysis_workflow/graph.py
+%% 入口:POST /workflow/analysis_workflow/run(单次无状态)
+flowchart TB
+    START([log_data 结构化日志]) --> RETRIEVE["retrieve 证据检索(纯代码)<br/>BM25 + kNN,RRF 融合"]
+    RETRIEVE --> ANALYZE["analyze 结构化分析<br/>(强模型 · AnalysisSchema)"]
+    ANALYZE --> VALIDATE{"validate 质量门控<br/>(弱模型 · PASS / FAIL)"}
+
+    VALIDATE -->|pass| REPORT["report 生成报告<br/>source_id 引用 + 推测标记"] --> END([结束])
+    VALIDATE -->|"fail 且未达上限"| ENRICH["enrich 定向补检索<br/>换词 / 扩时间窗"]
+    ENRICH -->|"合并证据重新分析"| ANALYZE
+    VALIDATE -->|"fail 但达 enrich 上限:强制出报告"| REPORT
+
+    classDef code fill:#E0F7FA,stroke:#00838F,color:#006064
+    classDef strong fill:#E3F2FD,stroke:#1565C0,color:#0D47A1
+    classDef gate fill:#FFF9C4,stroke:#F9A825,color:#F57F17
+
+    class RETRIEVE,ENRICH code
+    class ANALYZE,REPORT strong
+    class VALIDATE gate
