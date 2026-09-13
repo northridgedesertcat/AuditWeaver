@@ -32,8 +32,18 @@ AuditWeaver 是一个基于 AI 的日志分析系统，专为分布式集群环�
 
 ## 🏗 架构
 
+当前版本 V1.0.0  
 当前架构：
-![Architecture](docs/develop/system-design/architecture/current.drawio.png "Architecture")
+![Architecture](docs/images/Current.png "Architecture")
+
+当前简化架构：
+![Architecture](docs/images/Current_simple.png "Architecture")
+
+
+***
+V2 架构：
+![Architecture](docs/images/version.png "Architecture")
+
 
 ***
 
@@ -145,26 +155,7 @@ cp .env.example .env
 
 ### 7. 启动所有服务
 
-**Windows（推荐）：**
-
 ```bash
-start.bat
-```
-
-**Windows（Python 方式）：**
-
-```bash
-python start.py
-```
-
-**Linux：**
-
-```bash
-# 先启动 Docker 服务
-cd docker
-docker compose up -d
-
-# 再启动 Python 服务
 python start.py
 ```
 
