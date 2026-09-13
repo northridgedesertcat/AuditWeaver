@@ -1,0 +1,18 @@
+{"query": "SQL injection attack on login page", "expected_source_ids": ["evt-sql-001", "evt-sql-002"], "description": "SQL 注入 - 语义查询(描述攻击行为)"}
+{"query": "attack_type=sql_injection", "expected_source_ids": ["evt-sql-001", "evt-sql-002", "evt-sql-003"], "description": "SQL 注入 - 按 attack_type 字段精确查询"}
+{"query": "1.2.3.4 可疑请求", "expected_source_ids": ["evt-ip-1.2.3.4-001", "evt-ip-1.2.3.4-002"], "description": "按 IP 查询 - 中文意图"}
+{"query": "ip=1.2.3.4", "expected_source_ids": ["evt-ip-1.2.3.4-001", "evt-ip-1.2.3.4-002"], "description": "按 IP 查询 - 字段精确"}
+{"query": "XSS 跨站脚本攻击", "expected_source_ids": ["evt-xss-001", "evt-xss-002"], "description": "XSS - 中文语义查询"}
+{"query": "attack_type=xss", "expected_source_ids": ["evt-xss-001", "evt-xss-002"], "description": "XSS - 按 attack_type 字段"}
+{"query": "path traversal directory traversal", "expected_source_ids": ["evt-path-trav-001"], "description": "路径遍历 - 英文同义词"}
+{"query": "attack_type=path_traversal", "expected_source_ids": ["evt-path-trav-001", "evt-path-trav-002"], "description": "路径遍历 - 按 attack_type 字段"}
+{"query": "敏感文件访问 /etc/passwd", "expected_source_ids": ["evt-sensitive-001"], "description": "敏感访问 - 路径 + 文件名"}
+{"query": "attack_type=sensitive_access", "expected_source_ids": ["evt-sensitive-001", "evt-sensitive-002"], "description": "敏感访问 - 按 attack_type 字段"}
+{"query": "命令注入 command injection", "expected_source_ids": ["evt-cmd-inj-001"], "description": "命令注入 - 中英文混合"}
+{"query": "attack_type=command_injection", "expected_source_ids": ["evt-cmd-inj-001", "evt-cmd-inj-002"], "description": "命令注入 - 按 attack_type 字段"}
+{"query": "rule=rule-001 命中", "expected_source_ids": ["evt-rule-001-hit"], "description": "按 rule_id 查询"}
+{"query": "404 状态码异常请求扫描", "expected_source_ids": ["evt-scan-404-001", "evt-scan-404-002"], "description": "扫描行为 - 状态码 + 行为描述"}
+{"query": "5.6.7.8 brute force login", "expected_source_ids": ["evt-bf-5.6.7.8-001"], "description": "暴力破解 - IP + 英文意图"}
+{"query": "User-Agent sqlmap", "expected_source_ids": ["evt-ua-sqlmap-001"], "description": "扫描工具 UA - 字段精确"}
+{"query": "200 状态成功注入", "expected_source_ids": ["evt-sql-001"], "description": "状态码 + 攻击类型组合"}
+{"query": "时间窗 2024-01 攻击事件", "expected_source_ids": ["evt-2024-01-001"], "description": "时间范围查询(模拟)"}

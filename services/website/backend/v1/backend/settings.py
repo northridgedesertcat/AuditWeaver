@@ -13,6 +13,12 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 import sys
 from pathlib import Path
 
+import pymysql
+pymysql.install_as_MySQLdb()
+# Django 6 mysql backend 要求 mysqlclient>=2.2.1,PyMySQL 通过版本欺骗绕过检查
+pymysql.version_info = (2, 2, 1, 'final', 0)
+pymysql.__version__ = '2.2.1'
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 sys.path.append(str(BASE_DIR.parent.parent.parent.parent))
@@ -29,6 +35,18 @@ from common.env import (
     ES_PASSWORD,
     ES_USE_SSL,
     ES_VERIFY_CERTS,
+    AGENT_FASTAPI_BASE,
+    MYSQL_HOST,
+    MYSQL_PORT,
+    MYSQL_DATABASE,
+    MYSQL_USER,
+    MYSQL_PASSWORD,
+    JWT_SECRET_KEY,
+    JWT_ACCESS_TTL_MINUTES,
+    JWT_REFRESH_TTL_DAYS,
+    JWT_ROTATE_REFRESH,
+    JWT_BLACKLIST_AFTER_ROTATE,
+    REDIS_URL,
 )
 
 SECRET_KEY = DJANGO_SECRET_KEY
@@ -46,14 +64,22 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
     'api',
+    'accounts',
+    'incident_management',
+    'reports',
 ]
+
+AUTH_USER_MODEL = 'accounts.User'
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
+    'backend.middleware.ApiTrailingSlashMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -83,10 +109,53 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': MYSQL_DATABASE,
+        'USER': MYSQL_USER,
+        'PASSWORD': MYSQL_PASSWORD,
+        'HOST': MYSQL_HOST,
+        'PORT': MYSQL_PORT,
+        'OPTIONS': {
+            'charset': 'utf8mb4',
+            'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
+        },
     }
 }
+
+
+# ========== Django Cache(Redis) ==========
+# 方案 §7:Cache 是可丢失的软依赖 —— Redis 不可用 / 缓存丢失时降级为 cache miss,
+# 业务回源 MySQL/ES,不影响正确性(与 Agent checkpoint 的硬依赖 fast-fail 不同)。
+# - 配置了 REDIS_URL → django-redis,IGNORE_EXCEPTIONS 让连接异常静默降级为 miss。
+# - 未配置 REDIS_URL → 进程内 LocMemCache,Django 仍可正常启动/运行(缓存不跨进程)。
+# key namespace:auditweaver:cache:*;TTL 300s;不做压缩/warming/永久缓存(方案 §1.1)。
+if REDIS_URL:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django_redis.cache.RedisCache',
+            'LOCATION': REDIS_URL,
+            'KEY_PREFIX': 'auditweaver:cache',
+            'TIMEOUT': 300,  # 5 分钟
+            'OPTIONS': {
+                'SOCKET_CONNECT_TIMEOUT': 5,
+                'SOCKET_TIMEOUT': 5,
+                # Redis 异常时不抛错:读 → miss 回源,写 → noop,保证业务正确性
+                'IGNORE_EXCEPTIONS': True,
+            },
+        }
+    }
+    # 记录被忽略的缓存异常,便于排查(不影响请求)
+    DJANGO_REDIS_IGNORE_EXCEPTIONS = True
+    DJANGO_REDIS_LOG_IGNORED_EXCEPTIONS = True
+else:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'auditweaver-locmem',
+            'KEY_PREFIX': 'auditweaver:cache',
+            'TIMEOUT': 300,
+        }
+    }
 
 
 AUTH_PASSWORD_VALIDATORS = [
@@ -121,12 +190,32 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 CORS_ALLOW_ALL_ORIGINS = DJANGO_CORS_ALLOW_ALL_ORIGINS
 
 REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        # 自定义:在 SimpleJWT 基础上额外校验 is_active,禁用用户旧 JWT 立即失效
+        'accounts.authentication.ActiveUserJWTAuthentication',
+    ),
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny',
+        'rest_framework.permissions.IsAuthenticated',
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
 }
+
+from datetime import timedelta
+SIMPLE_JWT = {
+    'SIGNING_KEY': JWT_SECRET_KEY,
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=JWT_ACCESS_TTL_MINUTES),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=JWT_REFRESH_TTL_DAYS),
+    'ROTATE_REFRESH_TOKENS': JWT_ROTATE_REFRESH,
+    'BLACKLIST_AFTER_ROTATION': JWT_BLACKLIST_AFTER_ROTATE,
+    'AUTH_HEADER_TYPES': ('Bearer',),
+}
+
+# CORS 显式允许 Authorization 头(AllowAll=True 时默认全开,这里更稳妥)
+CORS_ALLOW_HEADERS = [
+    'accept', 'accept-encoding', 'authorization', 'content-type',
+    'dnt', 'origin', 'user-agent', 'x-csrftoken', 'x-requested-with',
+]
 
 ELASTICSEARCH_HOST = ES_HOST
 ELASTICSEARCH_PORT = ES_PORT
@@ -134,3 +223,7 @@ ELASTICSEARCH_USER = ES_USER
 ELASTICSEARCH_PASSWORD = ES_PASSWORD
 ELASTICSEARCH_USE_SSL = ES_USE_SSL
 ELASTICSEARCH_VERIFY_CERTS = ES_VERIFY_CERTS
+
+# Agent Service 反代目标(Django → FastAPI :8001,对内)
+# 值来自 common.env 的 AGENT_FASTAPI_BASE(按 AE_BACKEND_HOST/PORT 计算默认,可在 .env 覆盖)
+# 已在顶部 import 中引入,settings.AGENT_FASTAPI_BASE 可直接使用。

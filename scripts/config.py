@@ -7,6 +7,10 @@ if _services_path not in sys.path:
 from common.env import (
     KAFKA_CONNECT_HOST,
     KAFKA_CONNECT_PORT,
+    AE_BACKEND_HOST,
+    AE_BACKEND_PORT,
+    AE_MEMORY_BACKEND,
+    AE_MEMORY_REDIS_URL,
 )
 
 DEFAULT_CONFIG = {
@@ -45,6 +49,16 @@ DEFAULT_CONFIG = {
             "retry_delay": 5,
             "post_delay": 0,
         },
+        "mysql": {
+            "type": "tcp",
+            "host_env_key": "MYSQL_HOST",
+            "default_host": "localhost",
+            "port_env_key": "MYSQL_PORT",
+            "default_port": "13306",
+            "max_retries": 30,
+            "retry_delay": 2,
+            "post_delay": 3,
+        },
     },
     "scripts": {
         "kafka_topics": {
@@ -56,13 +70,23 @@ DEFAULT_CONFIG = {
         "es_mapping": {
             "path": os.path.join("docker", "config", "elasticsearch", "creatMapping.py"),
         },
+        "django_migrate": {
+            "command": "python manage.py migrate",
+            "cwd": os.path.join("services", "website", "backend", "v1"),
+        },
     },
     "services": [
         {
             "id": "docker",
             "name": "Starting Docker Compose services",
             "type": "docker",
-            "description": "Kafka, Elasticsearch, Kibana, Logstash",
+            "description": "Kafka, Elasticsearch, Kibana, Logstash, MySQL, Redis",
+        },
+        {
+            "id": "redis_check",
+            "name": "Checking Redis readiness",
+            "type": "redis_check",
+            "description": "Agent session state dependency (skipped in memory mode)",
         },
         {
             "id": "wait_es",
@@ -122,6 +146,32 @@ DEFAULT_CONFIG = {
             "cwd": os.path.join("services", "agent"),
             "post_delay": 3,
             "description": "AI analysis (input: log.analysis)",
+        },
+        {
+            "id": "agent_service",
+            "name": "Starting Agent Service (FastAPI)",
+            "type": "window",
+            "window_title": "AgentService",
+            # 必须从项目根目录启动:子进程(MCP Skills)需继承项目根为 cwd,
+            # 才能 import common 并解析 services 包
+            "command": f"python -m uvicorn services.agent_service.backend.main:app --host {AE_BACKEND_HOST} --port {AE_BACKEND_PORT}",
+            "cwd": ".",
+            "post_delay": 3,
+            "port": AE_BACKEND_PORT,
+            "description": "Agent Service (FastAPI, 内部 :8001,反代给 Django)",
+        },
+        {
+            "id": "wait_mysql",
+            "name": "Waiting for MySQL to be ready",
+            "type": "wait",
+            "wait_type": "tcp",
+            "wait_config": "mysql",
+        },
+        {
+            "id": "django_migrate",
+            "name": "Running Django migrations & init admin",
+            "type": "shell",
+            "script_config": "django_migrate",
         },
         {
             "id": "django",

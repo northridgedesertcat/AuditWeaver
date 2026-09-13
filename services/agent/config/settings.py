@@ -25,7 +25,7 @@ KAFKA_CONFIG = {
     'auto_offset_reset': _cfg['kafka']['auto_offset_reset'],
     'consumer_timeout_ms': _cfg['kafka']['consumer_timeout_ms'],
     'max_poll_records': _cfg['kafka']['max_poll_records'],
-    'output_topic': _cfg['kafka']['output_topic'],
+    'dlq_topic': _cfg['kafka']['dlq_topic'],
 }
 
 DIFY_CONFIG = {
@@ -47,4 +47,12 @@ PROCESS_CONFIG = {
     'poll_interval_ms': _cfg['process']['poll_interval_ms'],
     'retry_times': _cfg['process']['retry_times'],
     'retry_delay': _cfg['process']['retry_delay'],
+    'retry_max_delay': _cfg['process'].get('retry_max_delay', 10),
+    'retry_jitter': _cfg['process'].get('retry_jitter', 0.0),  # 默认 0 兼容旧配置
+}
+
+CIRCUIT_CONFIG = {
+    'fail_max': _cfg['circuit_breaker']['fail_max'],
+    'reset_timeout': _cfg['circuit_breaker']['reset_timeout'],
+    'success_threshold': _cfg['circuit_breaker']['success_threshold'],
 }

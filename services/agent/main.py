@@ -4,12 +4,25 @@ import os
 import time
 import logging
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# 将 agent 目录加入 sys.path，以便导入 config/broker/dify 等模块
+_AGENT_DIR = os.path.dirname(os.path.abspath(__file__))
+# 将项目根目录加入 sys.path，以便导入 core 等公共模块
+_PROJECT_ROOT = os.path.abspath(os.path.join(_AGENT_DIR, '..', '..'))
+sys.path.insert(0, _AGENT_DIR)
+sys.path.insert(0, _PROJECT_ROOT)
 
-from config import KAFKA_CONFIG, DIFY_CONFIG, LOG_CONFIG, PROCESS_CONFIG
-from broker import LogAnalysisConsumer, AnalysisResultProducer
-from dify import DifyClient
-from preprocessor import build_elastic_document
+from tenacity import retry_if_result
+
+from core.kafka.dlq import DlqProducer
+from core.stable.circuit_breaker import CircuitBreaker
+from core.stable.retry import Retry
+
+from config import KAFKA_CONFIG, LOG_CONFIG, PROCESS_CONFIG, CIRCUIT_CONFIG
+from broker import LogAnalysisConsumer
+from repository import MySQLReportRepository
+from analysis import get_analysis_backend
+from common.env import ANALYSIS_BACKEND
+from preprocessor import build_report_record, build_degraded_result
 
 logging.basicConfig(
     level=getattr(logging, LOG_CONFIG['level']),
@@ -17,12 +30,44 @@ logging.basicConfig(
 )
 logger = logging.getLogger('agent_main')
 
+
 class AgentMain:
     def __init__(self):
         self.kafka_consumer = None
-        self.kafka_producer = None
-        self.dify_client = None
+        self.report_repo = None
+        self.dlq_producer = None
+        self.analysis_backend = None
         self.running = False
+        # 线性退避重试(配置见 agent.yaml process 段,等待序列 2s/4s/6s + jitter)
+        # 分析后端:analyze 吞异常返回 AnalysisResult(status='failed'),按结果重试
+        self.dify_retry = Retry(
+            max_retries=PROCESS_CONFIG['retry_times'],
+            base_delay=PROCESS_CONFIG['retry_delay'],
+            max_delay=PROCESS_CONFIG['retry_max_delay'],
+            jitter=PROCESS_CONFIG['retry_jitter'],
+            retry=retry_if_result(lambda r: r.status == 'failed'),
+            retry_error_callback=lambda rs: rs.outcome.result(),
+        )
+        # MySQL 写入:upsert() 失败返回 False,按返回值重试
+        self.send_retry = Retry(
+            max_retries=PROCESS_CONFIG['retry_times'],
+            base_delay=PROCESS_CONFIG['retry_delay'],
+            max_delay=PROCESS_CONFIG['retry_max_delay'],
+            jitter=PROCESS_CONFIG['retry_jitter'],
+            retry=retry_if_result(lambda sent: sent is False),
+            retry_error_callback=lambda rs: rs.outcome.result(),
+        )
+        # 分析后端熔断:重试耗尽仍失败连续达到 fail_max 条后熔断,
+        # 熔断期间不再调用后端,给其过载时喘息机会(配置见 agent.yaml circuit_breaker 段)
+        self.dify_breaker = CircuitBreaker(
+            fail_max=CIRCUIT_CONFIG['fail_max'],
+            reset_timeout=CIRCUIT_CONFIG['reset_timeout'],
+            success_threshold=CIRCUIT_CONFIG['success_threshold'],
+            name='analysis',
+            on_state_change=lambda old, new: logger.warning(
+                f'分析后端熔断器状态变化: {old} -> {new}'
+            ),
+        )
 
     def initialize(self) -> bool:
         logger.info('Initializing Agent module...')
@@ -40,48 +85,81 @@ class AgentMain:
             return False
         logger.info('Kafka consumer connected')
 
-        logger.info('Connecting to Kafka producer...')
-        self.kafka_producer = AnalysisResultProducer(
-            bootstrap_servers=KAFKA_CONFIG['brokers'],
-            topic=KAFKA_CONFIG['output_topic']
-        )
-        if not self.kafka_producer.connect():
-            logger.error('Failed to connect Kafka producer')
+        logger.info('Connecting to MySQL report repository...')
+        self.report_repo = MySQLReportRepository()
+        if not self.report_repo.connect():
+            logger.error('Failed to connect MySQL report repository')
             return False
-        logger.info('Kafka producer connected')
+        logger.info('MySQL report repository connected')
 
-        logger.info('Connecting to Dify API...')
-        self.dify_client = DifyClient(
-            base_url=DIFY_CONFIG['base_url'],
-            api_key=DIFY_CONFIG['api_key'],
-            timeout=DIFY_CONFIG['timeout'],
-            endpoint=DIFY_CONFIG['endpoint']
+        logger.info('Connecting to DLQ producer...')
+        self.dlq_producer = DlqProducer(
+            KAFKA_CONFIG['brokers'],
+            KAFKA_CONFIG['dlq_topic'],
+            failed_stage='agent',
         )
-        logger.info('Dify client initialized')
+        self.dlq_producer.connect()
+        logger.info('DLQ producer connected')
+
+        logger.info('Initializing analysis backend...')
+        self.analysis_backend = get_analysis_backend()
+        logger.info(f'Analysis backend initialized: {ANALYSIS_BACKEND}')
 
         return True
 
     def process_log(self, raw_message: dict) -> bool:
-        """管道: Dify 分析 → 构建文档 → 发送 Kafka"""
+        """管道: 分析后端 → 构建报告记录 → 写入 MySQL。失败时发送到 DLQ。"""
         event_id = raw_message.get('event_id', 'unknown')
 
         try:
-            response = self.dify_client.analyze_log(raw_message)
+            # 熔断包在重试外层:单条消息走完整线性退避重试(含 jitter),彻底失败计 1 次熔断失败;
+            # 熔断打开时走 fallback 产出降级报告(仅规则匹配),不调用后端,落库后 offset 正常提交;
+            # 半开探测期放行真实 analyze(走重试,不走 fallback),探测恢复见 CircuitBreaker 状态机
+            response = self.dify_breaker.call(
+                lambda msg: self.dify_retry.call(self.analysis_backend.analyze, msg),
+                raw_message,
+                result_is_failure=lambda r: r.status == 'failed',
+                fallback=lambda msg: build_degraded_result(msg),
+            )
 
-            if response.get('status') == 'success':
-                document = build_elastic_document(raw_message, response.get('response', {}))
-                if self.kafka_producer.send(document, key=event_id):
-                    logger.info(f'Processed: event_id={event_id}')
+            # 降级(status='degraded')与成功(status='success')同走落库路径:
+            # 降级报告 AI 字段全空、规则字段完整,走成功路径不进 DLQ(降级是"产出报告",非"失败")
+            if response.status in ('success', 'degraded'):
+                if response.status == 'degraded':
+                    logger.warning(f'降级产出(仅规则匹配): event_id={event_id}')
+                record = build_report_record(raw_message, response)
+                if self.send_retry.call(self.report_repo.upsert, record):
+                    logger.info(f'Processed: event_id={event_id}, status={response.status}')
                     return True
                 else:
-                    logger.error(f'Kafka send failed: event_id={event_id}')
+                    logger.error(f'MySQL write failed: event_id={event_id}')
+                    self.dlq_producer.send_dlq(
+                        original_payload=raw_message,
+                        key=event_id,
+                        failure_reason='db_write_failed',
+                        source_topic=KAFKA_CONFIG['input_topic'],
+                    )
                     return False
             else:
-                logger.error(f'Dify analysis failed: {response.get("error")}')
+                error = response.error or 'unknown'
+                logger.error(f'Analysis failed: {error}')
+                self.dlq_producer.send_dlq(
+                    original_payload=raw_message,
+                    key=event_id,
+                    failure_reason=f'analysis_failed: {error}',
+                    source_topic=KAFKA_CONFIG['input_topic'],
+                )
                 return False
 
         except Exception as e:
             logger.error(f'Error processing {event_id}: {str(e)}')
+            self.dlq_producer.send_dlq(
+                original_payload=raw_message,
+                key=event_id,
+                failure_reason='processing_exception',
+                error=e,
+                source_topic=KAFKA_CONFIG['input_topic'],
+            )
             return False
 
     def run(self):
@@ -93,13 +171,20 @@ class AgentMain:
 
         while self.running:
             try:
-                messages = self.kafka_consumer.consume(max_records=batch_size)
+                records = self.kafka_consumer.consume(max_records=batch_size)
 
-                if messages:
-                    logger.info(f'Received {len(messages)} messages')
+                if records:
+                    logger.info(f'Received {len(records)} messages')
 
-                    success_count = sum(1 for m in messages if self.process_log(m))
-                    fail_count = len(messages) - success_count
+                    success_count = 0
+                    for msg, raw_message in records:
+                        # 处理成功（已落库）或失败（已入 DLQ）都属终态，
+                        # 显式提交 offset，避免消息无限重放
+                        ok = self.process_log(raw_message)
+                        self.kafka_consumer.commit(msg)
+                        if ok:
+                            success_count += 1
+                    fail_count = len(records) - success_count
 
                     logger.info(f'Batch complete: success={success_count}, failed={fail_count}')
                 else:
@@ -120,11 +205,14 @@ class AgentMain:
         logger.info('Shutting down Agent module...')
         if self.kafka_consumer:
             self.kafka_consumer.close()
-        if self.kafka_producer:
-            self.kafka_producer.close()
-        if self.dify_client:
-            self.dify_client.close()
+        if self.report_repo:
+            self.report_repo.close()
+        if self.dlq_producer:
+            self.dlq_producer.close()
+        if self.analysis_backend:
+            self.analysis_backend.close()
         logger.info('Agent module stopped')
+
 
 def main():
     agent = AgentMain()
@@ -136,6 +224,7 @@ def main():
     except Exception as e:
         logger.error(f'Fatal error: {str(e)}')
         sys.exit(1)
+
 
 if __name__ == '__main__':
     main()

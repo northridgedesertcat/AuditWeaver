@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { apiFetch } from '@/lib/api/client'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   PieChart,
@@ -37,8 +38,8 @@ export function ThreatDistributionChart() {
   useEffect(() => {
     const fetchDistribution = async () => {
       try {
-        const response = await fetch(
-          "http://localhost:8000/api/v1/dashboard/threat-distribution/?range=all"
+        const response = await apiFetch(
+          '/dashboard/threat-distribution/?range=all'
         )
         const result = await response.json()
 
@@ -72,8 +73,8 @@ export function ThreatDistributionChart() {
     }
 
     fetchDistribution()
-    // 每 30 秒刷新一次
-    const interval = setInterval(fetchDistribution, 30000)
+    // 每 10 秒刷新一次
+    const interval = setInterval(fetchDistribution, 10000)
 
     return () => clearInterval(interval)
   }, [])

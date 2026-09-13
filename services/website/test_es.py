@@ -44,10 +44,10 @@ def test_elasticsearch():
     except Exception as e:
         print(f"   ❌ 获取索引列表失败: {e}")
     
-    # 4. 检查log_analysis_reports索引
-    print("\n4. 检查 log_analysis_reports 索引:")
+    # 4. 检查 nginx-log-raw 索引（报告详情"原始日志行"仍依赖该索引）
+    print("\n4. 检查 nginx-log-raw 索引:")
     try:
-        indices = es.cat.indices(index="log_analysis_reports", format="json")
+        indices = es.cat.indices(index="nginx-log-raw", format="json")
         if indices:
             print(f"   ✅ 索引存在")
             print(f"   索引信息: {indices}")
@@ -55,58 +55,10 @@ def test_elasticsearch():
             print("   ❌ 索引不存在")
     except Exception as e:
         print(f"   ❌ 检查索引失败: {e}")
-    
-    # 5. 获取总数
-    print("\n5. 获取报告总数:")
-    try:
-        search_body = {
-            "size": 0,
-            "track_total_hits": True
-        }
-        result = es.search(index="log_analysis_reports", body=search_body)
-        total = result['hits']['total']['value']
-        print(f"   ✅ 总报告数: {total}")
-        
-        # 显示一些示例数据
-        if total > 0:
-            print("\n6. 示例数据 (前3条):")
-            sample_search = {
-                "size": 3,
-                "track_total_hits": True
-            }
-            sample_result = es.search(index="log_analysis_reports", body=sample_search)
-            for hit in sample_result['hits']['hits']:
-                source = hit['_source']
-                print(f"   - ID: {hit['_id']}")
-                print(f"     risk_level: {source.get('risk_level', 'N/A')}")
-                print(f"     analysis_timestamp: {source.get('analysis_timestamp', 'N/A')}")
-                print()
-    except Exception as e:
-        print(f"   ❌ 获取总数失败: {e}")
-        import traceback
-        traceback.print_exc()
-    
-    # 7. 检查risk_level字段的值
-    print("\n7. risk_level 字段聚合:")
-    try:
-        agg_body = {
-            "size": 0,
-            "aggs": {
-                "risk_levels": {
-                    "terms": {
-                        "field": "risk_level",
-                        "size": 10
-                    }
-                }
-            }
-        }
-        result = es.search(index="log_analysis_reports", body=agg_body)
-        buckets = result['aggregations']['risk_levels']['buckets']
-        for bucket in buckets:
-            print(f"   - {bucket['key']}: {bucket['doc_count']}")
-    except Exception as e:
-        print(f"   ❌ 聚合失败: {e}")
-    
+
+    # 注：AI 分析报告（原 log_analysis_reports 索引）已迁移至 MySQL
+    # analysis_report 表，请用 Django ORM / MySQL 客户端核对，不再走 ES。
+
     print("\n" + "=" * 60)
 
 if __name__ == "__main__":

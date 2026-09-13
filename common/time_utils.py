@@ -45,3 +45,30 @@ def format_for_directory() -> tuple[str, str]:
 
 def utc_from_epoch_millis(epoch_ms: int) -> datetime:
     return datetime.fromtimestamp(epoch_ms / 1000, tz=timezone.utc)
+
+
+def parse_time_range(time_range: str = '24h') -> tuple[int, int]:
+    """将形如 15m / 1h / 24h / 7d / all 的范围解析为 (gte_epoch_millis, lte_epoch_millis)。
+
+    - lte 永远是当前 UTC 毫秒。
+    - all 或无法识别时 gte=0(查全部)。
+    """
+    lte = epoch_millis_now()
+    if not time_range:
+        return 0, lte
+
+    key = time_range.strip().lower()
+    if key in ('all', '*'):
+        return 0, lte
+
+    import re
+    m = re.fullmatch(r'(\d+)\s*([smhd])', key)
+    if not m:
+        # 不可识别时退化为查全部,避免误判成 0 条
+        return 0, lte
+
+    value = int(m.group(1))
+    unit = m.group(2)
+    multipliers = {'s': 1000, 'm': 60_000, 'h': 3_600_000, 'd': 86_400_000}
+    delta_ms = value * multipliers[unit]
+    return lte - delta_ms, lte

@@ -1,11 +1,13 @@
 "use client"
 
 import { Bell, User, Moon, RefreshCw } from "lucide-react"
+import { useAuth } from '@/lib/auth'
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -19,6 +21,7 @@ interface HeaderProps {
 }
 
 export function Header({ title, subtitle }: HeaderProps) {
+  const { user, logout } = useAuth()
   return (
     <header className="flex h-16 shrink-0 items-center justify-between border-b border-border bg-card/50 px-6">
       <div>
@@ -48,24 +51,27 @@ export function Header({ title, subtitle }: HeaderProps) {
             </Badge>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-80">
-            <DropdownMenuLabel>通知</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="flex flex-col items-start gap-1 py-3">
-              <span className="font-medium text-destructive">严重告警</span>
-              <span className="text-sm text-muted-foreground">检测到可疑的 SQL 注入攻击</span>
-              <span className="text-xs text-muted-foreground">2 分钟前</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem className="flex flex-col items-start gap-1 py-3">
-              <span className="font-medium text-warning">高危告警</span>
-              <span className="text-sm text-muted-foreground">异常登录尝试来自未知 IP</span>
-              <span className="text-xs text-muted-foreground">15 分钟前</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem className="flex flex-col items-start gap-1 py-3">
-              <span className="font-medium text-info">系统通知</span>
-              <span className="text-sm text-muted-foreground">AI 模型已完成训练更新</span>
-              <span className="text-xs text-muted-foreground">1 小时前</span>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
+            {/* Base UI 要求 GroupLabel 必须位于 Group 内,否则抛 MenuGroupContext 错误 */}
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>通知</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="flex flex-col items-start gap-1 py-3">
+                <span className="font-medium text-destructive">严重告警</span>
+                <span className="text-sm text-muted-foreground">检测到可疑的 SQL 注入攻击</span>
+                <span className="text-xs text-muted-foreground">2 分钟前</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem className="flex flex-col items-start gap-1 py-3">
+                <span className="font-medium text-warning">高危告警</span>
+                <span className="text-sm text-muted-foreground">异常登录尝试来自未知 IP</span>
+                <span className="text-xs text-muted-foreground">15 分钟前</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem className="flex flex-col items-start gap-1 py-3">
+                <span className="font-medium text-info">系统通知</span>
+                <span className="text-sm text-muted-foreground">AI 模型已完成训练更新</span>
+                <span className="text-xs text-muted-foreground">1 小时前</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+            </DropdownMenuGroup>
             <DropdownMenuItem className="justify-center text-primary">
               查看全部通知
             </DropdownMenuItem>
@@ -77,23 +83,25 @@ export function Header({ title, subtitle }: HeaderProps) {
           <DropdownMenuTrigger className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
             <Avatar className="h-7 w-7">
               <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                管
+                {user?.display_name?.[0] || user?.username?.[0] || 'U'}
               </AvatarFallback>
             </Avatar>
-            <span className="text-sm font-medium">管理员</span>
+            <span className="text-sm font-medium">{user?.display_name || user?.username || '用户'}</span>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuLabel>我的账户</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem>
-              <User className="mr-2 h-4 w-4" />
-              个人设置
-            </DropdownMenuItem>
-            <DropdownMenuItem>
-              系统偏好
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive">
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>我的账户</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem>
+                <User className="mr-2 h-4 w-4" />
+                个人设置
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                系统偏好
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+            </DropdownMenuGroup>
+            <DropdownMenuItem className="text-destructive" onClick={logout}>
               退出登录
             </DropdownMenuItem>
           </DropdownMenuContent>

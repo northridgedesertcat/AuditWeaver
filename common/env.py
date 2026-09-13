@@ -26,10 +26,14 @@ def _load_env():
                         key, value = line.split('=', 1)
                         key = key.strip()
                         value = value.strip()
-                        if value.startswith('"') and value.endswith('"'):
-                            value = value[1:-1]
-                        elif value.startswith("'") and value.endswith("'"):
-                            value = value[1:-1]
+                        # 剥离行内注释(对齐 python-dotenv:仅引号外的 ' #' 之后为注释)
+                        if value and value[0] in ('"', "'"):
+                            quote = value[0]
+                            end = value.find(quote, 1)
+                            if end != -1:
+                                value = value[1:end]
+                        elif ' #' in value:
+                            value = value[:value.find(' #')].rstrip()
                         os.environ.setdefault(key, value)
     
     _env_loaded = True
@@ -55,6 +59,17 @@ def get_env_bool(key: str, default: bool = False) -> bool:
     _load_env()
     value = os.environ.get(key, '').lower()
     return value in ('true', '1', 'yes', 'on')
+
+
+def get_env_float(key: str, default: float = 0.0) -> float:
+    _load_env()
+    value = os.environ.get(key)
+    if value is not None:
+        try:
+            return float(value)
+        except ValueError:
+            pass
+    return default
 
 
 DJANGO_SECRET_KEY = get_env('DJANGO_SECRET_KEY')
@@ -83,7 +98,7 @@ KAFKA_TOPIC_ANALYSIS = get_env('KAFKA_TOPIC_ANALYSIS', 'log.analysis')
 KAFKA_TOPIC_RISK = get_env('KAFKA_TOPIC_RISK', 'log.risk')
 
 ES_INDEX_MATCHED_LOGS = get_env('ES_INDEX_MATCHED_LOGS', 'matched_logs')
-ES_INDEX_ANALYSIS_REPORTS = get_env('ES_INDEX_ANALYSIS_REPORTS', 'log_analysis_reports')
+# 分析报告已迁移至 MySQL analysis_report 表，不再使用 log_analysis_reports ES 索引
 ES_INDEX_NGINX_RAW = get_env('ES_INDEX_NGINX_RAW', 'nginx-log-raw')
 
 DIFY_BASE_URL = get_env('DIFY_BASE_URL', 'http://localhost/v1')
@@ -96,3 +111,47 @@ LOG_LEVEL = get_env('LOG_LEVEL', 'INFO')
 
 ZOOKEEPER_PORT = get_env_int('ZOOKEEPER_PORT', 2181)
 KIBANA_PORT = get_env_int('KIBANA_PORT', 5601)
+
+# Agent Service(FastAPI,对内,只服务 Django)
+AE_BACKEND_HOST = get_env('AE_BACKEND_HOST', '127.0.0.1')
+AE_BACKEND_PORT = get_env_int('AE_BACKEND_PORT', 8001)
+
+# Django 反代目标(Django → FastAPI)
+AGENT_FASTAPI_BASE = get_env('AGENT_FASTAPI_BASE', f'http://{AE_BACKEND_HOST}:{AE_BACKEND_PORT}')
+
+# ========== 分析后端切换(services/agent 管线) ==========
+ANALYSIS_BACKEND = get_env('ANALYSIS_BACKEND', 'dify')  # dify | langgraph
+
+# LangGraph 后端 → agent_service 内网地址(默认复用 AGENT_FASTAPI_BASE)
+AGENT_SERVICE_BASE_URL = get_env('AGENT_SERVICE_BASE_URL', AGENT_FASTAPI_BASE)
+AGENT_SERVICE_TIMEOUT = get_env_int('AGENT_SERVICE_TIMEOUT', DIFY_TIMEOUT)
+
+# MySQL
+MYSQL_HOST = get_env('MYSQL_HOST', 'localhost')
+MYSQL_PORT = get_env_int('MYSQL_PORT', 13306)
+MYSQL_DATABASE = get_env('MYSQL_DATABASE', 'auditweaver')
+MYSQL_USER = get_env('MYSQL_USER', 'auditweaver')
+MYSQL_PASSWORD = get_env('MYSQL_PASSWORD', 'auditweaver')
+MYSQL_ROOT_PASSWORD = get_env('MYSQL_ROOT_PASSWORD', 'rootpass')
+
+# Redis(Docker 单容器,对外端口 16379)
+# ⚠️ 密码无默认值:redis 模式下未配置 REDIS_URL/REDIS_PASSWORD 时应 fast fail,不静默使用弱密码
+REDIS_URL = get_env('REDIS_URL')
+REDIS_PASSWORD = get_env('REDIS_PASSWORD')
+REDIS_PORT = get_env_int('REDIS_PORT', 16379)
+
+# Agent Service 会话历史(LangGraph checkpointer)
+# memory(默认):进程内 MemorySaver,不依赖 Redis;redis:使用 RedisSaver 持久化到 Redis。
+# AE_MEMORY_REDIS_URL 不给弱默认值:redis 模式下未配置时由启动检查 / redis.py fast fail,
+# 不静默连到无密码的 localhost:6379。
+AE_MEMORY_BACKEND = get_env('AE_MEMORY_BACKEND', 'memory')
+AE_MEMORY_REDIS_URL = get_env('AE_MEMORY_REDIS_URL')
+
+# JWT
+JWT_SECRET_KEY = get_env('JWT_SECRET_KEY') or DJANGO_SECRET_KEY
+JWT_ACCESS_TTL_MINUTES = get_env_int('JWT_ACCESS_TTL_MINUTES', 15)
+JWT_REFRESH_TTL_DAYS = get_env_int('JWT_REFRESH_TTL_DAYS', 1)
+JWT_ROTATE_REFRESH = get_env_bool('JWT_ROTATE_REFRESH', True)
+JWT_BLACKLIST_AFTER_ROTATE = get_env_bool('JWT_BLACKLIST_AFTER_ROTATE', True)
+
+# Root Admin 不从 .env 读取,由 `python manage.py create_root_admin` 交互式创建

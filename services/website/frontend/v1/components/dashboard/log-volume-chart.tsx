@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { apiFetch } from '@/lib/api/client'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   AreaChart,
@@ -25,7 +26,7 @@ export function LogVolumeChart() {
   useEffect(() => {
     const fetchTrend = async () => {
       try {
-        const response = await fetch("http://localhost:8000/api/v1/logs/trend/")
+        const response = await apiFetch('/logs/trend/')
         const result = await response.json()
         
         if (result.data && result.data.length > 0) {
@@ -42,7 +43,7 @@ export function LogVolumeChart() {
     }
 
     fetchTrend()
-    const interval = setInterval(fetchTrend, 30000)
+    const interval = setInterval(fetchTrend, 10000)
 
     return () => clearInterval(interval)
   }, [])

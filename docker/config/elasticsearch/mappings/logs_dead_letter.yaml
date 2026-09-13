@@ -1,0 +1,76 @@
+mappings:
+  properties:
+    "@timestamp":
+      type: date
+      format: "epoch_millis||strict_date_optional_time||yyyy-MM-dd HH:mm:ss"
+
+    # ── 消息标识 ──
+    event_id:
+      type: keyword
+
+    # ── 来源追踪 ──
+    source_topic:
+      type: keyword
+
+    failed_stage:
+      type: keyword
+
+    # ── 失败原因（text + keyword 双字段，支持全文搜索和精确匹配） ──
+    failure_reason:
+      type: text
+      fields:
+        keyword:
+          type: keyword
+          ignore_above: 512
+
+    # ── 异常详情 ──
+    error_type:
+      type: keyword
+
+    error_message:
+      type: text
+      fields:
+        keyword:
+          type: keyword
+          ignore_above: 1024
+
+    error_traceback:
+      type: text
+      index: false
+
+    # ── 原始失败数据（flattened: 不限制子字段，支持 exists/term 查询） ──
+    original_payload:
+      type: flattened
+
+    # ── 原始日志行（兼容 Logstash grok 失败场景） ──
+    message:
+      type: text
+      fields:
+        keyword:
+          type: keyword
+          ignore_above: 2048
+
+    # ── 标签与来源 ──
+    tags:
+      type: keyword
+
+    log_source:
+      type: keyword
+
+    # ── 运维状态 ──
+    dlq_status:
+      type: keyword
+
+    retry_count:
+      type: integer
+
+    resolved_at:
+      type: date
+      format: "epoch_millis||strict_date_optional_time"
+
+    resolved_note:
+      type: text
+
+settings:
+  number_of_shards: 1
+  number_of_replicas: 0

@@ -22,7 +22,7 @@ patterns:
 
     enabled: true
 
-    regex: '(?i)/(?:admin(?:istrator)?|login|signin|auth)(?:/|$|\?)'
+    regex: '(?i)/(?:admin(?:istrator)?|signin|auth)(?:/|$|\?)'
 
 
 

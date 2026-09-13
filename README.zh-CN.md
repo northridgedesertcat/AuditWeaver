@@ -214,10 +214,10 @@ python start.py
 | log.structured        | 结构化/解析后的日志（通过 Logstash）           |
 | log.audit             | 待规则引擎处理的日志                        |
 | log.analysis          | 规则引擎分析结果                           |
-| agent.event.save      | Agent AI 分析结果（ES Sink 目标）     |
 | rule.event.save       | 规则引擎事件（ES Sink 目标）            |
 
 > Topics 通过 `docker/config/kafka/topics/topics.yaml` 和 `create-init-topics.py` 自动初始化。
+> Agent AI 分析报告直接写入 MySQL `analysis_report` 表，不再经 Kafka/ES 中转。
 
 ### Elasticsearch 索引说明
 
@@ -225,7 +225,8 @@ python start.py
 | :----------------------- | :--------------------------------------- |
 | nginx-log-raw            | 原始 Nginx 日志                           |
 | matched_logs             | 规则匹配的日志                    |
-| log_analysis_reports     | AI 生成的分析报告            |
+
+> AI 生成的分析报告存于 MySQL `analysis_report` 表（Django `reports` 应用）；报告详情页的"原始日志行"（event.original）仍查 `nginx-log-raw`。
 
 ***
 

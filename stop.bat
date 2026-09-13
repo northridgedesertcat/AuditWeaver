@@ -27,7 +27,7 @@ echo       Stopped -^> NextJSFrontend
 
 echo [5/5] Stopping Docker Compose services...
 docker-compose -f "%DOCKER_COMPOSE_PATH%" down
-echo       Stopped -^> Docker services (Kafka, Elasticsearch, etc.)
+echo       Stopped -^> Docker services (Kafka, Elasticsearch, MySQL, etc.)
 
 echo.
 echo ============================================

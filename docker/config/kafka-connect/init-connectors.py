@@ -4,8 +4,8 @@
 AuditWeaver - Kafka Connect Connector Initializer
 
 Reads connector JSON files from the connectors/ subdirectory and creates
-missing connectors via the Kafka Connect REST API. Existing connectors
-are left untouched (idempotent).
+connectors via the Kafka Connect REST API.  Existing connectors (including
+stale / FAILED ones) are deleted and recreated for a clean state.
 
 Usage:
     python init-connectors.py
@@ -80,14 +80,25 @@ def discover_connector_files(connectors_dir: Path) -> list:
 # ---------------------------------------------------------------------------
 
 class ConnectConnectionError(Exception):
-    """Raised when Kafka Connect is unreachable."""
+    """Raised when Kafka Connect is unreachable or returns an unexpected response."""
+    pass
+
+
+class ConnectAPIError(ConnectConnectionError):
+    """Raised when Kafka Connect responds but with an unexpected HTTP status."""
     pass
 
 
 def check_connector_exists(connector_name, connect_host='localhost', connect_port=8083):
     """Check if a connector already exists on the Kafka Connect cluster.
-    Returns True if the connector exists (HTTP 200), False if not (HTTP 404).
-    Raises ConnectConnectionError if the cluster is unreachable.
+
+    Returns:
+        True  — connector exists (HTTP 200) or is in an unhealthy state (HTTP 409)
+        False — connector does not exist (HTTP 404)
+
+    Raises:
+        ConnectAPIError       — unexpected HTTP status from Kafka Connect
+        ConnectConnectionError — cannot reach Kafka Connect at all
     """
     try:
         conn = http.client.HTTPConnection(connect_host, connect_port, timeout=10)
@@ -98,18 +109,29 @@ def check_connector_exists(connector_name, connect_host='localhost', connect_por
             return True
         if response.status == 404:
             return False
-        raise ConnectConnectionError(
-            f"Unexpected HTTP {response.status} checking connector '{connector_name}'"
+        if response.status == 409:
+            log.warning(
+                "Connector '%s' exists but is in an unhealthy state "
+                "(HTTP 409 — may be FAILED or REBALANCING)",
+                connector_name,
+            )
+            return True
+        raise ConnectAPIError(
+            f"Kafka Connect returned unexpected HTTP {response.status} "
+            f"when checking connector '{connector_name}'"
         )
     except (ConnectionRefusedError, OSError, TimeoutError) as e:
         raise ConnectConnectionError(
-            f"Cannot connect to Kafka Connect at {connect_host}:{connect_port}: {e}"
+            f"Cannot reach Kafka Connect at {connect_host}:{connect_port}: {e}"
         ) from e
 
 
 def list_all_connectors(connect_host='localhost', connect_port=8083):
     """Return the set of connector names already on the cluster.
-    Raises ConnectConnectionError if the cluster is unreachable.
+
+    Raises:
+        ConnectAPIError       — unexpected HTTP status from Kafka Connect
+        ConnectConnectionError — cannot reach Kafka Connect at all
     """
     try:
         conn = http.client.HTTPConnection(connect_host, connect_port, timeout=10)
@@ -119,30 +141,63 @@ def list_all_connectors(connect_host='localhost', connect_port=8083):
         conn.close()
         if response.status == 200:
             return set(json.loads(body))
-        raise ConnectConnectionError(
-            f"Unexpected HTTP {response.status} listing connectors"
+        raise ConnectAPIError(
+            f"Kafka Connect returned unexpected HTTP {response.status} "
+            f"when listing connectors"
         )
     except (ConnectionRefusedError, OSError, TimeoutError) as e:
         raise ConnectConnectionError(
-            f"Cannot connect to Kafka Connect at {connect_host}:{connect_port}: {e}"
+            f"Cannot reach Kafka Connect at {connect_host}:{connect_port}: {e}"
         ) from e
 
 
+def _delete_connector(connector_name, connect_host='localhost', connect_port=8083):
+    """Delete a connector by name. Logs result; does not raise on failure."""
+    try:
+        conn = http.client.HTTPConnection(connect_host, connect_port, timeout=10)
+        conn.request('DELETE', f'/connectors/{connector_name}')
+        response = conn.getresponse()
+        conn.close()
+        if response.status in (200, 204):
+            log.info("Deleted existing connector '%s'", connector_name)
+            return True
+        else:
+            log.warning(
+                "Failed to delete connector '%s' (HTTP %s)",
+                connector_name, response.status,
+            )
+            return False
+    except (ConnectionRefusedError, OSError, TimeoutError) as e:
+        log.warning(
+            "Cannot reach Kafka Connect while trying to delete connector '%s': %s",
+            connector_name, e,
+        )
+        return False
+
+
 def create_connector(connector_config_path, connect_host='localhost', connect_port=8083):
-    """Create a single connector from its JSON config file. Idempotent.
-    Raises ConnectConnectionError if the cluster is unreachable.
+    """Create a single connector from its JSON config file.  Idempotent.
+
+    If the connector already exists (including in a stale / FAILED state),
+    it is deleted first and then recreated from the JSON definition.
+
+    Raises:
+        ConnectConnectionError — cannot reach Kafka Connect at all
     """
     with open(connector_config_path, 'r', encoding='utf-8') as f:
         connector_config = json.load(f)
 
     connector_name = connector_config.get('name', '')
     if not connector_name:
-        log.warning(f"No 'name' field in {connector_config_path}, skipping")
+        log.warning("No 'name' field in %s, skipping", connector_config_path)
         return False
 
     if check_connector_exists(connector_name, connect_host, connect_port):
-        log.info(f"[SKIP] Connector '{connector_name}' already exists")
-        return True
+        log.info(
+            "Connector '%s' already exists, deleting to recreate from config...",
+            connector_name,
+        )
+        _delete_connector(connector_name, connect_host, connect_port)
 
     conn = http.client.HTTPConnection(connect_host, connect_port, timeout=10)
     headers = {'Content-Type': 'application/json'}
@@ -152,22 +207,25 @@ def create_connector(connector_config_path, connect_host='localhost', connect_po
     conn.close()
 
     if response.status == 201:
-        log.info(f"[OK]   Connector '{connector_name}' created successfully")
+        log.info("[OK]   Connector '%s' created successfully", connector_name)
         return True
-    elif response.status == 409:
-        log.info(f"[SKIP] Connector '{connector_name}' already exists (HTTP 409)")
+    if response.status == 409:
+        log.info("[SKIP] Connector '%s' already exists (HTTP 409)", connector_name)
         return True
-    else:
-        log.error(
-            f"[FAIL] Connector '{connector_name}' creation failed. "
-            f"HTTP {response.status}: {response_body}"
-        )
-        return False
+
+    log.error(
+        "[FAIL] Connector '%s' creation failed. HTTP %s: %s",
+        connector_name, response.status, response_body,
+    )
+    return False
 
 
 def show_status(connector_files, connect_host='localhost', connect_port=8083):
     """Print status of each connector file against the cluster.
-    Raises ConnectConnectionError if the cluster is unreachable.
+
+    Raises:
+        ConnectAPIError       — unexpected HTTP status from Kafka Connect
+        ConnectConnectionError — cannot reach Kafka Connect at all
     """
     existing = list_all_connectors(connect_host, connect_port)
     log.info("=" * 60)
@@ -187,8 +245,14 @@ def show_status(connector_files, connect_host='localhost', connect_port=8083):
 
 def create_all_connectors(connector_files, connect_host='localhost', connect_port=8083,
                           dry_run=False):
-    """Create all missing connectors. Existing ones are skipped.
-    Raises ConnectConnectionError if the cluster is unreachable.
+    """Create or recreate all connectors from their JSON definitions.
+
+    Existing connectors are deleted and recreated to guarantee a clean state.
+
+    Raises:
+        ConnectAPIError       — unexpected HTTP status from Kafka Connect
+        ConnectConnectionError — cannot reach Kafka Connect at all
+
     Returns (success_count, total_count).
     """
     if not connector_files:
@@ -297,9 +361,17 @@ def main():
             show_status(connector_files, connect_host, connect_port)
             if success < total:
                 sys.exit(1)
+    except ConnectAPIError as e:
+        log.error(str(e))
+        log.error(
+            "Kafka Connect responded with an unexpected status. "
+            "The service may be starting up or in an inconsistent state — "
+            "wait a moment and try again."
+        )
+        sys.exit(1)
     except ConnectConnectionError as e:
         log.error(str(e))
-        log.error("Kafka Connect is not available. Make sure it is running.")
+        log.error("Cannot reach Kafka Connect. Verify the service is running and accessible.")
         sys.exit(1)
 
 
