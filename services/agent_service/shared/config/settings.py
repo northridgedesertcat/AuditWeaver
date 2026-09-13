@@ -18,30 +18,46 @@ from common.env import (
 # ============ LLM Gateway 多角色配置 ============
 # analysis:强模型,用于 workflow analyze / agent plan / ReAct 决策
 # light:弱模型,用于 validate / decision gate / compact 摘要(省钱)
-# light 的字段缺失时,factory 会沿 LLM_FALLBACK_CHAIN 回退到 analysis,
-# 不静默使用无效配置。
+# report:强模型,用于 workflow report 节点生成最终报告(可独立于 analysis 配置)
+#
+# 设计原则(对齐 §3.7 + 本地模型优先):
+# - model 不硬编码云端模型名(deepseek-chat / gpt-4o-mini 等),必须由环境变量显式配置;
+#   未配置时为空字符串,由 OpenAICompatProvider.validate_config 抛 LLMConfigError fast fail。
+# - base_url 默认指向本地 Ollama(http://localhost:11434/v1),开箱即用本地模型。
+# - light / report 未单独配置时,默认复用 analysis 的 model/base_url/api_key,
+#   避免出现 "base_url 是厂商 A 但 model 是厂商 B" 的错配。
 _LLM_ANALYSIS = {
     'provider': get_env('AE_LLM_PROVIDER', 'openai_compat'),
-    'base_url': get_env('AE_LLM_BASE_URL'),
-    'api_key': get_env('AE_LLM_API_KEY'),
-    'model': get_env('AE_LLM_MODEL', 'deepseek-chat'),
+    'base_url': get_env('AE_LLM_BASE_URL', 'http://localhost:11434/v1'),
+    'api_key': get_env('AE_LLM_API_KEY', 'ollama'),
+    'model': get_env('AE_LLM_MODEL', ''),  # 不硬编码模型名,必须显式配置
     'temperature': get_env_float('AE_LLM_TEMPERATURE', 0.2),
 }
 _LLM_LIGHT = {
     'provider': get_env('AE_LLM_LIGHT_PROVIDER', _LLM_ANALYSIS['provider']),
     'base_url': get_env('AE_LLM_LIGHT_BASE_URL', _LLM_ANALYSIS['base_url']),
     'api_key': get_env('AE_LLM_LIGHT_API_KEY', _LLM_ANALYSIS['api_key']),
-    'model': get_env('AE_LLM_LIGHT_MODEL', 'gpt-4o-mini'),  # 默认指向更便宜的弱模型
+    # 未单独配置 light 模型时复用 analysis,不回退到 OpenAI 模型
+    'model': get_env('AE_LLM_LIGHT_MODEL', _LLM_ANALYSIS['model']),
     'temperature': get_env_float('AE_LLM_LIGHT_TEMPERATURE', 0.1),
+}
+_LLM_REPORT = {
+    'provider': get_env('AE_LLM_REPORT_PROVIDER', _LLM_ANALYSIS['provider']),
+    'base_url': get_env('AE_LLM_REPORT_BASE_URL', _LLM_ANALYSIS['base_url']),
+    'api_key': get_env('AE_LLM_REPORT_API_KEY', _LLM_ANALYSIS['api_key']),
+    # 未单独配置 report 模型时复用 analysis
+    'model': get_env('AE_LLM_REPORT_MODEL', _LLM_ANALYSIS['model']),
+    'temperature': get_env_float('AE_LLM_REPORT_TEMPERATURE', _LLM_ANALYSIS['temperature']),
 }
 
 LLM_CONFIGS: dict[str, dict] = {
     'analysis': _LLM_ANALYSIS,
     'light': _LLM_LIGHT,
+    'report': _LLM_REPORT,
 }
 
-# fallback 链:analysis 不可用 → light → 显式报错(不静默降级)
-LLM_FALLBACK_CHAIN: list[str] = ['analysis', 'light']
+# fallback 链:主 role 实例化失败 → 沿链向后尝试;全失败显式报错(不静默降级)
+LLM_FALLBACK_CHAIN: list[str] = ['analysis', 'light', 'report']
 
 # retry 配置(注入 ChatOpenAI 的 max_retries,SDK 自带指数退避)
 LLM_RETRY_CONFIG: dict = {
@@ -73,11 +89,12 @@ RAG_CONFIG: dict = {
     # RAG 语料 ES 索引名(由 evals/build_rag_index.py 创建 + 灌数据)
     'es_index_corpus': get_env('AE_RAG_ES_INDEX', 'auditweaver-rag-corpus'),
     # embedding 模型:OpenAI 兼容 embeddings endpoint
-    'embedding_model': get_env('AE_RAG_EMBEDDING_MODEL', 'text-embedding-3-small'),
+    # 不硬编码模型名(如 text-embedding-3-small),必须显式配置;
+    # 未配置时 embed.py 抛 EmbeddingNotConfigured,retriever 优雅降级为空 EvidencePack。
+    'embedding_model': get_env('AE_RAG_EMBEDDING_MODEL', ''),
     # embedding 独立 endpoint(chat 厂商可能不提供 embeddings,如 DeepSeek 官方无 /embeddings):
-    # 配了就走专用 embedding 服务商(如硅基流动 BAAI/bge-m3);
-    # 两项都留空 → 回退 light 角色的 base_url/api_key(向后兼容);
-    # 只配一项 → embed.py 显式抛 LLMConfigError(配置不完整不静默)
+    # 必须三项(BASE_URL / API_KEY / MODEL)同时配置或同时留空;
+    # 全留空 → RAG 优雅降级(空 EvidencePack),不影响主 Workflow。
     'embedding_base_url': get_env('AE_RAG_EMBEDDING_BASE_URL', ''),
     'embedding_api_key': get_env('AE_RAG_EMBEDDING_API_KEY', ''),
     # 向量维度(text-embedding-3-small=1536, bge-m3=1024, nomic=768)

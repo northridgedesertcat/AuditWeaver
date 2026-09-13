@@ -29,6 +29,17 @@ from .routes import workflow as workflow_routes
 # 触发所有 agent 注册(agents/__init__.py 会调用 register_agent)
 import agents  # noqa: F401,E402
 
+# 启动期配置校验:配置错 fast fail,不拖到运行时(避免 400/404 才暴露)
+from shared.config.validate import validate_runtime_config  # noqa: E402
+
+try:
+    validate_runtime_config()
+except Exception as e:
+    # 打印后让异常向上传播,阻止 uvicorn 启动
+    import sys
+    print(f"[FATAL] Agent Service 配置校验失败: {e}", file=sys.stderr)
+    raise
+
 app = FastAPI(title="AuditWeaver Agent Service", version="1.0")
 
 # FastAPI 仅对内服务 Django;开发期直接访问时放宽 CORS 以便联调

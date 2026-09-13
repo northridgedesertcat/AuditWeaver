@@ -31,6 +31,12 @@ LLM_API_KEY = get_env('AE_ANALYSIS_LLM_API_KEY', _ANALYSIS_CFG['api_key'])
 # 门控不需高随机性,0.1 保守;用 light 角色省钱(对齐 §3.1)
 VALIDATE_TEMPERATURE = get_env_float('AE_VALIDATE_TEMPERATURE', 0.1)
 
+# ============ report 节点 LLM 配置(report 角色,生成最终报告)============
+
+# report 用 report 角色(可独立配置 AE_LLM_REPORT_*,默认复用 analysis)
+# 温度默认与 analyze 一致(0.6),可单独调节
+REPORT_TEMPERATURE = get_env_float('AE_WORKFLOW_REPORT_TEMPERATURE', TEMPERATURE)
+
 # ============ enrich 循环配置 ============
 
 # enrich 循环上限:防死循环,对齐 §3.1 "enrich_count ≤ 2"

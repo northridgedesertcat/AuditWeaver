@@ -15,7 +15,8 @@
     - 只 BM25 成功 → 单路 BM25(fused=False, sources=['bm25'])
     - 只 Vector 成功 → 单路 Vector(fused=False, sources=['vector'])
     - 两路都失败 → 空 EvidencePack(fused=False, sources=[])
-    - embed_query 失败 → 不降级,直接抛错(配置问题应改 .env,不是运行时降级)
+    - embed_query 抛 EmbeddingNotConfigured → 空 EvidencePack(embedding 未配置,优雅降级)
+    - embed_query 抛其他异常 → 不降级,直接抛错(配置问题应改 .env,不是运行时降级)
 
 面试能讲什么:
 - 为什么用 EvidencePack 而不是 list:携带 fusion 元信息,LLM/前端可看是否融合 + 来源
@@ -31,7 +32,7 @@ from shared.config.settings import RAG_CONFIG
 from shared.llm.exceptions import LLMError
 
 from .bm25 import bm25_search
-from .embed import embed_query
+from .embed import EmbeddingNotConfigured, embed_query
 from .result import EvidencePack
 from .rrf import rrf_fusion
 from .vector import knn_search
@@ -62,9 +63,19 @@ def retrieve(
     multiplier = RAG_CONFIG.get("retrieve_candidate_multiplier", 2)
     candidate_k = max(top_k * multiplier, top_k)
 
-    # 1. embed query(失败显式抛错,不降级 —— 配置问题不应静默)
+    # 1. embed query
+    #    - EmbeddingNotConfigured: embedding 未配置 → 优雅降级为空 EvidencePack
+    #      (不阻断主 Workflow,analyze 节点仍可基于日志做分析)
+    #    - LLMError(配置错):显式抛出,不掩盖
+    #    - 其他异常(网络等):也显式抛出
     try:
         query_embedding = embed_query(query)
+    except EmbeddingNotConfigured:
+        logger.warning(
+            "[rag.retrieve] embedding 未配置,返回空 EvidencePack"
+            "(RAG 向量检索不可用,主 Workflow 仍可基于日志分析)"
+        )
+        return EvidencePack(query=query, evidences=[], fused=False, sources=[])
     except LLMError:
         # LLM 配置错:抛给上层处理(对齐项目原则)
         raise

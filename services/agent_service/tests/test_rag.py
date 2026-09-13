@@ -22,6 +22,7 @@ for _p in (_AGENT_SERVICE_DIR, _PROJECT_ROOT):
         sys.path.insert(0, _p)
 
 from shared.llm.exceptions import LLMConfigError
+from shared.rag.embed import EmbeddingNotConfigured
 from shared.rag.result import Evidence, EvidencePack, evidence_from_es_hit
 from shared.rag.rrf import rrf_fusion
 
@@ -279,13 +280,27 @@ class TestRetriever(unittest.TestCase):
 
     @patch("shared.rag.retriever.embed_query")
     def test_embed_failure_raises_no_degrade(self, mock_embed):
-        """embed_query 失败 → 抛错,不降级(配置问题应显式报错)。"""
+        """embed_query 失败(LLMConfigError) → 抛错,不降级(配置问题应显式报错)。"""
         from shared.rag.retriever import retrieve
 
         mock_embed.side_effect = LLMConfigError("missing api_key")
 
         with self.assertRaises(LLMConfigError):
             retrieve("test", top_k=5)
+
+    @patch("shared.rag.retriever.embed_query")
+    def test_embed_not_configured_degrades_to_empty_pack(self, mock_embed):
+        """embed_query 抛 EmbeddingNotConfigured → 返回空 EvidencePack(优雅降级)。"""
+        from shared.rag.retriever import retrieve
+
+        mock_embed.side_effect = EmbeddingNotConfigured("embedding not configured")
+
+        pack = retrieve("test", top_k=5)
+
+        self.assertTrue(pack.is_empty)
+        self.assertFalse(pack.fused)
+        self.assertEqual(pack.sources, [])
+        self.assertEqual(pack.query, "test")
 
     def test_empty_query_returns_empty_pack(self):
         """空查询:直接返回空 pack,不调 embed/bm25/knn。"""

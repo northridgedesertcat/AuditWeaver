@@ -8,8 +8,9 @@ v2.1 升级:从单节点(analyze)扩展到五节点流水线:
 - report_node: analysis 模型生成最终报告,带 source_id 引用 + 推测标记
 
 LLM 调用契约:
-- analyze / report: get_llm(role='analysis') 强模型
+- analyze: get_llm(role='analysis') 强模型
 - validate: get_llm(role='light') 弱模型(省钱,质量判断不需强推理)
+- report: get_llm(role='report') 强模型(可独立配置 AE_LLM_REPORT_*,默认复用 analysis)
 - 所有结构化输出走 invoke_structured_with_retry(解析失败附加错误反馈重试)
 
 State 字段读写(对齐 state.py):
@@ -33,6 +34,7 @@ from .config.settings import (
     LLM_MODEL,
     MAX_ENRICH_COUNT,
     RAG_TOP_K,
+    REPORT_TEMPERATURE,
     TEMPERATURE,
     VALIDATE_TEMPERATURE,
 )
@@ -108,7 +110,8 @@ async def _ensure_validate_llm() -> BaseChatModel:
 async def _ensure_report_llm() -> BaseChatModel:
     """懒加载 report 节点的结构化输出 LLM,只初始化一次。
 
-    report 需要强模型生成带 citation 的报告,用 analysis 角色。
+    report 需要强模型生成带 citation 的报告,用 report 角色
+    (可独立配置 AE_LLM_REPORT_*,默认复用 analysis)。
     """
     global _llm_report
     if _llm_report is not None:
@@ -117,11 +120,8 @@ async def _ensure_report_llm() -> BaseChatModel:
         if _llm_report is not None:
             return _llm_report
         llm = get_llm(
-            role="analysis",
-            temperature=TEMPERATURE,
-            model=LLM_MODEL,
-            base_url=LLM_BASE_URL,
-            api_key=LLM_API_KEY,
+            role="report",
+            temperature=REPORT_TEMPERATURE,
             streaming=False,
         )
         _llm_report = llm.with_structured_output(
