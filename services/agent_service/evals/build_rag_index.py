@@ -7,11 +7,9 @@
 - 用 ES bulk 写入 RAG 语料索引(content + embedding + source_id + source_type + raw)
 
 ES 索引 mapping(auditweaver-rag-corpus):
-    content:        text(analyzer=standard, BM25 用)
-    embedding:      dense_vector(dims=1536, index=true, similarity=cosine)
-    source_id:      keyword
-    source_type:    keyword
-    raw:            object(enabled=false, 不索引只存储)
+    统一定义在 docker/config/elasticsearch/mappings/auditweaver-rag-corpus.yaml，
+    由 creatMapping.py 在 docker 启动时自动创建；本脚本仅在索引不存在时从同一份 YAML
+    加载创建（兜底），不再硬编码 mapping，避免两处漂移。
 
 运行(项目根目录,需真实 ES + LLM embedding endpoint 配置):
     python -m services.agent_service.evals.build_rag_index
@@ -26,7 +24,8 @@ import argparse
 import logging
 import os
 import sys
-from pathlib import Path
+
+import yaml
 
 logger = logging.getLogger(__name__)
 
@@ -40,38 +39,75 @@ for _p in (_AGENT_SERVICE_DIR, _PROJECT_ROOT):
 from shared.config.settings import RAG_CONFIG  # noqa: E402
 from skills.config.settings import ES_INDEX_EVENTS, ES_INDEX_RAW  # noqa: E402
 from skills.es import get_es_client, is_es_available  # noqa: E402
-from shared.rag.chunking import (  # noqa: E402
-    build_corpus_evidences,
-    chunk_nginx_session,
-)
+from shared.rag.chunking import build_corpus_evidences  # noqa: E402
 from shared.rag.embed import embed_batch  # noqa: E402
 
+# RAG 索引 mapping 的单一数据源：与 creatMapping.py 共用同一份 YAML，
+# 避免 mapping 在两处漂移。build_rag_index.py 只负责灌数据，不再硬编码 mapping。
+# 注：_PROJECT_ROOT 实际指向 services/，docker/ 在项目根目录，需再上溯一级。
+_REAL_PROJECT_ROOT = os.path.dirname(_PROJECT_ROOT)
+_RAG_MAPPING_YAML = os.path.join(
+    _REAL_PROJECT_ROOT, "docker", "config", "elasticsearch", "mappings",
+    "auditweaver-rag-corpus.yaml",
+)
 
-def ensure_rag_index(es, index_name: str, embedding_dim: int) -> None:
-    """创建 RAG 语料索引(如不存在)。"""
+
+def _load_rag_mapping() -> dict:
+    """从 YAML 加载 RAG 索引 mapping（单一数据源，与 creatMapping.py 共用）。"""
+    if not os.path.exists(_RAG_MAPPING_YAML):
+        raise FileNotFoundError(
+            f"RAG mapping YAML 不存在: {_RAG_MAPPING_YAML}。"
+            f"请确认 docker/config/elasticsearch/mappings/auditweaver-rag-corpus.yaml 已创建。"
+        )
+    with open(_RAG_MAPPING_YAML, "r", encoding="utf-8") as f:
+        mapping = yaml.safe_load(f)
+    if not mapping or not isinstance(mapping, dict):
+        raise ValueError(f"RAG mapping YAML 解析失败或为空: {_RAG_MAPPING_YAML}")
+    return mapping
+
+
+def _get_yaml_embedding_dim(mapping: dict) -> int | None:
+    """从 mapping dict 中提取 dense_vector 的 dims，用于一致性校验。"""
+    try:
+        return (
+            mapping.get("mappings", {})
+            .get("properties", {})
+            .get("embedding", {})
+            .get("dims")
+        )
+    except (AttributeError, TypeError):
+        return None
+
+
+def ensure_rag_index(es, index_name: str) -> None:
+    """创建 RAG 语料索引(如不存在)。
+
+    mapping 从 docker/config/elasticsearch/mappings/auditweaver-rag-corpus.yaml 加载，
+    与 creatMapping.py 共用同一份 YAML，避免 mapping 漂移。
+    若 YAML 中 embedding.dims 与 RAG_CONFIG['embedding_dim'] 不一致，打 warning 提醒。
+    """
     if es.indices.exists(index=index_name):
         logger.info("[build_rag_index] 索引已存在: %s", index_name)
         return
-    mapping = {
-        "mappings": {
-            "properties": {
-                "content": {"type": "text", "analyzer": "standard"},
-                "embedding": {
-                    "type": "dense_vector",
-                    "dims": embedding_dim,
-                    "index": True,
-                    "similarity": "cosine",
-                },
-                "source_id": {"type": "keyword"},
-                "source_type": {"type": "keyword"},
-                "raw": {"type": "object", "enabled": False},
-            }
-        }
-    }
+
+    mapping = _load_rag_mapping()
+
+    # 维度一致性校验：YAML dims 必须与 .env 的 AE_RAG_EMBEDDING_DIM 一致，
+    # 否则 bulk 写入 embedding 时会因维度不匹配失败。
+    yaml_dim = _get_yaml_embedding_dim(mapping)
+    env_dim = RAG_CONFIG.get("embedding_dim")
+    if yaml_dim is not None and env_dim is not None and yaml_dim != env_dim:
+        logger.warning(
+            "[build_rag_index] 维度不一致：YAML dims=%d 但 AE_RAG_EMBEDDING_DIM=%d。"
+            "请同步修改 docker/config/elasticsearch/mappings/auditweaver-rag-corpus.yaml "
+            "和 .env 中的 AE_RAG_EMBEDDING_DIM，否则 bulk 写入会失败。",
+            yaml_dim, env_dim,
+        )
+
     es.indices.create(index=index_name, body=mapping)
     logger.info(
-        "[build_rag_index] 创建索引 %s (dense_vector dims=%d)",
-        index_name, embedding_dim,
+        "[build_rag_index] 创建索引 %s (dense_vector dims=%s)",
+        index_name, yaml_dim,
     )
 
 
@@ -160,8 +196,9 @@ def build_index(max_docs: int = 200, max_ips: int = 50, per_ip: int = 30, batch_
         return 0
 
     index_name = RAG_CONFIG.get("es_index_corpus", "auditweaver-rag-corpus")
-    embedding_dim = RAG_CONFIG.get("embedding_dim", 1536)
-    ensure_rag_index(es, index_name, embedding_dim)
+    # mapping 从 YAML 加载（与 creatMapping.py 共用），dims 以 YAML 为准；
+    # ensure_rag_index 内部会校验 YAML dims 与 AE_RAG_EMBEDDING_DIM 是否一致。
+    ensure_rag_index(es, index_name)
 
     # 1. 抽数据
     matched_hits = fetch_matched_logs(es, ES_INDEX_EVENTS, max_docs)

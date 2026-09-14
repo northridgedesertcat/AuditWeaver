@@ -1,0 +1,38 @@
+# RAG 语料索引 —— BM25 全文 + kNN 向量混合检索的存储
+#
+# 由 creatMapping.py 在 docker 启动时自动创建（与 matched_logs / nginx-log-raw 等一致）。
+# build_rag_index.py 仅负责从业务索引抽数据 → 切片 → embedding → bulk 灌入，不再硬编码 mapping。
+#
+# 注意：embedding.dims 必须与 .env 中的 AE_RAG_EMBEDDING_DIM 保持一致，
+# 否则 bulk 写入会因维度不匹配失败。修改任一处需同步另一处。
+settings:
+  number_of_shards: 1
+  number_of_replicas: 0
+
+mappings:
+  properties:
+    # BM25 全文检索字段（content 为切片后的自然语言描述）
+    content:
+      type: text
+      analyzer: standard
+
+    # kNN 向量检索字段（HNSW 近似最近邻，cosine 相似度）
+    # dims 必须与 .env 中的 AE_RAG_EMBEDDING_DIM 一致（qwen3-embedding:0.6b=1024）
+    embedding:
+      type: dense_vector
+      dims: 1024
+      index: true
+      similarity: cosine
+
+    # 引用溯源锚点（event_id / ES _id），供 LLM 报告挂 source_id
+    source_id:
+      type: keyword
+
+    # 来源类型（matched_logs / nginx-log-raw / analysis_report 等）
+    source_type:
+      type: keyword
+
+    # 原始 ES _source，不索引只存储，供 LLM 进一步查询时按需取用
+    raw:
+      type: object
+      enabled: false
