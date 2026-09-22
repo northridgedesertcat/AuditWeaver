@@ -1,7 +1,11 @@
-# RAG 语料索引 —— BM25 全文 + kNN 向量混合检索的存储
+# RAG 语料索引 —— BM25 全文 + kNN 向量混合检索的存储(v2 双路语料)
 #
 # 由 creatMapping.py 在 docker 启动时自动创建（与 matched_logs / nginx-log-raw 等一致）。
 # build_rag_index.py 仅负责从业务索引抽数据 → 切片 → embedding → bulk 灌入，不再硬编码 mapping。
+#
+# v2（对齐 RAG优化需求文档 §4.1）：单索引 + source_type 区分双路语料（knowledge / case）。
+# 版本化索引 + alias 蓝绿切换：物理索引名带版本号（如 auditweaver-rag-corpus-v2），
+# 读写统一走 alias `auditweaver-rag-corpus`；版本号由建库脚本管理，不进本 yaml。
 #
 # 注意：embedding.dims 必须与 .env 中的 AE_RAG_EMBEDDING_DIM 保持一致，
 # 否则 bulk 写入会因维度不匹配失败。修改任一处需同步另一处。
@@ -24,13 +28,21 @@ mappings:
       index: true
       similarity: cosine
 
-    # 引用溯源锚点（event_id / ES _id），供 LLM 报告挂 source_id
+    # 引用溯源锚点（case=event_id；knowledge={doc_id}::{chunk_index}），ES _id 同值（upsert 幂等键）
     source_id:
       type: keyword
 
-    # 来源类型（matched_logs / nginx-log-raw / analysis_report 等）
+    # 来源类型（v2 双路语料：knowledge / case）
     source_type:
       type: keyword
+
+    # 标量过滤字段（sql_injection / xss / ...；knowledge 必填，case 取主攻击类型）
+    attack_type:
+      type: keyword
+
+    # 事件时间（epoch ms）：case 路增量同步的复合游标水位依据
+    created_at:
+      type: long
 
     # 原始 ES _source，不索引只存储，供 LLM 进一步查询时按需取用
     raw:

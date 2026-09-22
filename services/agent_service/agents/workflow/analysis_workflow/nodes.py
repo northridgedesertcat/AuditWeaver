@@ -33,6 +33,7 @@ from .config.settings import (
     LLM_BASE_URL,
     LLM_MODEL,
     MAX_ENRICH_COUNT,
+    RAG_KB_TOP_K,
     RAG_TOP_K,
     REPORT_TEMPERATURE,
     TEMPERATURE,
@@ -166,22 +167,99 @@ def _build_retrieve_query(log_data: dict) -> str:
     return " ".join(parts) if parts else json.dumps(log_data, ensure_ascii=False)
 
 
+def _current_event_id(log_data: dict) -> str:
+    """提取当前事件的 event_id(用于 RAG 自引用排除,P0-2)。
+
+    兼容三种输入形态:
+    - 消费端提取后的扁平字段:log_id(= event_id,见 services/agent
+      preprocessor 的 LOG_FIELD_MAPPING)
+    - 原始检测消息:event_id 顶层字段
+    - 嵌套形态:log_context.event_id
+    """
+    return (
+        log_data.get("log_id")
+        or log_data.get("event_id")
+        or (log_data.get("log_context") or {}).get("event_id")
+        or ""
+    )
+
+
+# P1-2 双路 query 分离:attack_type → 知识语料 H1 标题语义词
+# (知识库正文是中文安全术语,直接用英文枚举值检索 BM25 命中弱;
+#  映射对齐 resources/rag/knowledge/attack_types/*.md 的 H1 标题)
+_ATTACK_TYPE_KB_TERMS = {
+    "sql_injection": "SQL 注入",
+    "xss": "XSS 跨站脚本",
+    "command_injection": "命令注入 RCE",
+    "path_traversal": "路径遍历",
+    "sensitive_access": "敏感文件访问",
+}
+
+
+def _primary_attack_type(log_data: dict) -> str:
+    """取主攻击类型(多类型事件 "path_traversal,sensitive_access" 取第一个)。"""
+    matched = (
+        log_data.get("matched_type")
+        or log_data.get("attack_type")
+        or (log_data.get("log_context") or {}).get("attack_type")
+        or ""
+    )
+    return str(matched).split(",")[0].strip()
+
+
+def _build_knowledge_query(log_data: dict, attack_type: str) -> str:
+    """knowledge 路 query(P1-2:attack_type 语义词 + path 特征词)。
+
+    与 case 路 query 的区别:去掉 IP / status / UA —— 这些是案例指纹(检索历史
+    攻击事件用),对知识检索是噪声(知识库不讨论具体 IP)。
+    """
+    terms = _ATTACK_TYPE_KB_TERMS.get(attack_type, attack_type)
+    path = log_data.get("path") or log_data.get("url") or ""
+    return " ".join(p for p in (terms, path) if p)
+
+
 async def retrieve_node(state: dict) -> dict:
     """retrieve 节点:调 RAG 把 evidence_pack 灌入 state(纯代码,不进 LLM)。
 
-    设计要点(对齐 §3.1):
+    设计要点(对齐 §3.1 + RAG优化需求文档 P0-2/P1-2):
     - 纯代码节点,零 LLM 调用,成本+确定性
     - 是流水线固定环节,不是 Agent 动态选工具
     - 检索失败(ES 不可用/索引未建)返回空 pack,后续节点自然降级
       (analyze 节点看到无证据仍能基于日志做分析,只是没有引用)
     - embed 配置错会抛 LLMError(配置问题不静默,对齐项目原则)
+    - P0-2 自引用排除:case 路传当前 event_id 进 exclude_ids,
+      检索结果不含当前正在分析的事件自身(防止"证据=复述输入")
+    - P1-2 双路 query 分离:
+        knowledge 路:attack_type 语义词 + path(无 IP/UA 噪声),
+            source_type=knowledge + attack_type 元数据过滤,取 KB_TOP_K 条
+        case 路:全量签名(IP/method/path/status/UA),source_type=case,
+            排除自身,取 TOP_K 条
+        结果按 source_type 分桶进同一 EvidencePack(Evidence.source_type 区分)
     """
     log_data = state.get("log_data", {}) or {}
-    query = _build_retrieve_query(log_data)
-    logger.info("[workflow.retrieve] query=%r top_k=%d", query[:80], RAG_TOP_K)
+    case_query = _build_retrieve_query(log_data)
+    event_id = _current_event_id(log_data)
+    exclude_ids = [event_id] if event_id else None
+    attack_type = _primary_attack_type(log_data)
+    kb_query = _build_knowledge_query(log_data, attack_type) if attack_type else ""
+    logger.info(
+        "[workflow.retrieve] case_query=%r kb_query=%r top_k=%d kb_top_k=%d exclude_ids=%s",
+        case_query[:80], kb_query[:60], RAG_TOP_K, RAG_KB_TOP_K, exclude_ids,
+    )
 
     try:
-        pack: EvidencePack = rag_retrieve(query, top_k=RAG_TOP_K)
+        # case 路:历史攻击日志(全量签名 + 自引用排除)
+        pack_case: EvidencePack = rag_retrieve(
+            case_query, top_k=RAG_TOP_K,
+            source_type="case", exclude_ids=exclude_ids,
+        )
+        # knowledge 路:安全知识背景(attack_type 过滤;matched_type 未知时跳过)
+        pack_kb: EvidencePack | None = None
+        if kb_query:
+            pack_kb = rag_retrieve(
+                kb_query, top_k=RAG_KB_TOP_K,
+                source_type="knowledge", attack_type=attack_type or None,
+            )
     except Exception as e:
         # RAG 检索失败:记日志但不抛(让 analyze 节点降级跑下去)
         # 注:embed_query 配置错会抛 LLMConfigError,这里捕获是为了让
@@ -190,9 +268,25 @@ async def retrieve_node(state: dict) -> dict:
             "[workflow.retrieve] RAG 检索失败,降级为空 evidence_pack: %s: %s",
             type(e).__name__, e,
         )
-        pack = EvidencePack(query=query, evidences=[], fused=False, sources=[])
+        pack_case = EvidencePack(query=case_query, evidences=[], fused=False, sources=[])
+        pack_kb = None
 
-    return {"evidence_pack": pack.model_dump(), "retrieved_context": _format_pack_as_context(pack)}
+    # 双路合并:Evidence.source_type 自带分桶标记(knowledge 在前 = 背景知识,
+    # case 在后 = 相似历史案例),LLM 按序消费
+    kb_evidences = list(pack_kb.evidences) if pack_kb else []
+    evidences = kb_evidences + list(pack_case.evidences)
+    merged = EvidencePack(
+        query=case_query,
+        evidences=evidences,
+        fused=bool(pack_case.fused or (pack_kb.fused if pack_kb else False)),
+        sources=sorted({e.source_type for e in evidences}),
+    )
+    logger.info(
+        "[workflow.retrieve] 双路检索完成: knowledge=%d case=%d (fused=%s)",
+        len(kb_evidences), len(pack_case.evidences), merged.fused,
+    )
+
+    return {"evidence_pack": merged.model_dump(), "retrieved_context": _format_pack_as_context(merged)}
 
 
 def _format_pack_as_context(pack: EvidencePack) -> str:

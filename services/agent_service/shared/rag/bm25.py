@@ -29,6 +29,9 @@ def bm25_search(
     top_k: int = 10,
     index: str | None = None,
     content_field: str = "content",
+    exclude_ids: list[str] | None = None,
+    source_type: str | None = None,
+    attack_type: str | None = None,
 ) -> list[Evidence]:
     """BM25 检索 ES RAG 语料索引。
 
@@ -37,6 +40,9 @@ def bm25_search(
         top_k: 返回条数
         index: ES 索引名,默认 RAG_CONFIG['es_index_corpus']
         content_field: BM25 匹配的字段名,默认 'content'
+        exclude_ids: 排除的 source_id 列表(P0-2 自引用过滤,must_not terms)
+        source_type: 元数据过滤,来源类型(knowledge / case;P1-2 双路 query 分离)
+        attack_type: 元数据过滤,攻击类型(P1-2 knowledge 路按 matched_type 过滤)
 
     Returns:
         list[Evidence]: 按 ES _score 降序排列
@@ -46,9 +52,24 @@ def bm25_search(
         return []
 
     idx = index or RAG_CONFIG.get("es_index_corpus", "auditweaver-rag-corpus")
+
+    # bool 组装:must(match content) + must_not(自引用排除) + filter(元数据过滤)
+    bool_query: dict = {"must": [{"match": {content_field: query}}]}
+    if exclude_ids:
+        bool_query.setdefault("must_not", []).append(
+            {"terms": {"source_id": exclude_ids}}
+        )
+    metadata_filters: list[dict] = []
+    if source_type:
+        metadata_filters.append({"term": {"source_type": source_type}})
+    if attack_type:
+        metadata_filters.append({"term": {"attack_type": attack_type}})
+    if metadata_filters:
+        bool_query["filter"] = metadata_filters
+
     body = {
         "size": top_k,
-        "query": {"match": {content_field: query}},
+        "query": {"bool": bool_query},
     }
     resp = es_search(idx, body)
     if resp is None:

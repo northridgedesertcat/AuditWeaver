@@ -9,6 +9,7 @@ v2 升级(对齐设计 §3.7 LLM Gateway):
 """
 from common.env import (
     get_env,
+    get_env_bool,
     get_env_float,
     get_env_int,
     AE_MEMORY_BACKEND,
@@ -105,4 +106,13 @@ RAG_CONFIG: dict = {
     'top_k': get_env_int('AE_RAG_TOP_K', 5),
     # 每路 BM25/Vector 候召回数 = top_k * multiplier(融合前抓更大候选集提升 Recall)
     'retrieve_candidate_multiplier': get_env_int('AE_RAG_CANDIDATE_MULTIPLIER', 2),
+    # ---- v2 双路语料增量(P1-1 / P1-2,对齐 RAG优化需求文档)----
+    # knowledge 路 top-K(双路 query 分离后知识证据条数,背景知识 2~3 条够用)
+    'kb_top_k': get_env_int('AE_RAG_KB_TOP_K', 3),
+    # case 路时间窗口(天):建库与增量同步共用,近 90 天 + 质量筛选
+    'case_window_days': get_env_int('AE_RAG_CASE_WINDOW_DAYS', 90),
+    # 定时增量同步开关(false = 关闭后台任务,仅手动建库)
+    'case_sync_enabled': get_env_bool('AE_RAG_CASE_SYNC_ENABLED', True),
+    # 定时增量同步间隔(秒,默认 5 分钟)
+    'case_sync_interval': get_env_int('AE_RAG_CASE_SYNC_INTERVAL', 300),
 }

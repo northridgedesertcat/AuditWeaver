@@ -47,3 +47,6 @@ MAX_ENRICH_COUNT = get_env_int('AE_WORKFLOW_MAX_ENRICH_COUNT', 2)
 
 # workflow 默认检索条数,可独立于 RAG_CONFIG.top_k 调整(对齐 §3.1 "K=5")
 RAG_TOP_K = get_env_int('AE_WORKFLOW_RAG_TOP_K', RAG_CONFIG.get('top_k', 5))
+
+# v2 双路 query 分离(P1-2):knowledge 路检索条数(背景知识 2~3 条够用)
+RAG_KB_TOP_K = get_env_int('AE_WORKFLOW_RAG_KB_TOP_K', RAG_CONFIG.get('kb_top_k', 3))

@@ -57,8 +57,10 @@ def get_env_int(key: str, default: int = 0) -> int:
 
 def get_env_bool(key: str, default: bool = False) -> bool:
     _load_env()
-    value = os.environ.get(key, '').lower()
-    return value in ('true', '1', 'yes', 'on')
+    value = os.environ.get(key)
+    if value is None:
+        return default
+    return value.lower() in ('true', '1', 'yes', 'on')
 
 
 def get_env_float(key: str, default: float = 0.0) -> float:

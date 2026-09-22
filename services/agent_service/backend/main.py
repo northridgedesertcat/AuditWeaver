@@ -5,6 +5,7 @@
 
 路径前置:FastAPI 路由不带 /api/v1 前缀,前缀由 Django 反代时保留。
 """
+import asyncio
 import os
 import sys
 
@@ -17,6 +18,8 @@ _PROJECT_ROOT = os.path.dirname(_AGENT_SERVICE_DIR)
 for _p in (_AGENT_SERVICE_DIR, _PROJECT_ROOT):
     if _p not in sys.path:
         sys.path.insert(0, _p)
+
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -31,6 +34,8 @@ import agents  # noqa: F401,E402
 
 # 启动期配置校验:配置错 fast fail,不拖到运行时(避免 400/404 才暴露)
 from shared.config.validate import validate_runtime_config  # noqa: E402
+from shared.config.settings import RAG_CONFIG  # noqa: E402
+from shared.rag.case_sync import run_case_sync_forever  # noqa: E402
 
 try:
     validate_runtime_config()
@@ -40,7 +45,29 @@ except Exception as e:
     print(f"[FATAL] Agent Service 配置校验失败: {e}", file=sys.stderr)
     raise
 
-app = FastAPI(title="AuditWeaver Agent Service", version="1.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """生命周期:启动 case 语料定时增量同步后台任务(P1-1),退出时取消。
+
+    - AE_RAG_CASE_SYNC_ENABLED=false 关闭(仅手动建库)
+    - 阻塞的 ES/embedding 调用在 run_case_sync_forever 内走 asyncio.to_thread
+    - 单轮失败只记 error 日志,循环继续(水位未推进,下轮自动补齐)
+    """
+    sync_task = None
+    if RAG_CONFIG.get("case_sync_enabled", True):
+        interval = RAG_CONFIG.get("case_sync_interval", 300)
+        sync_task = asyncio.create_task(run_case_sync_forever(interval=interval))
+    yield
+    if sync_task is not None:
+        sync_task.cancel()
+        try:
+            await sync_task
+        except (asyncio.CancelledError, Exception):  # noqa: B014
+            pass
+
+
+app = FastAPI(title="AuditWeaver Agent Service", version="1.0", lifespan=lifespan)
 
 # FastAPI 仅对内服务 Django;开发期直接访问时放宽 CORS 以便联调
 app.add_middleware(
