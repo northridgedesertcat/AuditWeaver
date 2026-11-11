@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { apiFetch } from '@/lib/api/client'
 import { Button } from "@/components/ui/button"
@@ -85,7 +85,7 @@ export function ReportDetailModal({ reportId, isOpen, onClose }: ReportDetailMod
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
-  const fetchDetail = async () => {
+  const fetchDetail = useCallback(async () => {
     setLoading(true)
     setError(null)
     setDetail(null)
@@ -103,13 +103,13 @@ export function ReportDetailModal({ reportId, isOpen, onClose }: ReportDetailMod
       setError("网络连接失败，请检查后端服务是否运行")
     }
     setLoading(false)
-  }
+  }, [reportId])
 
   useEffect(() => {
     if (isOpen && reportId) {
       fetchDetail()
     }
-  }, [isOpen, reportId])
+  }, [isOpen, reportId, fetchDetail])
 
   if (!isOpen) return null
 

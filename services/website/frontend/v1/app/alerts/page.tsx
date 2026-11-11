@@ -220,7 +220,7 @@ export default function AlertsPage() {
           <Card>
             <CardContent className="p-4">
               <div className="flex flex-wrap items-center gap-4">
-                <Select value={severityFilter} onValueChange={setSeverityFilter}>
+              <Select value={severityFilter} onValueChange={(value) => setSeverityFilter(value ?? "all")}>
                   <SelectTrigger className="w-32">
                     <SelectValue placeholder="严重程度" />
                   </SelectTrigger>
@@ -232,7 +232,7 @@ export default function AlertsPage() {
                     <SelectItem value="low">低危</SelectItem>
                   </SelectContent>
                 </Select>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value ?? "all")}>
                   <SelectTrigger className="w-32">
                     <SelectValue placeholder="状态" />
                   </SelectTrigger>

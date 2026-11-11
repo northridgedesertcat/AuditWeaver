@@ -44,7 +44,7 @@ def create_index(es, index_name, mapping, force_recreate=False):
                 es.indices.delete(index=index_name)
             else:
                 print(f"ℹ️ 索引 {index_name} 已存在，跳过创建")
-                return False
+                return True
         
         es.indices.create(index=index_name, body=mapping)
         print(f"✅ 成功创建索引: {index_name}")
@@ -75,6 +75,7 @@ def load_mappings_from_dir(mappings_dir):
                     print(f"📄 已加载映射配置: {filename} -> 索引 {index_name}")
             except Exception as e:
                 print(f"❌ 加载映射配置失败 {filename}: {str(e)}")
+                raise ValueError(f"Invalid Elasticsearch mapping: {filepath}") from e
                 
     return mappings
 
@@ -119,6 +120,8 @@ def main():
     print(f"{'=' * 70}")
     
     es.close()
+    if success_count != len(indices):
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()

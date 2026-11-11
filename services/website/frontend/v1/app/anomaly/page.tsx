@@ -342,7 +342,7 @@ export default function AnomalyPage() {
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-base font-medium">异常事件列表</CardTitle>
               <div className="flex items-center gap-2">
-                <Select value={severityFilter} onValueChange={setSeverityFilter}>
+              <Select value={severityFilter} onValueChange={(value) => setSeverityFilter(value ?? "all")}>
                   <SelectTrigger className="w-32">
                     <SelectValue placeholder="严重程度" />
                   </SelectTrigger>
