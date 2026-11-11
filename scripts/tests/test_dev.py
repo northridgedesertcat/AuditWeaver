@@ -52,6 +52,26 @@ class ConfigTests(unittest.TestCase):
             config = ServiceConfig()
         self.assertEqual(next(service for service in config.get_services() if service["id"] == "django")["port"], 8765)
 
+    def test_storage_is_disabled_by_default_without_initialization(self):
+        config = ServiceConfig({})
+        storage = next(service for service in config.get_services() if service["id"] == "log_storage")
+        self.assertFalse(storage["enabled"])
+        self.assertNotIn("storage_init", [step["id"] for step in config.get_steps()])
+
+    def test_storage_dependencies_migrate_before_initializing(self):
+        config = ServiceConfig({"STORAGE_ENABLED": "true", "CK_HOST": "archive", "CK_HTTP_PORT": "28123",
+                                "CK_SECURE": "true"}, python="test-python")
+        storage = next(service for service in config.get_services() if service["id"] == "log_storage")
+        self.assertTrue(storage["enabled"])
+        self.assertEqual(storage["command"], ["test-python", "-m", "services.log_storage", "supervise"])
+        steps = config.get_steps(["log_storage"])
+        ids = [step["id"] for step in steps]
+        self.assertLess(ids.index("django_migrate"), ids.index("storage_init"))
+        self.assertLess(ids.index("clickhouse"), ids.index("storage_init"))
+        self.assertIn("kafka_topics", ids)
+        self.assertNotIn("connectors", ids)
+        self.assertEqual(next(step["url"] for step in steps if step["id"] == "clickhouse"), "https://archive:28123/ping")
+
 
 class ReadinessTests(unittest.TestCase):
     def test_wait_failure_is_bounded(self):
@@ -123,9 +143,63 @@ class DockerTests(unittest.TestCase):
         with patch.object(docker, "run") as run:
             docker.stop_services()
             self.assertEqual(run.call_args.args, ("stop",))
+            self.assertIn("log-storage", run.call_args.kwargs["profiles"])
+
+    def test_storage_profile_is_opt_in_and_preserves_tools(self):
+        docker = DockerManager()
+        with patch.dict(os.environ, {"STORAGE_ENABLED": "false"}):
+            self.assertNotIn("log-storage", docker.command("up", "-d"))
+        with patch.dict(os.environ, {"STORAGE_ENABLED": "true"}):
+            command = docker.command("up", "-d", profiles=("tools", "log-storage"))
+            self.assertIn("tools", command)
+            self.assertEqual(command.count("log-storage"), 1)
 
 
 class LifecycleTests(unittest.TestCase):
+    def test_disabled_storage_cannot_be_started_explicitly(self):
+        args = argparse.Namespace(services=["log_storage"], no_docker=True, tools=False)
+        manager = Mock()
+        with self.assertRaisesRegex(RuntimeError, "STORAGE_ENABLED"):
+            dev.start_services(ServiceConfig({}), manager, Mock(), args)
+        manager.start.assert_not_called()
+
+    def test_default_start_skips_disabled_storage(self):
+        config = ServiceConfig({})
+        manager = Mock()
+        manager.process.return_value = Mock()
+        manager.start.return_value = False
+        args = argparse.Namespace(services=[], no_docker=True, tools=False)
+        with patch("dev.ROOT") as root, patch.dict(os.environ, {"DJANGO_SECRET_KEY": "test", "AE_LLM_MODEL": "test"}), \
+                patch("dev.initialize"), patch("dev.wait_for_process"), patch("dev.probe_service", return_value=True):
+            root.__truediv__.return_value.exists.return_value = True
+            dev.start_services(config, manager, Mock(), args)
+        self.assertNotIn("log_storage", [call.args[0]["id"] for call in manager.start.call_args_list])
+
+    def test_storage_is_started_after_initialization(self):
+        config = ServiceConfig({"STORAGE_ENABLED": "true"})
+        manager = Mock()
+        manager.process.side_effect = [None, Mock()]
+        order = []
+        manager.start.side_effect = lambda service: order.append("start") or True
+        args = argparse.Namespace(services=["log_storage"], no_docker=True, tools=False)
+        with patch("dev.ROOT") as root, patch.dict(os.environ, {"DJANGO_SECRET_KEY": "test"}), \
+                patch("dev.initialize", side_effect=lambda *_: order.append("initialize")), patch("dev.wait_for_process"):
+            root.__truediv__.return_value.exists.return_value = True
+            dev.start_services(config, manager, Mock(), args)
+        self.assertEqual(order, ["initialize", "start"])
+        manager.start.assert_called_once_with(next(s for s in config.get_services() if s["id"] == "log_storage"))
+
+    def test_stop_still_includes_storage_after_flag_is_disabled(self):
+        manager = Mock()
+        dev.stop_services(ServiceConfig({}), manager, Mock(), argparse.Namespace(services=[], no_docker=True))
+        self.assertIn("log_storage", [call.args[0] for call in manager.stop.call_args_list])
+
+    def test_disabled_storage_does_not_fail_status(self):
+        config = ServiceConfig({})
+        manager = Mock()
+        manager.process.return_value = None
+        self.assertEqual(dev.show_status(config, manager, Mock(), argparse.Namespace(services=["log_storage"], no_docker=True)), 0)
+
     def test_failed_start_rolls_back_only_new_processes(self):
         config = ServiceConfig({})
         manager = Mock()

@@ -172,18 +172,18 @@ export function Sidebar() {
     <TooltipProvider>
       <aside
         className={cn(
-          "flex h-screen flex-col border-r border-sidebar-border bg-sidebar transition-all duration-300",
-          collapsed ? "w-16" : "w-64"
+          "flex h-screen shrink-0 flex-col border-r border-sidebar-border bg-sidebar md:transition-all md:duration-300",
+          collapsed ? "w-16" : "w-16 md:w-64"
         )}
       >
         {/* Logo */}
         <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-4">
           {!collapsed && (
-            <Link href="/" className="flex items-center gap-2">
+            <Link href="/" aria-label="AuditWeaver" className="flex items-center gap-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
                 <Shield className="h-5 w-5 text-primary-foreground" />
               </div>
-              <span className="text-lg font-semibold text-sidebar-foreground">
+              <span className="hidden text-lg font-semibold text-sidebar-foreground md:inline">
                 AuditWeaver
               </span>
             </Link>
@@ -197,7 +197,7 @@ export function Sidebar() {
 
         {/* Search */}
         {!collapsed && (
-          <div className="p-3">
+          <div className="hidden p-3 md:block">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -220,6 +220,8 @@ export function Sidebar() {
               const navLink = (
                 <Link
                   href={item.href}
+                  aria-label={item.title}
+                  title={item.title}
                   className={cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                     isActive
@@ -230,12 +232,12 @@ export function Sidebar() {
                   <Icon className={cn("h-5 w-5 shrink-0", isActive && "text-sidebar-primary")} />
                   {!collapsed && (
                     <>
-                      <span className="flex-1">{item.title}</span>
+                      <span className="hidden flex-1 md:inline">{item.title}</span>
                       {item.badge && (
                         <Badge
                           variant="secondary"
                           className={cn(
-                            "h-5 px-1.5 text-xs",
+                            "hidden h-5 px-1.5 text-xs md:inline-flex",
                             item.href === "/anomaly" || item.href === "/incidents" || item.href === "/alerts" || item.href === "/reports/review"
                               ? "bg-destructive/20 text-destructive"
                               : "bg-muted text-muted-foreground"
@@ -274,7 +276,7 @@ export function Sidebar() {
 
         {/* AI Assistant Quick Access */}
         {!collapsed && (
-          <div className="p-3">
+          <div className="hidden p-3 md:block">
             <Link
               href="/agent"
               className="flex items-center gap-3 rounded-lg bg-primary/10 px-3 py-3 text-sm font-medium text-primary transition-colors hover:bg-primary/20"
@@ -286,7 +288,7 @@ export function Sidebar() {
         )}
 
         {/* Collapse Button */}
-        <div className="border-t border-sidebar-border p-2">
+        <div className="hidden border-t border-sidebar-border p-2 md:block">
           <Button
             variant="ghost"
             size="sm"

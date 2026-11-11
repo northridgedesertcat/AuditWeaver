@@ -1,4 +1,25 @@
 services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:25.8.4.13
+    profiles: [log-storage]
+    restart: unless-stopped
+    environment:
+      CLICKHOUSE_USER: ${CK_ADMIN_USER:-auditweaver_admin}
+      CLICKHOUSE_PASSWORD: ${CK_ADMIN_PASSWORD:-}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    ports:
+      - "127.0.0.1:${CK_HTTP_PORT:-18123}:8123"
+    mem_limit: 4g
+    cpus: 2
+    volumes:
+      - ck_data:/var/lib/clickhouse
+      - ./config/clickhouse/resources.xml:/etc/clickhouse-server/config.d/resources.xml:ro
+      - ./config/clickhouse/profiles.xml:/etc/clickhouse-server/users.d/profiles.xml:ro
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://localhost:8123/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
   zookeeper:
       image: confluentinc/cp-zookeeper:7.4.0
       container_name: zookeeper
@@ -183,6 +204,7 @@ services:
       retries: 20
 
 volumes:
+  ck_data:
   kafka_data:
     name: system_audit_kafka_data
   es_data:

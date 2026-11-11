@@ -38,7 +38,7 @@ except ImportError:
     sys.exit(1)
 
 try:
-    from confluent_kafka.admin import AdminClient, NewTopic
+    from confluent_kafka.admin import AdminClient, NewTopic, ConfigResource, ConfigEntry, AlterConfigOpType
     from confluent_kafka.error import KafkaException
 except ImportError:
     log.error("confluent-kafka is required. Install it via: pip install confluent-kafka")
@@ -186,15 +186,27 @@ def show_status(admin_client: AdminClient, topics: list):
     existing = list_existing_topics(admin_client)
     log.info("=" * 60)
     log.info("Topic status on cluster:")
+    for topic in topics:
+        log.info("[%s] %s", "EXISTS" if topic["name"] in existing else "MISSING", topic["name"])
     log.info("=" * 60)
-    for t in topics:
-        state = "EXISTS" if t['name'] in existing else "MISSING"
-        log.info(
-            f"  [{state:7s}] {t['name']} "
-            f"(partitions={t['partitions']}, "
-            f"replication={t['replication_factor']})"
-        )
-    log.info("=" * 60)
+
+
+def apply_existing_configs(admin, topics, dry_run=False):
+    resources = []
+    existing = list_existing_topics(admin)
+    for topic in topics:
+        if topic["name"] not in existing or not topic["configs"]:
+            continue
+        resource = ConfigResource(ConfigResource.Type.TOPIC, topic["name"])
+        for key, value in topic["configs"].items():
+            resource.add_incremental_config(ConfigEntry(key, str(value), incremental_operation=AlterConfigOpType.SET))
+        resources.append(resource)
+    if dry_run:
+        log.info("Would update configs for: %s", [r.name for r in resources])
+        return
+    for resource, future in admin.incremental_alter_configs(resources).items():
+        future.result()
+        log.info("Updated topic configs: %s", resource.name)
 
 
 def connect_brokers(brokers: str) -> AdminClient:
@@ -249,6 +261,7 @@ def parse_args() -> argparse.Namespace:
         action='store_true',
         help='Only show current topic status, do not create anything',
     )
+    parser.add_argument('--apply-configs', action='store_true', help='Explicitly apply configured retention to existing topics')
     parser.add_argument(
         '-v', '--verbose',
         action='store_true',
@@ -290,6 +303,8 @@ def main():
         else:
             show_status(admin, topics)
             created, failed = create_topics(admin, topics, dry_run=args.dry_run)
+            if args.apply_configs:
+                apply_existing_configs(admin, topics, dry_run=args.dry_run)
             show_status(admin, topics)
             if failed > 0:
                 log.error(f"{failed} topic(s) failed to be created.")

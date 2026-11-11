@@ -5,10 +5,10 @@
 
 数据边界：
 - AI 结构化分析报告 → MySQL（本表）
-- 原始访问日志（nginx-log-raw）、规则命中（matched_logs）、死信 → Elasticsearch
+- 原始访问日志和规则命中 → 统一冷热存储；死信继续存 Elasticsearch
 
 一份报告对应一个 event_id；同 event_id 重复分析时整行覆盖（与 ES 既有行为一致）。
-报告详情页所需的"原始日志行"（event.original）仍在 ES nginx-log-raw，
+报告详情页所需的"原始日志行"（event.original）由统一冷热查询回查，
 本表 ``original_log`` 仅保存规则引擎消息快照。
 """
 from django.conf import settings

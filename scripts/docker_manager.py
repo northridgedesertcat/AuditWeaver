@@ -15,7 +15,9 @@ class DockerManager:
         if env_file.exists():
             cmd += ["--env-file", str(env_file)]
         cmd += ["-f", str(self.project_dir / "docker" / "docker-compose.yml")]
-        for profile in profiles:
+        if os.environ.get("STORAGE_ENABLED", "false").lower() in {"true", "1", "yes", "on"}:
+            profiles = (*profiles, "log-storage")
+        for profile in dict.fromkeys(profiles):
             cmd += ["--profile", profile]
         return [*cmd, *args]
 
@@ -31,7 +33,7 @@ class DockerManager:
 
     def stop_services(self):
         # Stop containers without deleting containers, networks or persistent data.
-        self.run("stop", profiles=("tools",))
+        self.run("stop", profiles=("tools", "log-storage"))
 
     def check_docker_running(self):
         return subprocess.run(

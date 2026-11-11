@@ -14,7 +14,7 @@ const nextConfig = {
     return [
       {
         source: '/api/v1/:path*',
-        destination: `${(process.env.DJANGO_API_BASE || `http://localhost:${process.env.DJANGO_PORT || '8000'}`).replace(/\/$/, '')}/api/v1/:path*`,
+        destination: `${(process.env.DJANGO_API_BASE || process.env.AUDITWEAVER_API_ORIGIN || `http://localhost:${process.env.DJANGO_PORT || '8000'}`).replace(/\/$/, '')}/api/v1/:path*`,
       },
     ]
   },

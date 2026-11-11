@@ -19,7 +19,13 @@ class ServiceConfig:
         agent_host = env.get("AE_BACKEND_HOST", "127.0.0.1")
         probe_host = "127.0.0.1" if agent_host == "0.0.0.0" else agent_host
         node = shutil.which("node") or "node"
+        storage_enabled = env.get("STORAGE_ENABLED", "false").lower() in {"true", "1", "yes", "on"}
         self.services = [
+            {
+                "id": "log_storage", "cwd": ".", "enabled": storage_enabled,
+                "command": [python, "-m", "services.log_storage", "supervise"],
+                "startup_grace": 3,
+            },
             {
                 "id": "rule_engine", "cwd": ".",
                 "command": [python, "-m", "services.ruleEngine.main"],
@@ -61,6 +67,12 @@ class ServiceConfig:
             {"id": "django_check", "cwd": BACKEND_DIR, "command": [python, "manage.py", "check"]},
             {"id": "django_migrate", "cwd": BACKEND_DIR, "command": [python, "manage.py", "migrate", "--noinput"]},
         ]
+        if storage_enabled:
+            ck_scheme = "https" if env.get("CK_SECURE", "false").lower() in {"true", "1", "yes", "on"} else "http"
+            self.steps.extend([
+                {"id": "clickhouse", "url": f"{ck_scheme}://{env.get('CK_HOST', 'localhost')}:{env.get('CK_HTTP_PORT', '18123')}/ping"},
+                {"id": "storage_init", "command": [python, "-m", "services.log_storage", "init"]},
+            ])
 
     def get_services(self):
         return self.services
@@ -69,6 +81,8 @@ class ServiceConfig:
         if service_ids is None:
             return self.steps
         dependencies = {
+            "log_storage": {"elasticsearch", "kafka", "mysql", "kafka_topics", "es_mapping",
+                            "django_check", "django_migrate", "clickhouse", "storage_init"},
             "rule_engine": {"elasticsearch", "kafka", "kafka_connect", "kafka_topics", "es_mapping", "connectors"},
             "agent": {"elasticsearch", "kafka", "kafka_connect", "kafka_topics", "es_mapping", "connectors", "mysql", "django_check", "django_migrate"},
             "agent_service": {"elasticsearch", "es_mapping", "mysql", "django_check", "django_migrate"},

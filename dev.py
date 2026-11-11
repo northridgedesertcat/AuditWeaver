@@ -87,6 +87,10 @@ def initialize(config, service_ids):
 
 def start_services(config, manager, docker, args):
     services = select_services(config, args.services)
+    disabled = [service["id"] for service in services if not service.get("enabled", True)]
+    if args.services and disabled:
+        raise RuntimeError("Set STORAGE_ENABLED=true before starting log_storage.")
+    services = [service for service in services if service.get("enabled", True)]
     needs_backend = any(service["id"] != "frontend" for service in services)
     if needs_backend and not (ROOT / ".env").exists():
         raise RuntimeError("Missing .env. Copy .env.example to .env and configure it first.")
@@ -147,6 +151,9 @@ def show_status(config, manager, docker, args):
     healthy = True
     for service in select_services(config, args.services):
         process = manager.process(service["id"])
+        if not service.get("enabled", True) and process is None:
+            print(f"{service['id']:16} {'disabled':10}")
+            continue
         ready = process is not None and probe_service(service)
         state = "running" if ready else "unhealthy" if process else "stopped"
         print(f"{service['id']:16} {state:10} {f'PID {process.pid}' if process else ''}")
@@ -221,12 +228,16 @@ def check_project(args):
     from scripts.config import BACKEND_DIR, FRONTEND_DIR
     run([sys.executable, "-m", "pip", "check"])
     run([sys.executable, "-m", "unittest", "discover", "-s", "scripts/tests", "-v"])
+    run([sys.executable, "-m", "unittest", "discover", "-s", "services/log_storage/tests", "-v"])
     run([sys.executable, "-m", "unittest", "core.stable.retry.test_retry",
          "core.stable.circuit_breaker.test_circuit_breaker", "services.ruleEngine.tests.test_pipeline", "-v"])
     for test in ("test_main_retry.py", "test_main_degradation.py"):
         run([sys.executable, str(ROOT / "services" / "agent" / "tests" / test), "-v"])
     env = {**os.environ, "DJANGO_SECRET_KEY": os.environ.get("DJANGO_SECRET_KEY") or "offline-check-only-not-for-deployment"}
     run([sys.executable, "manage.py", "check"], cwd=ROOT / BACKEND_DIR, env=env)
+    test_env = {**env, "PYTHONPATH": str(ROOT) + (os.pathsep + env["PYTHONPATH"] if env.get("PYTHONPATH") else "")}
+    run([sys.executable, "manage.py", "test", "log_storage_meta",
+         "--settings=services.log_storage.test_settings", "--noinput"], cwd=ROOT / BACKEND_DIR, env=test_env)
     if not args.python_only:
         npm = shutil.which("npm.cmd" if os.name == "nt" else "npm")
         if not npm:

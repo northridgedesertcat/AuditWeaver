@@ -41,7 +41,7 @@ class TestQueryIPLogs(unittest.TestCase):
                 }],
             }
         }
-        with patch.object(mod, "search", return_value=fake):
+        with patch.object(mod, "search_logs", return_value=fake):
             r = mod.query_ip_logs("192.168.1.100", "24h", 10)
         self.assertEqual(r["ip"], "192.168.1.100")
         self.assertEqual(r["total"], 1)
@@ -55,9 +55,9 @@ class TestQueryIPLogs(unittest.TestCase):
 
     def test_es_unavailable(self):
         from services.agent_service.skills import query_ip_logs as mod
-        with patch.object(mod, "search", return_value=None):
+        with patch.object(mod, "search_logs", return_value=None):
             r = mod.query_ip_logs("10.0.0.1", "24h", 5)
-        self.assertEqual(r["total"], 0)
+        self.assertIsNone(r["total"])
         self.assertEqual(r["logs"], [])
         self.assertIn("error", r)
 
@@ -78,7 +78,8 @@ class TestQueryAnalysisResults(unittest.TestCase):
                 }],
             }
         }
-        with patch.object(mod, "search", return_value=fake):
+        row = fake["hits"]["hits"][0]["_source"]
+        with patch.object(mod, "query", side_effect=[[{"c": 1}], [row]]):
             r = mod.query_analysis_results(ip="1.2.3.4", risk_level="High")
         self.assertEqual(r["total"], 1)
         self.assertEqual(r["reports"][0]["risk_level"], "High")
@@ -106,7 +107,7 @@ class TestQuerySecurityEvents(unittest.TestCase):
                 }],
             }
         }
-        with patch.object(mod, "search", return_value=fake):
+        with patch.object(mod, "search_logs", return_value=fake):
             r = mod.query_security_events(attack_type="sql_injection")
         ev = r["events"][0]
         self.assertEqual(ev["attack_type"], "sql_injection")

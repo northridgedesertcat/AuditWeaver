@@ -4,8 +4,7 @@
 - riskLevel 仍为小写；id 仍为 event_id（= 原 ES _id）；
 - generatedAt 仍为本地时区格式化字符串；recent-alerts 的 time 仍为毫秒时间戳。
 
-唯一保留的 ES 依赖：报告详情页的"原始日志行"（event.original）
-仍查 nginx-log-raw 索引（D12）。
+报告详情页的原始日志行通过统一冷热查询回查，报告主体仍存 MySQL。
 """
 from datetime import timedelta
 
@@ -16,14 +15,12 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 
-from common.env import ES_INDEX_NGINX_RAW
+from common.log_query import QueryUnavailable, get_log_query_service
 from common.time_utils import to_epoch_millis
 
 from .models import AnalysisReport, ReportReview, ReportReviewHistory
 from .serializers import ReviewReadSerializer, ReviewWriteSerializer, HistorySerializer
 
-# 报告详情所需"原始日志行"仍在 ES（nginx-log-raw）
-from api.es_client import is_es_available, get_es_client
 
 # 认领超时（惰性过期，无需定时任务）：判断时点在认领/提交时比较 claimed_at
 CLAIM_TTL = timedelta(minutes=30)
@@ -265,8 +262,7 @@ class ReportListView(APIView):
 class ReportDetailView(APIView):
     """报告详情：按 event_id 取 analysis_report。
 
-    originalRiskData.original_log（原始日志行 event.original）仍查
-    ES nginx-log-raw（D12）；ES 不可用时返回空字符串，不影响详情主体。
+    originalRiskData.original_log 通过公共查询层获取；故障状态独立返回。
     """
 
     def get(self, request, report_id):
@@ -284,26 +280,16 @@ class ReportDetailView(APIView):
 
         attack_type = report.attack_type_ai or report.detect_type or '未知攻击'
 
-        # 原始日志行：查 ES nginx-log-raw（迁移后报告链路唯一 ES 依赖）
         original_log_content = ''
-        if is_es_available():
-            try:
-                es = get_es_client()
-                if es:
-                    log_result = es.search(
-                        index=ES_INDEX_NGINX_RAW,
-                        body={
-                            'query': {'match': {'event_id': report.event_id}},
-                            'size': 1,
-                        },
-                    )
-                    hits = log_result.get('hits', {}).get('hits', [])
-                    if hits:
-                        original_log_content = (
-                            hits[0].get('_source', {}).get('event', {}).get('original', '')
-                        )
-            except Exception:
-                pass
+        try:
+            original = get_log_query_service().get_log(report.event_id, report.log_timestamp)
+            original_log_status = original['status']
+            if original['data']:
+                original_log_content = (original['data'].get('event') or {}).get('original', '')
+                if not original_log_content:
+                    original_log_status = 'original_missing'
+        except QueryUnavailable:
+            original_log_status = 'unavailable'
 
         original_risk_data = {
             'event_id': report.event_id,
@@ -313,6 +299,7 @@ class ReportDetailView(APIView):
             'status': report.status if report.status is not None else 0,
             'path': report.path or '',
             'original_log': original_log_content,
+            'original_log_status': original_log_status,
         }
 
         # ---- 审核增量：当前结论 + 认领/处理信息（未处理时 review 为 null）----

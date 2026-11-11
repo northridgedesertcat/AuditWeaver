@@ -14,9 +14,9 @@ export function DashboardLayout({ children, title, subtitle }: DashboardLayoutPr
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar />
-      <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <Header title={title} subtitle={subtitle} />
-        <main className="flex-1 overflow-y-auto bg-background p-6">
+        <main className="min-w-0 flex-1 overflow-y-auto bg-background p-4 sm:p-6">
           {children}
         </main>
       </div>

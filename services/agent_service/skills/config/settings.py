@@ -4,7 +4,7 @@
 这样 Skills 与 Django 侧共用同一份 ES 索引配置,避免漂移。
 
 注:AI 分析报告已迁移至 MySQL ``analysis_report`` 表(经 skills/db.py 访问),
-不再有报告索引配置;原始日志(nginx-log-raw)与安全事件(matched_logs)仍在 ES。
+不再有报告索引配置;原始日志与安全事件经统一冷热查询，下面索引覆盖仅用于旧模式。
 """
 from common.env import (
     get_env,

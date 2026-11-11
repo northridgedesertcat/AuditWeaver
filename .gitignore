@@ -5,6 +5,10 @@ logs/
 *.log
 
 # Python
+node_modules/
+.next/
+*.tsbuildinfo
+.storage-pids.json
 __pycache__/
 *.py[cod]
 *$py.class
@@ -37,9 +41,6 @@ ENV/
 
 # Local service state and frontend output
 .run/
-node_modules/
-.next/
-*.tsbuildinfo
 
 # Local test dependencies (tenacity vendored for sandbox testing)
 .test_deps/

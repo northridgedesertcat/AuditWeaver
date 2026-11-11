@@ -1,10 +1,11 @@
 """Skill 3: QuerySecurityEvents —— 查询规则匹配命中的安全事件。
 
-数据源:``matched_logs``。
+数据源:统一冷热事件查询。
 """
-from common.time_utils import parse_time_range, to_epoch_millis
-from .es import search
-from .config.settings import ES_INDEX_EVENTS, MAX_SIZE_EVENTS
+from common.time_utils import to_epoch_millis
+from .log_search import search_logs
+from common.log_query import QueryError, QueryUnavailable
+from .config.settings import MAX_SIZE_EVENTS
 
 
 def _extract_detection(source: dict) -> tuple[str | None, str | None]:
@@ -32,37 +33,32 @@ def query_security_events(
     Args:
         attack_type: 攻击类型,如 sql_injection / xss / path_traversal / command_injection / sensitive_access;all 表示不过滤,默认 all。
         ip: 目标 IP;不传则查所有 IP。
-        time_range: 时间范围,可选 15m / 1h / 24h / 7d / all,默认 24h。
+        time_range: 时间范围,可选 15m / 1h / 24h / 7d / 30d / 90d,默认 24h。
         size: 返回条数上限(最大 200),默认 50。
 
     Returns:
         dict: {attack_type, ip, time_range, total, returned, events: [...]}
     """
     size = max(1, min(int(size or 50), MAX_SIZE_EVENTS))
-    gte, lte = parse_time_range(time_range)
 
-    must = [{"range": {"log_context.timestamp": {"gte": gte, "lte": lte}}}]
-    if attack_type and attack_type.lower() != "all":
-        must.append({"term": {"attack_type": attack_type}})
-    if ip:
-        must.append({"term": {"log_context.ip": ip}})
-
-    body = {
-        "size": size,
-        "query": {"bool": {"must": must}},
-        "sort": [{"log_context.timestamp": {"order": "desc"}}],
-    }
-
-    resp = search(ES_INDEX_EVENTS, body)
+    try:
+        filters = {"ip": ip}
+        if attack_type and attack_type.lower() != "all":
+            filters["attack_type"] = attack_type
+        resp = search_logs("events", time_range, size, filters)
+    except (QueryError, QueryUnavailable) as exc:
+        return {"attack_type": attack_type, "ip": ip, "time_range": time_range, "total": None, "returned": 0,
+                "events": [], "coverage": {"complete": False}, "error": str(exc)}
     if resp is None:
         return {
             "attack_type": attack_type,
             "ip": ip,
             "time_range": time_range,
-            "total": 0,
+            "total": None,
             "returned": 0,
             "events": [],
-            "error": "elasticsearch unavailable",
+            "error": "log storage unavailable",
+            "coverage": {"complete": False},
         }
 
     hits = (resp.get("hits") or {})
@@ -96,4 +92,6 @@ def query_security_events(
         "total": total,
         "returned": len(events),
         "events": events,
+        "coverage": resp.get("coverage"),
+        "has_more": resp.get("has_more", False),
     }

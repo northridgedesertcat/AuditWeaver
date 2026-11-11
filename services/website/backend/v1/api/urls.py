@@ -1,10 +1,6 @@
 from django.urls import path, re_path, include
 from .views import (
     HealthCheckView,
-    DashboardStatsView,
-    LogsView,
-    LogStatsView,
-    LogTrendView,
     AlertsView,
     AlertRulesView,
     IncidentsView,
@@ -18,6 +14,7 @@ from .views import (
     RecentAnalysesView,
     AgentProxyView,
 )
+from .log_views import DashboardStatsView, LogsView, LogStatsView, LogTrendView
 
 urlpatterns = [
     path('health/', HealthCheckView.as_view(), name='health_check'),

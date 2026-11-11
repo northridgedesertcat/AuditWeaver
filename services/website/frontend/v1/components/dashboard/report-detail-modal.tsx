@@ -40,6 +40,7 @@ interface OriginalRiskData {
   status: number
   path: string
   original_log: string
+  original_log_status?: string
 }
 
 interface ReviewData {
@@ -417,7 +418,7 @@ export function ReportDetailModal({ reportId, isOpen, onClose }: ReportDetailMod
                   <h4 className="text-sm font-medium text-foreground mb-2">原始日志</h4>
                   <div className="rounded-lg border border-border p-4 bg-muted/50">
                     <pre className="font-mono text-xs text-muted-foreground whitespace-pre-wrap break-all">
-                      {detail.originalRiskData.original_log || "暂无原始日志"}
+                      {detail.originalRiskData.original_log || (detail.originalRiskData.original_log_status === "unavailable" ? "原始日志暂时无法读取，请稍后重试" : "未找到原始日志文本")}
                     </pre>
                   </div>
                 </div>

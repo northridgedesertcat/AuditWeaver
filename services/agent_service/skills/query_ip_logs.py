@@ -1,10 +1,11 @@
 """Skill 1: QueryIPLogs —— 查询某 IP 的原始 nginx 访问日志。
 
-数据源:``nginx-log-raw``。
+数据源:统一冷热日志查询。
 """
-from common.time_utils import parse_time_range, to_epoch_millis
-from .es import search
-from .config.settings import ES_INDEX_RAW, MAX_SIZE_RAW
+from common.time_utils import to_epoch_millis
+from .log_search import search_logs
+from common.log_query import QueryError, QueryUnavailable
+from .config.settings import MAX_SIZE_RAW
 
 
 def query_ip_logs(ip: str, time_range: str = "24h", size: int = 50) -> dict:
@@ -12,37 +13,28 @@ def query_ip_logs(ip: str, time_range: str = "24h", size: int = 50) -> dict:
 
     Args:
         ip: 目标 IP 地址(必填)。
-        time_range: 时间范围,可选 15m / 1h / 24h / 7d / all,默认 24h。
+        time_range: 时间范围,可选 15m / 1h / 24h / 7d / 30d / 90d,默认 24h。
         size: 返回条数上限(最大 200),默认 50。
 
     Returns:
         dict: {ip, total, returned, time_range, logs: [...]}
     """
     size = max(1, min(int(size or 50), MAX_SIZE_RAW))
-    gte, lte = parse_time_range(time_range)
 
-    body = {
-        "size": size,
-        "query": {
-            "bool": {
-                "must": [
-                    {"term": {"ip": ip}},
-                    {"range": {"@timestamp": {"gte": gte, "lte": lte}}},
-                ]
-            }
-        },
-        "sort": [{"@timestamp": {"order": "desc"}}],
-    }
-
-    resp = search(ES_INDEX_RAW, body)
+    try:
+        resp = search_logs("raw", time_range, size, {"ip": ip})
+    except (QueryError, QueryUnavailable) as exc:
+        return {"ip": ip, "total": None, "returned": 0, "time_range": time_range, "logs": [],
+                "coverage": {"complete": False}, "error": str(exc)}
     if resp is None:
         return {
             "ip": ip,
-            "total": 0,
+            "total": None,
             "returned": 0,
             "time_range": time_range,
             "logs": [],
-            "error": "elasticsearch unavailable",
+            "error": "log storage unavailable",
+            "coverage": {"complete": False},
         }
 
     hits = (resp.get("hits") or {})
@@ -70,4 +62,6 @@ def query_ip_logs(ip: str, time_range: str = "24h", size: int = 50) -> dict:
         "returned": len(logs),
         "time_range": time_range,
         "logs": logs,
+        "coverage": resp.get("coverage"),
+        "has_more": resp.get("has_more", False),
     }

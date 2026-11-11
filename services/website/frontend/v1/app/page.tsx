@@ -38,11 +38,11 @@ export default function DashboardPage() {
         const response = await apiFetch('/dashboard/stats/')
         const data = await response.json()
         setStats({
-          logVolume: data.logVolume || "0",
+          logVolume: data.logVolume ?? "暂不可用",
           attackLogs: data.attackLogs || "0",
           highSeverityAlerts: data.highSeverityAlerts || "0",
           riskIps: data.riskIps || "0",
-          totalLogs: data.totalLogs || "0",
+          totalLogs: data.totalLogs ?? "暂不可用",
           avgResponseTime: data.avgResponseTime || "0",
         })
       } catch (error) {

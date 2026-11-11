@@ -27,6 +27,7 @@ python dev.py stop
 ```
 
 服务 ID 为 `rule_engine`、`agent_service`、`agent`、`django`、`frontend`。
+The optional `log_storage` service is enabled by `STORAGE_ENABLED=true`. It uses the same start/stop/status/logs commands, initializes after Django migrations, and enables the ClickHouse Compose profile. See `services/log_storage/README.md` for migration and cleanup requirements.
 服务清单只维护在 `scripts/config.py`。`start.py`、`start.bat`、`stop.bat` 都是兼容封装。
 Linux / WSL 使用相同的 Python 入口，无需图形终端。
 
@@ -89,6 +90,7 @@ python services/website/backend/v1/manage.py create_root_admin
 
 - `DJANGO_PORT`、`FRONTEND_PORT`、`AE_BACKEND_HOST` 和 `AE_BACKEND_PORT` 决定本机监听地址。
 - Next.js 服务端反代使用 `DJANGO_API_BASE`；留空时自动使用 `http://localhost:<DJANGO_PORT>`。
+- `AUDITWEAVER_API_ORIGIN` remains supported for existing storage previews when `DJANGO_API_BASE` is unset.
 - 修改 Django 端口后，如果显式设置过 `NEXT_PUBLIC_API_BASE`，也要同步调整；Django 到 Agent 的显式地址同理。
 - 容器化前端时可把 `DJANGO_API_BASE` 改为 `http://django:8000`，但前提是确实已建立该容器服务。
 - Next.js 仍保留尾斜杠和关闭压缩的配置，避免影响现有 Django 路由与 SSE 流式响应。
