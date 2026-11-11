@@ -16,7 +16,9 @@ class DockerManager:
     
     def start_services(self):
         logger.info(f"Starting Docker Compose services: {self.compose_file}")
-        cmd = f'docker-compose -f "{self.compose_file}" up -d'
+        from common.env import get_env_bool
+        profile = " --profile log-storage" if get_env_bool("STORAGE_ENABLED") else ""
+        cmd = f'docker-compose -f "{self.compose_file}"{profile} up -d'
         success, stdout, stderr = run_command(cmd)
         if success:
             logger.info("Docker Compose services started successfully")

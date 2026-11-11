@@ -23,22 +23,22 @@ interface HeaderProps {
 export function Header({ title, subtitle }: HeaderProps) {
   const { user, logout } = useAuth()
   return (
-    <header className="flex h-16 shrink-0 items-center justify-between border-b border-border bg-card/50 px-6">
-      <div>
-        <h1 className="text-xl font-semibold text-foreground">{title}</h1>
+    <header className="flex h-16 shrink-0 items-center justify-between gap-2 border-b border-border bg-card/50 px-4 sm:px-6">
+      <div className="min-w-0">
+        <h1 className="truncate text-base font-semibold text-foreground sm:text-xl">{title}</h1>
         {subtitle && (
-          <p className="text-sm text-muted-foreground">{subtitle}</p>
+          <p className="hidden text-sm text-muted-foreground sm:block">{subtitle}</p>
         )}
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex shrink-0 items-center gap-1 sm:gap-3">
         {/* Refresh Button */}
-        <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
+        <Button variant="ghost" size="icon" className="hidden text-muted-foreground hover:text-foreground sm:inline-flex">
           <RefreshCw className="h-4 w-4" />
         </Button>
 
         {/* Theme Toggle */}
-        <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
+        <Button variant="ghost" size="icon" className="hidden text-muted-foreground hover:text-foreground sm:inline-flex">
           <Moon className="h-4 w-4" />
         </Button>
 
@@ -80,13 +80,13 @@ export function Header({ title, subtitle }: HeaderProps) {
 
         {/* User Menu */}
         <DropdownMenu>
-          <DropdownMenuTrigger className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+          <DropdownMenuTrigger aria-label={user?.display_name || user?.username || '用户'} className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
             <Avatar className="h-7 w-7">
               <AvatarFallback className="bg-primary text-primary-foreground text-xs">
                 {user?.display_name?.[0] || user?.username?.[0] || 'U'}
               </AvatarFallback>
             </Avatar>
-            <span className="text-sm font-medium">{user?.display_name || user?.username || '用户'}</span>
+            <span className="hidden text-sm font-medium md:inline">{user?.display_name || user?.username || '用户'}</span>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
             <DropdownMenuGroup>

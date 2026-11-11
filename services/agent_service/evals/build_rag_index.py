@@ -303,10 +303,7 @@ def main():
         "--days", type=int, default=DEFAULT_CASE_WINDOW_DAYS,
         help=f"case 路时间窗口天数(默认 {DEFAULT_CASE_WINDOW_DAYS})",
     )
-    parser.add_argument(
-        "--max_docs", type=int, default=10000,
-        help="case 路拉取上限(默认 10000,近 90 天全量)",
-    )
+    parser.add_argument("--max_docs", type=int, default=0, help="可选案例上限; 0 表示流式读取完整时间窗口")
     parser.add_argument("--batch_size", type=int, default=50, help="embedding+bulk 批大小")
     parser.add_argument(
         "--switch-alias", action="store_true",
@@ -347,17 +344,27 @@ def main():
     ensure_rag_index(es, index_name)
     logger.info("[build_rag_index] 目标物理索引: %s (alias=%s)", index_name, _alias_name())
 
-    corpus_docs: list[dict] = []
+    total = 0
     if args.source in ("knowledge", "all"):
-        corpus_docs.extend(build_knowledge_corpus_docs())
+        total += embed_and_write(es, index_name, build_knowledge_corpus_docs(), batch_size=args.batch_size)
     if args.source in ("case", "all"):
-        corpus_docs.extend(build_case_corpus_docs(es, days=args.days, max_docs=args.max_docs))
-
-    if not corpus_docs:
+        from datetime import timedelta
+        from common.log_query import QuerySpec, get_log_query_service
+        from common.log_query.types import utcnow
+        now = utcnow()
+        seen = 0
+        for hits in get_log_query_service().scan_security_events(
+            QuerySpec("events", now - timedelta(days=args.days), now), batch_size=min(1000, args.batch_size),
+        ):
+            seen += len(hits)
+            if args.max_docs and seen > args.max_docs:
+                raise RuntimeError("案例超过指定上限; 新索引不完整,不得切换 alias。增大 --max_docs 或设为 0 后重建")
+            valid, _ = quality_filter_case(hits)
+            total += embed_and_write(es, index_name, hits_to_corpus_docs(valid), batch_size=args.batch_size)
+    if not total:
         logger.error("[build_rag_index] 无可入库语料(source=%s),终止", args.source)
         sys.exit(1)
 
-    total = embed_and_write(es, index_name, corpus_docs, batch_size=args.batch_size)
     logger.info(
         "[build_rag_index] 完成: source=%s index=%s 写入 %d 条;"
         "验证无误后执行 --switch-alias 切换",

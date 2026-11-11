@@ -1,0 +1,9 @@
+<clickhouse>
+    <profiles>
+        <default>
+            <max_memory_usage>536870912</max_memory_usage>
+            <max_threads>2</max_threads>
+            <max_execution_time>30</max_execution_time>
+        </default>
+    </profiles>
+</clickhouse>

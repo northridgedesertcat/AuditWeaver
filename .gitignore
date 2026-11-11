@@ -5,6 +5,10 @@ logs/
 *.log
 
 # Python
+node_modules/
+.next/
+*.tsbuildinfo
+.storage-pids.json
 __pycache__/
 *.py[cod]
 *$py.class

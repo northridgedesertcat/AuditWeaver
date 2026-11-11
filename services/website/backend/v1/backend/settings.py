@@ -71,6 +71,7 @@ INSTALLED_APPS = [
     'accounts',
     'incident_management',
     'reports',
+    'log_storage_meta',
 ]
 
 AUTH_USER_MODEL = 'accounts.User'

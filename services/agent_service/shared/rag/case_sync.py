@@ -186,6 +186,8 @@ def _embed_and_upsert(es, corpus_index: str, corpus_docs: list[dict]) -> None:
     if not corpus_docs:
         return
     embs = embed_batch([d["content"] for d in corpus_docs])  # 失败直接抛(显式报错)
+    if len(embs) != len(corpus_docs):
+        raise RuntimeError("Embedding result count differs from the corpus batch")
     actions: list[dict] = []
     for d, emb in zip(corpus_docs, embs):
         doc = dict(d)
@@ -213,6 +215,10 @@ def sync_once(
     任一批失败:抛异常终止本轮,水位停留在上一批成功位置,下轮自动补齐。
     """
     from shared.config.settings import RAG_CONFIG  # 延迟导入避免循环依赖
+    from common.env import get_env
+
+    if get_env("LOG_QUERY_MODE", "es_legacy") != "es_legacy":
+        return sync_storage_once(es, corpus_index, window_days, batch_size)
 
     if es is None:
         es = get_es_client()
@@ -262,6 +268,84 @@ def sync_once(
         stats["fetched"], stats["kept"], stats["dropped"], stats["written"],
         stats["batches"], last_created_at, last_event_id or "-",
     )
+    return stats
+
+
+def sync_storage_once(es=None, corpus_index=None, window_days=90, batch_size=50):
+    """Bootstrap via the shared reader, then consume durable archive notifications."""
+    from datetime import timedelta
+    from common.log_query import QuerySpec, get_log_query_service
+    from common.log_query.types import utcnow
+    from services.log_storage.archive import archive_lock
+    from services.log_storage.metadata import models, topic_for
+    from shared.config.settings import RAG_CONFIG
+
+    es = es or get_es_client()
+    corpus_index = corpus_index or RAG_CONFIG.get("es_index_corpus", "auditweaver-rag-corpus")
+    m = models()
+    service = get_log_query_service()
+    event_topic = topic_for("events")
+    stats = {"fetched": 0, "kept": 0, "dropped": 0, "written": 0, "batches": 0}
+    now = utcnow()
+    start = now - timedelta(days=window_days)
+    with archive_lock("rag-case-sync:" + corpus_index):
+        try:
+            state = es.get(index=corpus_index, id="__meta__storage_case_sync")["_source"]
+        except Exception as exc:
+            if getattr(exc, "status_code", None) != 404:
+                raise
+            state = {}
+        if not state.get("bootstrapped"):
+            for hits in service.scan_security_events(QuerySpec("events", start, now), batch_size=batch_size):
+                valid, quality = quality_filter_case(hits)
+                docs = hits_to_corpus_docs(valid)
+                _embed_and_upsert(es, corpus_index, docs)
+                stats["fetched"] += len(hits)
+                stats["written"] += len(docs)
+                stats["kept"] += quality["kept"]
+                stats["dropped"] += quality["dropped"]
+                stats["batches"] += 1
+            es.index(index=corpus_index, id="__meta__storage_case_sync", document={"bootstrapped": True, "at": now.isoformat()})
+        # Snapshot the pending IDs so a busy producer cannot make a sync round unbounded.
+        from django.db.models import Max
+        upper = m.EventOutbox.objects.filter(topic=event_topic).aggregate(n=Max("id"))["n"] or 0
+        while True:
+            pending = list(m.EventOutbox.objects.filter(topic=event_topic, processed_at__isnull=True, id__lte=upper).order_by("id")[:batch_size])
+            if not pending:
+                break
+            hits, remove = [], []
+            for notice in pending:
+                if notice.event_time < start or notice.event_time >= now:
+                    if notice.event_time < start:
+                        remove.append(notice.event_id)
+                    else:
+                        # A future-dated event stays pending until it enters the case window.
+                        continue
+                else:
+                    spec = QuerySpec("events", notice.event_time, notice.event_time + timedelta(milliseconds=1), {"event_id": notice.event_id})
+                    rows, _ = service.ck.fetch(spec, spec.start, spec.end, 1)
+                    if not rows:
+                        raise RuntimeError("Archived event notification has no readable source")
+                    hits.append({"_id": notice.event_id, "_source": rows[0]["payload"]})
+            valid, quality = quality_filter_case(hits)
+            valid_ids = {h["_id"] for h in valid}
+            remove.extend(h["_id"] for h in hits if h["_id"] not in valid_ids)
+            _embed_and_upsert(es, corpus_index, hits_to_corpus_docs(valid))
+            for source_id in set(remove):
+                es.options(ignore_status=404).delete(index=corpus_index, id=source_id)
+            done = [n.id for n in pending if n.event_time < now]
+            m.EventOutbox.objects.filter(id__in=done).update(processed_at=utcnow())
+            stats["fetched"] += len(hits)
+            stats["written"] += len(valid)
+            stats["kept"] += quality["kept"]
+            stats["dropped"] += quality["dropped"]
+            stats["batches"] += 1
+            # Do not repeatedly fetch future-dated pending notifications in the same round.
+            if len(done) < len(pending):
+                break
+        es.delete_by_query(index=corpus_index, body={"query": {"bool": {"filter": [
+            {"term": {"source_type": "case"}}, {"range": {"created_at": {"lt": int(start.timestamp() * 1000)}}},
+        ]}}}, conflicts="proceed")
     return stats
 
 

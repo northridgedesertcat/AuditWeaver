@@ -48,6 +48,7 @@ interface OriginalRiskData {
   status: number
   path: string
   original_log: string
+  original_log_status?: string
 }
 
 interface ReviewData {
@@ -356,7 +357,7 @@ export default function ReviewProcessingPage() {
                       <h4 className="mb-2 text-sm font-medium">原始日志</h4>
                       <div className="rounded-lg border border-border bg-muted/50 p-4">
                         <pre className="whitespace-pre-wrap break-all font-mono text-xs text-muted-foreground">
-                          {detail.originalRiskData.original_log || "暂无原始日志"}
+                          {detail.originalRiskData.original_log || (detail.originalRiskData.original_log_status === "unavailable" ? "原始日志暂时无法读取，请稍后重试" : "未找到原始日志文本")}
                         </pre>
                       </div>
                     </div>

@@ -185,6 +185,12 @@ DEFAULT_CONFIG = {
             "description": "Django Backend",
         },
         {
+            "id": "log_storage",
+            "name": "Starting log storage workers",
+            "type": "log_storage",
+            "description": "Independent CK archive and ES hot storage (optional)",
+        },
+        {
             "id": "frontend",
             "name": "Starting Next.js Frontend",
             "type": "window",

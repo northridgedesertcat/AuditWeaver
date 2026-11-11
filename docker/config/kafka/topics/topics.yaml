@@ -32,6 +32,8 @@ topics:
   - name: log.structured
     partitions: 2
     replication_factor: 1
+    configs:
+      retention.ms: "1209600000"
     description: >
       Logs after Grok/Date/Mutate processing in Logstash. Consumed by the
       RulesMatching engine for attack-pattern detection and also sinked to
@@ -71,7 +73,7 @@ topics:
     partitions: 2
     replication_factor: 1
     configs:
-      retention.ms: "259200000"
+      retention.ms: "1209600000"
     description: >
       Rule Engine produce.Consumed by the Elasticsearch.
 
@@ -98,3 +100,11 @@ topics:
       retention.ms: "259200000"
     description: >
       Unified dead letter queue for all modules (logstash / rule engine / agent).
+
+  - name: log.storage.quarantine
+    partitions: 1
+    replication_factor: 1
+    configs:
+      retention.ms: "-1"
+      retention.bytes: "-1"
+    description: Storage validation failures; retained until explicitly repaired.

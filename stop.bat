@@ -8,6 +8,9 @@ echo.
 
 set "PROJECT_DIR=%~dp0"
 set "DOCKER_COMPOSE_PATH=%PROJECT_DIR%docker\docker-compose.yml"
+pushd "%PROJECT_DIR%"
+python -m services.log_storage stop
+popd
 
 echo [1/5] Stopping Rules Matching Engine...
 taskkill /FI "WINDOWTITLE eq RulesMatching" /F >nul 2>&1

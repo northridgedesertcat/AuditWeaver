@@ -247,6 +247,20 @@ def resolve_port(port_env_key, default_port):
 
 def run_service(service, project_dir, service_config, docker_manager=None):
     service_type = service.get("type")
+
+    if service_type == "log_storage":
+        import sys
+        from common.env import get_env_bool
+        if not get_env_bool("STORAGE_ENABLED"):
+            print("          Log storage workers disabled")
+            return True
+        log_dir = os.path.join(project_dir, "logs", "log-storage")
+        os.makedirs(log_dir, exist_ok=True)
+        with open(os.path.join(log_dir, "supervisor.log"), "ab") as output:
+            subprocess.Popen([sys.executable, "-m", "services.log_storage", "supervise"], cwd=project_dir,
+                             stdout=output, stderr=subprocess.STDOUT,
+                             creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
+        return True
     
     if service_type == "docker":
         if docker_manager:

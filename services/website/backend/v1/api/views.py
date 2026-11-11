@@ -10,7 +10,6 @@ from .serializers import (
     ServerSerializer,
     ThreatSerializer,
     AIModelSerializer,
-    DashboardStatsSerializer,
 )
 from .mock_data import (
     MOCK_ALERTS,
@@ -22,7 +21,6 @@ from .mock_data import (
     MOCK_AI_MODELS,
     MOCK_RECENT_ANALYSES,
     MOCK_THREAT_FEEDS,
-    DASHBOARD_STATS,
     ALERT_STATS,
     INCIDENT_STATS,
     ANOMALY_STATS,
@@ -30,17 +28,13 @@ from .mock_data import (
     THREAT_STATS,
     AI_STATS,
 )
-from .es_client import is_es_available, get_es_client
+from .es_client import is_es_available
 import sys
 import os
 # 添加 services 目录到路径，以便导入 common 模块
 _services_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))))
 if _services_path not in sys.path:
     sys.path.insert(0, _services_path)
-from common.time_utils import now_utc, epoch_millis_now
-from common.env import ES_INDEX_NGINX_RAW
-from reports.models import AnalysisReport
-from datetime import timedelta
 
 # Agent Service 反代所需(透传 SSE 流到内部 FastAPI :8001)
 import httpx
@@ -153,198 +147,8 @@ class HealthCheckView(APIView):
             "elasticsearch": "available" if es_available else "unavailable"
         })
 
-class DashboardStatsView(APIView):
-    def get(self, request):
-        stats = {
-            "logVolume": "0",
-            "attackLogs": 0,
-            "highSeverityAlerts": 0,
-            "riskIps": 0,
-            "totalLogs": 0,
-            "avgResponseTime": "0ms",
-        }
-        
-        if is_es_available():
-            try:
-                es = get_es_client()
-                if es:
-                    now = now_utc()
-                    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-                    today_start_ms = int(today_start.timestamp() * 1000)
-                    now_ms = epoch_millis_now()
-                    
-                    # 1. 今日日志量 - nginx-log-raw (epoch_millis 格式)
-                    nginx_today_query = {
-                        "query": {
-                            "range": {
-                                "@timestamp": {
-                                    "gte": today_start_ms,
-                                    "lte": now_ms
-                                }
-                            }
-                        }
-                    }
-                    nginx_result = es.count(index=ES_INDEX_NGINX_RAW, body=nginx_today_query)
-                    today_count = nginx_result.get('count', 0)
-                    
-                    if today_count >= 1000000:
-                        stats['logVolume'] = f"{today_count/1000000:.1f}M"
-                    elif today_count >= 1000:
-                        stats['logVolume'] = f"{today_count//1000}K"
-                    else:
-                        stats['logVolume'] = str(today_count)
-                    
-                    # 2. 总日志数 - nginx-log-raw
-                    total_result = es.count(index=ES_INDEX_NGINX_RAW)
-                    stats['totalLogs'] = total_result.get('count', 0)
-                    
-            except Exception as e:
-                pass
-        
-        # 报告计数来自 MySQL analysis_report（不依赖 ES 可用性）
-        _today_start = now_utc().replace(hour=0, minute=0, second=0, microsecond=0)
-        _today_reports = AnalysisReport.objects.filter(analysis_timestamp__gte=_today_start)
-        stats['attackLogs'] = _today_reports.count()
-        stats['highSeverityAlerts'] = _today_reports.filter(
-            risk_level__in=['critical', 'high']
-        ).count()
 
-        serializer = DashboardStatsSerializer(stats)
-        return Response(serializer.data)
 
-class LogsView(APIView):
-    def get(self, request):
-        page = int(request.query_params.get('page', 1))
-        size = int(request.query_params.get('size', 20))
-        ip = request.query_params.get('ip', None)
-        method = request.query_params.get('method', None)
-        status = request.query_params.get('status', None)
-        path = request.query_params.get('path', None)
-        
-        if is_es_available():
-            try:
-                es = get_es_client()
-                if es:
-                    query = {
-                        "query": {
-                            "bool": {
-                                "must": []
-                            }
-                        },
-                        "sort": [{"@timestamp": {"order": "desc"}}],
-                        "from": (page - 1) * size,
-                        "size": size
-                    }
-                    
-                    if ip:
-                        query['query']['bool']['must'].append({"match": {"ip": ip}})
-                    if method:
-                        query['query']['bool']['must'].append({"match": {"method": method}})
-                    if status:
-                        query['query']['bool']['must'].append({"match": {"status": status}})
-                    if path:
-                        query['query']['bool']['must'].append({"wildcard": {"path": f"*{path}*"}})
-                    
-                    result = es.search(index=ES_INDEX_NGINX_RAW, body=query)
-                    logs = [hit['_source'] for hit in result['hits']['hits']]
-                    total = result['hits']['total']['value']
-                    
-                    return Response({
-                        "data": logs,
-                        "total": total,
-                        "page": page,
-                        "size": size
-                    })
-            except Exception as e:
-                pass
-        
-        return Response({
-            "data": [],
-            "total": 0,
-            "page": page,
-            "size": size
-        })
-
-class LogStatsView(APIView):
-    def get(self, request):
-        stats = {
-            "total": 0,
-            "today": 0,
-            "top_ips": [],
-            "top_paths": [],
-            "status_distribution": {}
-        }
-        
-        if is_es_available():
-            try:
-                es = get_es_client()
-                if es:
-                    now = now_utc()
-                    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-                    today_start_ms = int(today_start.timestamp() * 1000)
-                    now_ms = epoch_millis_now()
-                    
-                    total_result = es.count(index=ES_INDEX_NGINX_RAW)
-                    stats['total'] = total_result.get('count', 0)
-                    
-                    today_query = {
-                        "query": {
-                            "range": {
-                                "@timestamp": {
-                                    "gte": today_start_ms,
-                                    "lte": now_ms
-                                }
-                            }
-                        }
-                    }
-                    today_result = es.count(index=ES_INDEX_NGINX_RAW, body=today_query)
-                    stats['today'] = today_result.get('count', 0)
-                    
-                    ip_agg = {
-                        "size": 0,
-                        "aggs": {
-                            "top_ips": {
-                                "terms": {"field": "ip", "size": 10}
-                            }
-                        }
-                    }
-                    ip_result = es.search(index=ES_INDEX_NGINX_RAW, body=ip_agg)
-                    stats['top_ips'] = [
-                        {"ip": bucket['key'], "count": bucket['doc_count']}
-                        for bucket in ip_result['aggregations']['top_ips']['buckets']
-                    ]
-                    
-                    path_agg = {
-                        "size": 0,
-                        "aggs": {
-                            "top_paths": {
-                                "terms": {"field": "path", "size": 10}
-                            }
-                        }
-                    }
-                    path_result = es.search(index=ES_INDEX_NGINX_RAW, body=path_agg)
-                    stats['top_paths'] = [
-                        {"path": bucket['key'], "count": bucket['doc_count']}
-                        for bucket in path_result['aggregations']['top_paths']['buckets']
-                    ]
-                    
-                    status_agg = {
-                        "size": 0,
-                        "aggs": {
-                            "status_dist": {
-                                "terms": {"field": "status", "size": 20}
-                            }
-                        }
-                    }
-                    status_result = es.search(index=ES_INDEX_NGINX_RAW, body=status_agg)
-                    stats['status_distribution'] = {
-                        str(bucket['key']): bucket['doc_count']
-                        for bucket in status_result['aggregations']['status_dist']['buckets']
-                    }
-            except Exception as e:
-                pass
-        
-        return Response(stats)
 
 class AlertsView(APIView):
     def get(self, request):
@@ -443,65 +247,3 @@ class AIModelsView(APIView):
 class RecentAnalysesView(APIView):
     def get(self, request):
         return Response(MOCK_RECENT_ANALYSES)
-
-class LogTrendView(APIView):
-    def get(self, request):
-        trend_data = []
-        
-        if is_es_available():
-            try:
-                es = get_es_client()
-                if es:
-                    now = now_utc()
-                    start_time = now - timedelta(hours=24)
-                    start_time_ms = int(start_time.timestamp() * 1000)
-                    now_ms = epoch_millis_now()
-                    
-                    query = {
-                        "size": 0,
-                        "query": {
-                            "range": {
-                                "@timestamp": {
-                                    "gte": start_time_ms,
-                                    "lte": now_ms
-                                }
-                            }
-                        },
-                        "aggs": {
-                            "hourly": {
-                                "date_histogram": {
-                                    "field": "@timestamp",
-                                    "calendar_interval": "hour",
-                                    "min_doc_count": 0,
-                                    "extended_bounds": {
-                                        "min": start_time_ms,
-                                        "max": now_ms
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    
-                    result = es.search(index=ES_INDEX_NGINX_RAW, body=query)
-                    buckets = result['aggregations']['hourly']['buckets']
-                    
-                    trend_data = []
-                    for bucket in buckets:
-                        trend_data.append({
-                            "time": bucket['key'],
-                            "logs": bucket['doc_count']
-                        })
-            except Exception as e:
-                pass
-        
-        if not trend_data:
-            trend_data = []
-            current = now_utc()
-            for i in range(24):
-                hour_time = current - timedelta(hours=23 - i)
-                trend_data.append({
-                    "time": int(hour_time.replace(minute=0, second=0, microsecond=0).timestamp() * 1000),
-                    "logs": 0
-                })
-        
-        return Response({"data": trend_data})

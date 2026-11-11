@@ -349,6 +349,12 @@ def main():
         connector_files = discover_connector_files(connectors_dir)
 
     log.info(f"Found {len(connector_files)} connector file(s)")
+    project_root = Path(__file__).resolve().parents[3]
+    if str(project_root) not in sys.path:
+        sys.path.insert(0, str(project_root))
+    from common.env import get_env_bool
+    if not get_env_bool("STORAGE_LEGACY_CONNECTORS_ENABLED", True):
+        connector_files = [p for p in connector_files if p.name not in {"log-structured-sink.json", "rule-event-save-sink.json"}]
 
     try:
         if args.list_only:
