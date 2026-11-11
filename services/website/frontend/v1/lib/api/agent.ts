@@ -102,7 +102,6 @@ export async function streamAgentChat(
   const decoder = new TextDecoder("utf-8")
   let buffer = ""
 
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     const { value, done } = await reader.read()
     if (done) break

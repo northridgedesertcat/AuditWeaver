@@ -15,7 +15,8 @@
     - 只 BM25 成功 → 单路 BM25(fused=False, sources=['bm25'])
     - 只 Vector 成功 → 单路 Vector(fused=False, sources=['vector'])
     - 两路都失败 → 空 EvidencePack(fused=False, sources=[])
-    - embed_query 失败 → 不降级,直接抛错(配置问题应改 .env,不是运行时降级)
+    - embed_query 抛 EmbeddingNotConfigured → 空 EvidencePack(embedding 未配置,优雅降级)
+    - embed_query 抛其他异常 → 不降级,直接抛错(配置问题应改 .env,不是运行时降级)
 
 面试能讲什么:
 - 为什么用 EvidencePack 而不是 list:携带 fusion 元信息,LLM/前端可看是否融合 + 来源
@@ -31,7 +32,7 @@ from shared.config.settings import RAG_CONFIG
 from shared.llm.exceptions import LLMError
 
 from .bm25 import bm25_search
-from .embed import embed_query
+from .embed import EmbeddingNotConfigured, embed_query
 from .result import EvidencePack
 from .rrf import rrf_fusion
 from .vector import knn_search
@@ -43,6 +44,9 @@ def retrieve(
     query: str,
     top_k: int | None = None,
     rrf_k: int | None = None,
+    exclude_ids: list[str] | None = None,
+    source_type: str | None = None,
+    attack_type: str | None = None,
 ) -> EvidencePack:
     """混合检索 BM25 + Vector,RRF 融合返回 EvidencePack。
 
@@ -50,6 +54,11 @@ def retrieve(
         query: 查询文本
         top_k: 返回条数,默认 RAG_CONFIG['top_k']
         rrf_k: RRF 参数 k,默认 RAG_CONFIG['rrf_k']
+        exclude_ids: 排除的 source_id 列表(P0-2 自引用过滤,
+            两路均生效:BM25 must_not / kNN filter 预过滤)
+        source_type: 元数据过滤(knowledge / case;P1-2 双路 query 分离,
+            None = 双路语料混合检索)
+        attack_type: 元数据过滤(P1-2 knowledge 路按 matched_type 过滤)
 
     Returns:
         EvidencePack(query, evidences, fused, sources)
@@ -62,9 +71,19 @@ def retrieve(
     multiplier = RAG_CONFIG.get("retrieve_candidate_multiplier", 2)
     candidate_k = max(top_k * multiplier, top_k)
 
-    # 1. embed query(失败显式抛错,不降级 —— 配置问题不应静默)
+    # 1. embed query
+    #    - EmbeddingNotConfigured: embedding 未配置 → 优雅降级为空 EvidencePack
+    #      (不阻断主 Workflow,analyze 节点仍可基于日志做分析)
+    #    - LLMError(配置错):显式抛出,不掩盖
+    #    - 其他异常(网络等):也显式抛出
     try:
         query_embedding = embed_query(query)
+    except EmbeddingNotConfigured:
+        logger.warning(
+            "[rag.retrieve] embedding 未配置,返回空 EvidencePack"
+            "(RAG 向量检索不可用,主 Workflow 仍可基于日志分析)"
+        )
+        return EvidencePack(query=query, evidences=[], fused=False, sources=[])
     except LLMError:
         # LLM 配置错:抛给上层处理(对齐项目原则)
         raise
@@ -77,8 +96,16 @@ def retrieve(
         raise
 
     # 2. 两路检索(顺序执行;ES 同连,顺序开销小,后期需并发可加 asyncio.to_thread)
-    bm25_results = bm25_search(query, top_k=candidate_k)
-    vector_results = knn_search(query_embedding, top_k=candidate_k)
+    #    过滤参数(exclude_ids / source_type / attack_type)两路透传,语义一致:
+    #    BM25 = bool must_not + filter;kNN = filter 预过滤(HNSW 图遍历前,不丢召回)
+    bm25_results = bm25_search(
+        query, top_k=candidate_k,
+        exclude_ids=exclude_ids, source_type=source_type, attack_type=attack_type,
+    )
+    vector_results = knn_search(
+        query_embedding, top_k=candidate_k,
+        exclude_ids=exclude_ids, source_type=source_type, attack_type=attack_type,
+    )
 
     # 3. 决策融合 / 降级(显式语义,不静默)
     if bm25_results and vector_results:

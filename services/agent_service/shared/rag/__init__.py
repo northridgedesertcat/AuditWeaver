@@ -24,7 +24,12 @@ from .chunking import (
     chunk_event_to_evidence,
     chunk_nginx_session,
 )
-from .embed import clear_embed_cache, embed_batch, embed_query
+from .embed import (
+    EmbeddingNotConfigured,
+    clear_embed_cache,
+    embed_batch,
+    embed_query,
+)
 from .result import Evidence, EvidencePack, evidence_from_es_hit
 from .retriever import retrieve
 from .rrf import rrf_fusion
@@ -41,6 +46,7 @@ __all__ = [
     "embed_query",
     "embed_batch",
     "clear_embed_cache",
+    "EmbeddingNotConfigured",
     # bm25 / vector
     "bm25_search",
     "knn_search",

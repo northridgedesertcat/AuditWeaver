@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { DashboardLayout } from "@/components/layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -67,7 +67,7 @@ export default function LogsPage() {
   const [page, setPage] = useState(1)
   const [size] = useState(20)
 
-  const fetchLogs = async () => {
+  const fetchLogs = useCallback(async () => {
     setLoading(true)
     try {
       const response = await apiFetch(`/logs/?page=${page}&size=${size}`)
@@ -79,11 +79,11 @@ export default function LogsPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [page, size])
 
   useEffect(() => {
     fetchLogs()
-  }, [page])
+  }, [fetchLogs])
 
   const handleRefresh = () => {
     fetchLogs()
@@ -274,7 +274,7 @@ export default function LogsPage() {
                           </TableCell>
                           <TableCell className="max-w-[400px] truncate text-sm">
                             {log.event?.original?.substring(0, 100) || "-"}
-                            {log.event?.original?.length > 100 && "..."}
+                            {(log.event?.original?.length ?? 0) > 100 && "..."}
                           </TableCell>
                         </TableRow>
                       ))}

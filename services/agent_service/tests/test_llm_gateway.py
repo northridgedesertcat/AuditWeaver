@@ -28,6 +28,22 @@ for _p in (_AGENT_SERVICE_DIR, _PROJECT_ROOT):
 class TestLLMConfigAndRouting(unittest.TestCase):
     """角色路由 + 配置缺失显式报错。"""
 
+    def setUp(self):
+        """每个测试前确保 analysis/light 角色有合法 model,不依赖 .env。"""
+        from shared.config import settings as settings_module
+        self._orig_analysis_model = settings_module.LLM_CONFIGS['analysis']['model']
+        self._orig_light_model = settings_module.LLM_CONFIGS['light']['model']
+        self._orig_report_model = settings_module.LLM_CONFIGS['report']['model']
+        settings_module.LLM_CONFIGS['analysis']['model'] = 'test-analysis-model'
+        settings_module.LLM_CONFIGS['light']['model'] = 'test-light-model'
+        settings_module.LLM_CONFIGS['report']['model'] = 'test-report-model'
+
+    def tearDown(self):
+        from shared.config import settings as settings_module
+        settings_module.LLM_CONFIGS['analysis']['model'] = self._orig_analysis_model
+        settings_module.LLM_CONFIGS['light']['model'] = self._orig_light_model
+        settings_module.LLM_CONFIGS['report']['model'] = self._orig_report_model
+
     def test_get_llm_default_role_is_analysis(self):
         """get_llm() 无参 → role='analysis',行为对齐 v1。"""
         from shared.llm.factory import get_llm
@@ -42,6 +58,13 @@ class TestLLMConfigAndRouting(unittest.TestCase):
         from shared.config.settings import LLM_CONFIGS
         llm = get_llm(role='light')
         self.assertEqual(llm.model_name, LLM_CONFIGS['light']['model'])
+
+    def test_get_llm_role_report_uses_report_model(self):
+        """get_llm(role='report') → 用 report 角色的 model。"""
+        from shared.llm.factory import get_llm
+        from shared.config.settings import LLM_CONFIGS
+        llm = get_llm(role='report')
+        self.assertEqual(llm.model_name, LLM_CONFIGS['report']['model'])
 
     def test_get_llm_overrides_apply(self):
         """workflow nodes.py 的调用方式:get_llm(temperature=, model=, ...) overrides。"""
@@ -74,9 +97,38 @@ class TestLLMConfigAndRouting(unittest.TestCase):
         finally:
             settings_module.LLM_CONFIGS['analysis']['api_key'] = original
 
+    def test_missing_model_raises_config_error(self):
+        """analysis 角色 model 为空 → LLMConfigError(不硬编码默认模型名)。"""
+        from shared.llm.factory import get_llm
+        from shared.llm.exceptions import LLMConfigError
+        from shared.config import settings as settings_module
+        original = settings_module.LLM_CONFIGS['analysis']['model']
+        try:
+            settings_module.LLM_CONFIGS['analysis']['model'] = ''
+            with self.assertRaises(LLMConfigError) as ctx:
+                get_llm(role='analysis')
+            self.assertIn('model', str(ctx.exception))
+        finally:
+            settings_module.LLM_CONFIGS['analysis']['model'] = original
+
 
 class TestFallbackChain(unittest.TestCase):
     """fallback 链:主 role 实例化失败 → 走下一 role。"""
+
+    def setUp(self):
+        """确保 analysis/light/report 有合法 model,不依赖 .env。"""
+        from shared.config import settings as settings_module
+        self._orig_models = {
+            role: settings_module.LLM_CONFIGS[role]['model']
+            for role in ('analysis', 'light', 'report')
+        }
+        for role in ('analysis', 'light', 'report'):
+            settings_module.LLM_CONFIGS[role]['model'] = f'test-{role}-model'
+
+    def tearDown(self):
+        from shared.config import settings as settings_module
+        for role, model in self._orig_models.items():
+            settings_module.LLM_CONFIGS[role]['model'] = model
 
     def test_fallback_when_primary_runtime_failure(self):
         """主 role 实例化抛非 LLMConfigError → 走 fallback 到 light。"""

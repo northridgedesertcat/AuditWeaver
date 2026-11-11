@@ -3,7 +3,7 @@
 > 一个基于 AI 和 Dify 的日志分析平台。
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg "License")](#license)
-[![Python](https://img.shields.io/badge/python-3.11+-blue.svg "Python")]()
+[![Python](https://img.shields.io/badge/python-3.12+-blue.svg "Python")]()
 [![Docker](https://img.shields.io/badge/docker-supported-blue.svg "Docker")]()
 
 [English](README.md) | 简体中文
@@ -92,7 +92,8 @@ AuditWeaver/
 │   ├── riskAssessment/  # 风险评估模块
 │   └── website/         # Web 平台（Django + Next.js）
 ├── .env.example         # 环境变量模板
-├── start.py             # 一键启动脚本（Python）
+├── dev.py               # 统一启停、状态、日志和检查入口
+├── start.py             # dev.py start 的兼容入口
 ├── start.bat            # 一键启动脚本（Windows）
 ├── stop.bat             # 停止脚本（Windows）
 ├── requirements.txt
@@ -108,9 +109,9 @@ AuditWeaver/
 
 在开始之前，请确保已安装以下依赖：
 
-- Python 3.11+
-- Node.js 18+（Next.js 前端开发需要）
-- Docker & Docker Compose
+- Python 3.12+（推荐 3.13，见 `.python-version`）
+- Node.js 22.13+ 的 22 LTS 系列，或 24+（推荐 22 LTS，见 `.nvmrc`），npm 10+
+- Docker 与支持 `up --wait` 的 Compose v2（建议 2.20+）
 - 运行中的 Dify 平台（或本地 LLM Ollama）
 
 ### 2. 克隆仓库
@@ -123,16 +124,22 @@ cd AuditWeaver
 ### 3. 安装 Python 依赖
 
 ```bash
-pip install -r requirements.txt
+python -m venv .venv
+# Windows PowerShell：
+.venv\Scripts\Activate.ps1
+# Linux / WSL：source .venv/bin/activate
+python -m pip install -r requirements.txt
 ```
 
-### 4. 安装前端依赖（可选，开发时需要）
+需要孤立森林训练、评估或推理工具时，再安装：`python -m pip install -r requirements-model.txt`。
+
+### 4. 安装前端依赖
 
 ```bash
-cd services/website/frontend/v1
-npm install
-cd ../../..
+npm --prefix services/website/frontend/v1 ci
 ```
+
+前端统一使用 npm 和已提交的 `package-lock.json`，不再维护 pnpm/yarn 锁文件。
 
 ### 5. 配置 Dify 平台
 
@@ -151,25 +158,41 @@ cp .env.example .env
 编辑 `.env` 文件，配置以下内容：
 - `DIFY_API_KEY`：你的 Dify API 密钥
 - `DIFY_BASE_URL`：Dify API 地址
+- `DJANGO_SECRET_KEY`：独立生成的随机密钥
+- `REDIS_PASSWORD`：替换 `change-me`，同步修改两个 Redis URL 中的密码，特殊字符需 URL 编码
+- `AE_LLM_MODEL`：启动 Agent Service 必填，并配置对应模型地址和密钥
 - 根据需要调整其他服务端口
 
 ### 7. 启动所有服务
 
 ```bash
-python start.py
+python dev.py doctor
+python dev.py start
 ```
 
 启动脚本会自动完成以下步骤：
-1. 启动所有 Docker Compose 服务（Kafka、Elasticsearch、Kibana、Logstash、Kafka Connect）
-2. 等待 Elasticsearch 和 Kafka 就绪
-3. 初始化 Kafka Topics 和 Elasticsearch 索引
-4. 初始化 Kafka Connect 连接器
-5. 启动规则引擎、Agent 模块、Django 后端和 Next.js 前端
+1. 通过 Compose 启动基础服务并等待健康检查通过，Kibana 通过 `--tools` 按需启用
+2. 检查依赖，初始化 Kafka Topics、Elasticsearch 索引和 Kafka Connect 连接器
+3. 检查 Django 配置、完成数据库迁移，再启动业务进程
+4. 启动规则引擎、Agent Service、分析进程、Django 和 Next.js，启动失败时明确报错
+
+`start.py` 和 Windows 双击脚本均调用同一个入口，不再依赖弹窗或 Linux 的 `xterm`。
+
+```bash
+python dev.py status
+python dev.py logs agent_service --tail 100 --follow
+python dev.py stop
+python dev.py check --build
+```
+
+需要在编辑器中调试某个服务时，只启动其他服务。例如：
+`python dev.py start rule_engine agent_service agent frontend`，Django 留给编辑器启动。
+基础服务由你自行管理时加 `--no-docker`。详细行为、限制和 WSL 准备见[开发指南](docs/development.md)。
 
 启动完成后，访问：
 - 仪表板前端: http://localhost:3000
 - Django 后端 API: http://localhost:8000
-- Kibana: http://localhost:5601
+- Kibana（加 `--tools` 时）: http://localhost:5601
 
 ***
 
@@ -182,6 +205,8 @@ python start.py
 | DJANGO_SECRET_KEY         | Django 密钥 | -           |
 | DJANGO_DEBUG              | Django 调试模式 | True        |
 | DJANGO_PORT               | Django 后端端口 | 8000        |
+| FRONTEND_PORT             | Next.js 开发服务器端口 | 3000 |
+| DJANGO_API_BASE           | Next.js 服务端反代地址，留空时跟随 DJANGO_PORT | - |
 | ES_HOST                   | Elasticsearch 主机 | localhost   |
 | ES_PORT                   | Elasticsearch 端口 | 19200       |
 | KAFKA_BROKERS             | Kafka 代理地址 | localhost:29092 |

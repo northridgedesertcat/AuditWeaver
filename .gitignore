@@ -30,9 +30,16 @@ wheels/
 *.egg
 
 # Virtual environments
+.venv/
 venv/
 env/
 ENV/
+
+# Local service state and frontend output
+.run/
+node_modules/
+.next/
+*.tsbuildinfo
 
 # Local test dependencies (tenacity vendored for sandbox testing)
 .test_deps/

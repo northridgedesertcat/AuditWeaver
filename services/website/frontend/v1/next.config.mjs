@@ -7,9 +7,6 @@ const nextConfig = {
   // curl 默认不发所以 curl 看似正常但浏览器一次性输出)。SSE 本身靠小 chunk 实时推送,
   // 压缩收益低但缓冲代价高。
   compress: false,
-  typescript: {
-    ignoreBuildErrors: true,
-  },
   images: {
     unoptimized: true,
   },
@@ -17,7 +14,7 @@ const nextConfig = {
     return [
       {
         source: '/api/v1/:path*',
-        destination: 'http://localhost:8000/api/v1/:path*',
+        destination: `${(process.env.DJANGO_API_BASE || `http://localhost:${process.env.DJANGO_PORT || '8000'}`).replace(/\/$/, '')}/api/v1/:path*`,
       },
     ]
   },

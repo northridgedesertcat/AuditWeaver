@@ -1,13 +1,17 @@
-version: '3.8'
-
 services:
   zookeeper:
       image: confluentinc/cp-zookeeper:7.4.0
       container_name: zookeeper
       environment:
-        - ZOOKEEPER_CLIENT_PORT=${ZOOKEEPER_PORT:-2181}
+        - ZOOKEEPER_CLIENT_PORT=2181
       volumes:
         - zk_data:/var/lib/zookeeper/data
+      healthcheck:
+        test: ["CMD", "cub", "zk-ready", "localhost:2181", "10"]
+        interval: 10s
+        timeout: 15s
+        retries: 12
+        start_period: 20s
 
   kafka:
     image: confluentinc/cp-kafka:7.4.0
@@ -16,7 +20,8 @@ services:
       - "9092:9092"
       - "${KAFKA_PORT:-29092}:${KAFKA_PORT:-29092}"
     depends_on:
-      - zookeeper
+      zookeeper:
+        condition: service_healthy
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
@@ -28,15 +33,24 @@ services:
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
     volumes:
       - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
+      interval: 10s
+      timeout: 15s
+      retries: 12
+      start_period: 30s
   
   kafka-connect:
     build: ./config/kafka-connect
     container_name: kafka-connect
     hostname: kafka-connect
     depends_on:
-      - kafka
+      kafka:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
     ports:
-      - "8083:8083"
+      - "${KAFKA_CONNECT_PORT:-8083}:8083"
 
     environment:
       # Kafka
@@ -65,6 +79,12 @@ services:
       CONNECT_INTERNAL_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
       # Connector Plugins
       CONNECT_PLUGIN_PATH: /usr/share/java,/usr/share/confluent-hub-components
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8083/connectors"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 30s
 
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.12.0
@@ -77,13 +97,21 @@ services:
       - "${ES_PORT:-19200}:9200"
     volumes:
       - es_data:/usr/share/elasticsearch/data 
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=3s"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 30s
 
   logstash:
     image: docker.elastic.co/logstash/logstash:8.12.0
     container_name: logstash
     depends_on:
-      - kafka
-      - elasticsearch
+      kafka:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
     volumes:
       - ./config/logstash/pipeline:/usr/share/logstash/pipeline
     environment:
@@ -91,6 +119,7 @@ services:
       - KAFKA_TOPIC_STRUCTURED=${KAFKA_TOPIC_STRUCTURED:-log.structured}
 
   kibana:
+    profiles: ["tools"]
     image: docker.elastic.co/kibana/kibana:8.12.0
     container_name: kibana
     ports:
@@ -98,7 +127,8 @@ services:
     environment:
       ELASTICSEARCH_HOSTS: http://elasticsearch:9200
     depends_on:
-      - elasticsearch
+      elasticsearch:
+        condition: service_healthy
 
   mysql:
     image: mysql:8.0
@@ -117,11 +147,19 @@ services:
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$${MYSQL_PASSWORD}\" mysql --protocol=TCP -h 127.0.0.1 -u \"$${MYSQL_USER}\" \"$${MYSQL_DATABASE}\" -e 'SELECT 1'"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
 
   redis:
     image: redis:8.0-alpine
     container_name: redis
     restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
     command:
       - redis-server
       - --requirepass
@@ -138,6 +176,11 @@ services:
       - "${REDIS_PORT:-16379}:6379"
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$${REDIS_PASSWORD}\" redis-cli ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
 volumes:
   kafka_data:

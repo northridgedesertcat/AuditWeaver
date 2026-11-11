@@ -1,17 +1,20 @@
-"""Query Embedding —— 走 LLM Gateway light 角色调 OpenAI 兼容 embeddings endpoint。
+"""Query Embedding —— 走独立的 OpenAI-compatible embeddings endpoint。
 
 设计要点(对齐 §3.4 / §3.7):
-- embedding 专用 endpoint:AE_RAG_EMBEDDING_BASE_URL / AE_RAG_EMBEDDING_API_KEY
-  (chat 与 embedding 可走不同厂商,如 chat=DeepSeek + embedding=硅基流动 bge-m3);
-  两项都留空时回退 light 角色配置(向后兼容)
-- 不走 ChatOpenAI(那是对话模型),用 openai 库直调 embeddings API
-- 配置缺失/不完整(api_key/base_url)显式抛 LLMConfigError,不静默降级(对齐项目原则)
-- 进程内 LRU 缓存:同 query 文本复用 embedding,避免重复调 API
-- 批量接口 embed_batch:建索引时一次批量多文本,省 API 调用次数
+- embedding 专用 endpoint:AE_RAG_EMBEDDING_BASE_URL / AE_RAG_EMBEDDING_API_KEY /
+  AE_RAG_EMBEDDING_MODEL(chat 与 embedding 可走不同厂商,如 chat=Ollama +
+  embedding=硅基流动 bge-m3)。
+- 不再回退到 light LLM 的 endpoint(DeepSeek 等厂商不提供 /embeddings,
+  回退会导致 404)。
+- 三项全未配置 → 抛 EmbeddingNotConfigured,由 retriever 优雅降级为空 EvidencePack。
+- 只配了部分 → 抛 LLMConfigError(配置不完整不静默,对齐项目原则)。
+- 不走 ChatOpenAI(那是对话模型),用 openai 库直调 embeddings API。
+- 进程内 LRU 缓存:同 query 文本复用 embedding,避免重复调 API。
+- 批量接口 embed_batch:建索引时一次批量多文本,省 API 调用次数。
 
 面试能讲什么:
 - 为什么 query 和 document 用同一个 embedding 模型:cosine 相似度要求同向量空间
-- 为什么走 light 角色:embedding 不需要推理能力,弱模型/小模型足够且便宜
+- 为什么走独立 endpoint:chat 厂商(如 DeepSeek 官方)不一定提供 /embeddings
 - 为什么缓存:同 query 多次检索(决策门控触发 replan 时)避免重复花 token
 """
 from __future__ import annotations
@@ -19,10 +22,21 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from shared.config.settings import LLM_CONFIGS, RAG_CONFIG
+from shared.config.settings import RAG_CONFIG
 from shared.llm.exceptions import LLMConfigError
 
 logger = logging.getLogger(__name__)
+
+
+class EmbeddingNotConfigured(LLMConfigError):
+    """embedding 未配置(base_url / api_key / model 全空)。
+
+    与 LLMConfigError 的区别:
+    - EmbeddingNotConfigured 表示"用户主动不配置 embedding",retriever 应优雅降级
+      为空 EvidencePack,不阻断主 Workflow。
+    - LLMConfigError 表示"配置了但不完整/不合法",应显式报错让用户改 .env。
+    """
+
 
 # 进程内缓存:key=query 文本(前 200 字),value=embedding 向量
 # 不做 LRU 上限:RAG 查询词数量有限,后期可换 functools.lru_cache
@@ -30,63 +44,58 @@ _embed_cache: dict[str, list[float]] = {}
 _client: Any = None  # openai.OpenAI 实例,懒加载
 
 
-def _resolve_embed_credentials() -> tuple[str, str]:
-    """解析 embedding endpoint 凭证,返回 (api_key, base_url)。
+def _resolve_embed_credentials() -> tuple[str, str, str]:
+    """解析 embedding endpoint 凭证,返回 (api_key, base_url, model)。
 
-    优先级(对齐 §3.4 / §3.7):
-    1. RAG_CONFIG 的 AE_RAG_EMBEDDING_API_KEY / AE_RAG_EMBEDDING_BASE_URL
-       (embedding 专用服务商,如硅基流动;chat 与 embedding 可走不同厂商)
-    2. 两项都未配 → 回退 light 角色(再回退 analysis),向后兼容
-       (OpenAI 官方等同时提供 chat + embeddings 的厂商无需重复配置)
+    规则(对齐 §3.4 / §3.7):
+    1. 三项(base_url / api_key / model)全空 → 抛 EmbeddingNotConfigured
+       (retriever 捕获后降级为空 EvidencePack)。
+    2. 只配了部分 → 抛 LLMConfigError(配置不完整不静默)。
+    3. 三项齐全 → 返回凭证。
 
-    只配了其中一项 → 显式抛 LLMConfigError(配置不完整不静默,对齐项目原则)。
+    不再回退到 light LLM 角色:chat 厂商(如 DeepSeek 官方)不一定提供 /embeddings,
+    回退会导致运行时 404,不如显式告知用户配置独立 embedding endpoint。
     """
     emb_api_key = (RAG_CONFIG.get("embedding_api_key") or "").strip()
     emb_base_url = (RAG_CONFIG.get("embedding_base_url") or "").strip()
-    if emb_api_key or emb_base_url:
-        missing = []
-        if not emb_api_key:
-            missing.append("AE_RAG_EMBEDDING_API_KEY")
-        if not emb_base_url:
-            missing.append("AE_RAG_EMBEDDING_BASE_URL")
-        if missing:
-            raise LLMConfigError(
-                f"RAG embedding 配置不完整,缺少: {missing}。"
-                f"embedding 的 base_url 与 api_key 必须同时配置(或同时留空回退 light 角色)。"
-            )
-        return emb_api_key, emb_base_url
+    emb_model = (RAG_CONFIG.get("embedding_model") or "").strip()
 
-    # 回退:light 角色 → analysis 角色(向后兼容)
-    config = LLM_CONFIGS.get("light") or LLM_CONFIGS.get("analysis") or {}
-    api_key = config.get("api_key")
-    base_url = config.get("base_url")
+    # 三项全空 → 未配置 embedding,允许 RAG 降级
+    if not emb_api_key and not emb_base_url and not emb_model:
+        raise EmbeddingNotConfigured(
+            "RAG embedding 未配置(AE_RAG_EMBEDDING_BASE_URL / API_KEY / MODEL 均为空)。"
+            "RAG 将降级为空 EvidencePack,不影响主 Workflow。"
+            "如需启用向量检索,请配置独立的 embedding endpoint(如 Ollama nomic-embed-text)。"
+        )
+
+    # 只配了部分 → 配置不完整,显式报错
     missing = []
-    if not api_key:
-        missing.append("api_key")
-    if not base_url:
-        missing.append("base_url")
+    if not emb_api_key:
+        missing.append("AE_RAG_EMBEDDING_API_KEY")
+    if not emb_base_url:
+        missing.append("AE_RAG_EMBEDDING_BASE_URL")
+    if not emb_model:
+        missing.append("AE_RAG_EMBEDDING_MODEL")
     if missing:
         raise LLMConfigError(
-            f"RAG embedding 配置缺失字段: {missing}。"
-            f"请在 .env 中配置 AE_RAG_EMBEDDING_API_KEY / AE_RAG_EMBEDDING_BASE_URL"
-            f"(embedding 专用服务商,推荐);"
-            f"或配置 AE_LLM_API_KEY / AE_LLM_BASE_URL 回退 light 角色。"
-            f"注意:DeepSeek 官方 API 不提供 /embeddings,必须使用专用 embedding endpoint。"
+            f"RAG embedding 配置不完整,缺少: {missing}。"
+            f"embedding 的 base_url / api_key / model 必须同时配置(或同时留空以降级)。"
         )
-    return api_key, base_url
+
+    return emb_api_key, emb_base_url, emb_model
 
 
 def _get_embed_client() -> Any:
     """懒加载 openai.OpenAI 客户端。
 
-    凭证解析见 _resolve_embed_credentials(优先 RAG 专用配置,回退 light 角色)。
-    配置缺失/不完整显式报错,不静默降级(对齐项目原则)。
+    凭证解析见 _resolve_embed_credentials(独立 embedding endpoint,不回退 chat)。
+    未配置 → EmbeddingNotConfigured(由 retriever 降级);配置不完整 → LLMConfigError。
     """
     global _client
     if _client is not None:
         return _client
 
-    api_key, base_url = _resolve_embed_credentials()
+    api_key, base_url, _model = _resolve_embed_credentials()
 
     try:
         # openai 库是 langchain_openai 的传递依赖,这里直接用
@@ -116,6 +125,10 @@ def embed_query(text: str, model: str | None = None) -> list[float]:
         list[float]: 维度 = RAG_CONFIG['embedding_dim']
 
     缓存策略:同 text(前 200 字)直接返回缓存结果,不重复调 API。
+
+    Raises:
+        EmbeddingNotConfigured: embedding 未配置时(由 retriever 降级)
+        LLMConfigError: 配置不完整时
     """
     if not text:
         return []
@@ -124,7 +137,13 @@ def embed_query(text: str, model: str | None = None) -> list[float]:
         return _embed_cache[cache_key]
 
     client = _get_embed_client()
-    model = model or RAG_CONFIG.get("embedding_model", "text-embedding-3-small")
+    model = model or RAG_CONFIG.get("embedding_model")
+    if not model:
+        # model 为空理论上不会到这里(_resolve_embed_credentials 已校验),
+        # 但兜底显式报错
+        raise LLMConfigError(
+            "embedding model 未配置,请设置 AE_RAG_EMBEDDING_MODEL。"
+        )
     logger.debug("[rag.embed] embed_query model=%s text_len=%d", model, len(text))
 
     try:
@@ -160,7 +179,11 @@ def embed_batch(texts: list[str], model: str | None = None) -> list[list[float]]
         return []
 
     client = _get_embed_client()
-    model = model or RAG_CONFIG.get("embedding_model", "text-embedding-3-small")
+    model = model or RAG_CONFIG.get("embedding_model")
+    if not model:
+        raise LLMConfigError(
+            "embedding model 未配置,请设置 AE_RAG_EMBEDDING_MODEL。"
+        )
 
     # 分离缓存命中 / 未命中
     results: list[list[float] | None] = [None] * len(texts)
