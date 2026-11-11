@@ -1,0 +1,43 @@
+name: Project Checks
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    env:
+      PYTHONUTF8: "1"
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: requirements.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: services/website/frontend/v1/package-lock.json
+      - name: Install Python dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Install frontend dependencies
+        run: npm --prefix services/website/frontend/v1 ci
+      - name: Validate Compose configuration
+        env:
+          REDIS_PASSWORD: ci-config-validation-only
+        run: docker compose --project-directory docker -f docker/docker-compose.yml --profile tools config --quiet
+        if: runner.os == 'Linux'
+      - name: Run checks and frontend build
+        run: python dev.py check --build

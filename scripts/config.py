@@ -1,222 +1,93 @@
+"""Single service manifest, resolved after loading the project environment."""
+
 import os
+import shutil
 import sys
 
-_services_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if _services_path not in sys.path:
-    sys.path.insert(0, _services_path)
-from common.env import (
-    KAFKA_CONNECT_HOST,
-    KAFKA_CONNECT_PORT,
-    AE_BACKEND_HOST,
-    AE_BACKEND_PORT,
-    AE_MEMORY_BACKEND,
-    AE_MEMORY_REDIS_URL,
-)
 
-DEFAULT_CONFIG = {
-    "env": {
-        "django_port": {"env_key": "DJANGO_PORT", "default": "8000"},
-        "frontend_port": {"env_key": "FRONTEND_PORT", "default": "3000"},
-    },
-    "docker": {
-        "compose_file": os.path.join("docker", "docker-compose.yml"),
-    },
-    "wait": {
-        "elasticsearch": {
-            "type": "http",
-            "host": "localhost",
-            "port_env_key": "ES_PORT",
-            "default_port": "19200",
-            "max_retries": 10,
-            "retry_delay": 5,
-            "post_delay": 10,
-        },
-        "kafka": {
-            "type": "tcp",
-            "host_env_key": "KAFKA_BROKERS",
-            "default_host": "localhost",
-            "port_env_key": "KAFKA_BROKERS",
-            "default_port": "29092",
-            "max_retries": 5,
-            "retry_delay": 3,
-            "post_delay": 4,
-        },
-        "kafka_connect": {
-            "type": "http",
-            "host": KAFKA_CONNECT_HOST,
-            "default_port": KAFKA_CONNECT_PORT,
-            "max_retries": 20,
-            "retry_delay": 5,
-            "post_delay": 0,
-        },
-        "mysql": {
-            "type": "tcp",
-            "host_env_key": "MYSQL_HOST",
-            "default_host": "localhost",
-            "port_env_key": "MYSQL_PORT",
-            "default_port": "13306",
-            "max_retries": 30,
-            "retry_delay": 2,
-            "post_delay": 3,
-        },
-    },
-    "scripts": {
-        "kafka_topics": {
-            "path": os.path.join("docker", "config", "kafka", "topics", "create-init-topics.py"),
-        },
-        "init_connectors": {
-            "path": os.path.join("docker", "config", "kafka-connect", "init-connectors.py"),
-        },
-        "es_mapping": {
-            "path": os.path.join("docker", "config", "elasticsearch", "creatMapping.py"),
-        },
-        "django_migrate": {
-            "command": "python manage.py migrate",
-            "cwd": os.path.join("services", "website", "backend", "v1"),
-        },
-    },
-    "services": [
-        {
-            "id": "docker",
-            "name": "Starting Docker Compose services",
-            "type": "docker",
-            "description": "Kafka, Elasticsearch, Kibana, Logstash, MySQL, Redis",
-        },
-        {
-            "id": "redis_check",
-            "name": "Checking Redis readiness",
-            "type": "redis_check",
-            "description": "Agent session state dependency (skipped in memory mode)",
-        },
-        {
-            "id": "wait_es",
-            "name": "Waiting for Elasticsearch to be ready",
-            "type": "wait",
-            "wait_type": "http",
-            "wait_config": "elasticsearch",
-        },
-        {
-            "id": "wait_kafka",
-            "name": "Waiting for Kafka to be ready",
-            "type": "wait",
-            "wait_type": "tcp",
-            "wait_config": "kafka",
-        },
-        {
-            "id": "init_kafka_topics",
-            "name": "Initializing Kafka Topics",
-            "type": "script",
-            "script_config": "kafka_topics",
-        },
-        {
-            "id": "es_mapping",
-            "name": "Creating Elasticsearch Indexes",
-            "type": "script",
-            "script_config": "es_mapping",
-        },
-        {
-            "id": "wait_kafka_connect",
-            "name": "Waiting for Kafka Connect to be ready",
-            "type": "wait",
-            "wait_type": "http",
-            "wait_config": "kafka_connect",
-        },
-        {
-            "id": "init_kafka_connectors",
-            "name": "Initializing Kafka Connect Connectors",
-            "type": "script",
-            "script_config": "init_connectors",
-        },
-        {
-            "id": "rule_engine",
-            "name": "Starting Rule Engine",
-            "type": "window",
-            "window_title": "RuleEngine",
-            "command": "python -m services.ruleEngine.main",
-            "cwd": os.path.join("services", "ruleEngine", "..", ".."),
-            "post_delay": 5,
-            "description": "Processes Kafka logs (input: log.audit, output: log.analysis)",
-        },
-        {
-            "id": "agent",
-            "name": "Starting Agent Module",
-            "type": "window",
-            "window_title": "AgentModule",
-            "command": "python main.py",
-            "cwd": os.path.join("services", "agent"),
-            "post_delay": 3,
-            "description": "AI analysis (input: log.analysis)",
-        },
-        {
-            "id": "agent_service",
-            "name": "Starting Agent Service (FastAPI)",
-            "type": "window",
-            "window_title": "AgentService",
-            # 必须从项目根目录启动:子进程(MCP Skills)需继承项目根为 cwd,
-            # 才能 import common 并解析 services 包
-            "command": f"python -m uvicorn services.agent_service.backend.main:app --host {AE_BACKEND_HOST} --port {AE_BACKEND_PORT}",
-            "cwd": ".",
-            "post_delay": 3,
-            "port": AE_BACKEND_PORT,
-            "description": "Agent Service (FastAPI, 内部 :8001,反代给 Django)",
-        },
-        {
-            "id": "wait_mysql",
-            "name": "Waiting for MySQL to be ready",
-            "type": "wait",
-            "wait_type": "tcp",
-            "wait_config": "mysql",
-        },
-        {
-            "id": "django_migrate",
-            "name": "Running Django migrations & init admin",
-            "type": "shell",
-            "script_config": "django_migrate",
-        },
-        {
-            "id": "django",
-            "name": "Starting Django Backend",
-            "type": "window",
-            "window_title": "DjangoBackend",
-            "command": "python manage.py runserver 0.0.0.0:8000",
-            "cwd": os.path.join("services", "website", "backend", "v1"),
-            "post_delay": 3,
-            "port": 8000,
-            "description": "Django Backend",
-        },
-        {
-            "id": "log_storage",
-            "name": "Starting log storage workers",
-            "type": "log_storage",
-            "description": "Independent CK archive and ES hot storage (optional)",
-        },
-        {
-            "id": "frontend",
-            "name": "Starting Next.js Frontend",
-            "type": "window",
-            "window_title": "NextJSFrontend",
-            "command": "npm run dev",
-            "cwd": os.path.join("services", "website", "frontend", "v1"),
-            "post_delay": 0,
-            "port": 3000,
-            "description": "Next.js Frontend",
-        },
-    ],
-}
+FRONTEND_DIR = os.path.join("services", "website", "frontend", "v1")
+BACKEND_DIR = os.path.join("services", "website", "backend", "v1")
 
 
 class ServiceConfig:
-    def __init__(self, config=None):
-        self.config = config or DEFAULT_CONFIG
-    
-    def get_wait_config(self, key):
-        return self.config["wait"].get(key, {})
-    
-    def get_script_config(self, key):
-        return self.config["scripts"].get(key, {})
-    
-    def get_docker_config(self):
-        return self.config["docker"]
-    
+    def __init__(self, env=None, python=None):
+        env = os.environ if env is None else env
+        python = python or sys.executable
+        django_port = int(env.get("DJANGO_PORT", "8000"))
+        frontend_port = int(env.get("FRONTEND_PORT", "3000"))
+        agent_port = int(env.get("AE_BACKEND_PORT", "8001"))
+        agent_host = env.get("AE_BACKEND_HOST", "127.0.0.1")
+        probe_host = "127.0.0.1" if agent_host == "0.0.0.0" else agent_host
+        node = shutil.which("node") or "node"
+        storage_enabled = env.get("STORAGE_ENABLED", "false").lower() in {"true", "1", "yes", "on"}
+        self.services = [
+            {
+                "id": "log_storage", "cwd": ".", "enabled": storage_enabled,
+                "command": [python, "-m", "services.log_storage", "supervise"],
+                "startup_grace": 3,
+            },
+            {
+                "id": "rule_engine", "cwd": ".",
+                "command": [python, "-m", "services.ruleEngine.main"],
+                "startup_grace": 3,
+            },
+            {
+                "id": "agent_service", "cwd": ".",
+                "command": [python, "-m", "uvicorn", "services.agent_service.backend.main:app",
+                            "--host", agent_host, "--port", str(agent_port)],
+                "port": agent_port, "host": probe_host,
+                "health_url": f"http://{probe_host}:{agent_port}/agent/health",
+            },
+            {
+                "id": "agent", "cwd": os.path.join("services", "agent"),
+                "command": [python, "main.py"], "startup_grace": 3,
+            },
+            {
+                "id": "django", "cwd": BACKEND_DIR,
+                "command": [python, "manage.py", "runserver", f"0.0.0.0:{django_port}", "--noreload"],
+                "port": django_port, "host": "127.0.0.1",
+                "health_url": f"http://localhost:{django_port}/api/v1/health/",
+            },
+            {
+                "id": "frontend", "cwd": FRONTEND_DIR,
+                "command": [node, "node_modules/next/dist/bin/next", "dev", "--port", str(frontend_port)],
+                "port": frontend_port, "host": "127.0.0.1",
+                "health_url": f"http://127.0.0.1:{frontend_port}/login/",
+                "startup_timeout": 120,
+            },
+        ]
+        self.steps = [
+            {"id": "elasticsearch", "url": f"{env.get('ES_SCHEME', 'http')}://{env.get('ES_HOST', 'localhost')}:{env.get('ES_PORT', '19200')}/"},
+            {"id": "kafka", "address": env.get("KAFKA_BROKERS", f"localhost:{env.get('KAFKA_PORT', '29092')}").split(",")[0]},
+            {"id": "mysql", "address": f"{env.get('MYSQL_HOST', 'localhost')}:{env.get('MYSQL_PORT', '13306')}"},
+            {"id": "kafka_connect", "url": f"http://{env.get('KAFKA_CONNECT_HOST', 'localhost')}:{env.get('KAFKA_CONNECT_PORT', '8083')}/connectors"},
+            {"id": "kafka_topics", "command": [python, "docker/config/kafka/topics/create-init-topics.py", "--brokers", env.get("KAFKA_BROKERS", f"localhost:{env.get('KAFKA_PORT', '29092')}")]},
+            {"id": "es_mapping", "command": [python, "docker/config/elasticsearch/creatMapping.py"]},
+            {"id": "connectors", "command": [python, "docker/config/kafka-connect/init-connectors.py", "--connect-host", env.get("KAFKA_CONNECT_HOST", "localhost"), "--connect-port", env.get("KAFKA_CONNECT_PORT", "8083")]},
+            {"id": "django_check", "cwd": BACKEND_DIR, "command": [python, "manage.py", "check"]},
+            {"id": "django_migrate", "cwd": BACKEND_DIR, "command": [python, "manage.py", "migrate", "--noinput"]},
+        ]
+        if storage_enabled:
+            ck_scheme = "https" if env.get("CK_SECURE", "false").lower() in {"true", "1", "yes", "on"} else "http"
+            self.steps.extend([
+                {"id": "clickhouse", "url": f"{ck_scheme}://{env.get('CK_HOST', 'localhost')}:{env.get('CK_HTTP_PORT', '18123')}/ping"},
+                {"id": "storage_init", "command": [python, "-m", "services.log_storage", "init"]},
+            ])
+
     def get_services(self):
-        return self.config["services"]
+        return self.services
+
+    def get_steps(self, service_ids=None):
+        if service_ids is None:
+            return self.steps
+        dependencies = {
+            "log_storage": {"elasticsearch", "kafka", "mysql", "kafka_topics", "es_mapping",
+                            "django_check", "django_migrate", "clickhouse", "storage_init"},
+            "rule_engine": {"elasticsearch", "kafka", "kafka_connect", "kafka_topics", "es_mapping", "connectors"},
+            "agent": {"elasticsearch", "kafka", "kafka_connect", "kafka_topics", "es_mapping", "connectors", "mysql", "django_check", "django_migrate"},
+            "agent_service": {"elasticsearch", "es_mapping", "mysql", "django_check", "django_migrate"},
+            "django": {"mysql", "django_check", "django_migrate"},
+            "frontend": set(),
+        }
+        required = set().union(*(dependencies[name] for name in service_ids))
+        return [step for step in self.steps if step["id"] in required]

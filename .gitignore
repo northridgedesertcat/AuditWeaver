@@ -34,9 +34,13 @@ wheels/
 *.egg
 
 # Virtual environments
+.venv/
 venv/
 env/
 ENV/
+
+# Local service state and frontend output
+.run/
 
 # Local test dependencies (tenacity vendored for sandbox testing)
 .test_deps/

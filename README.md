@@ -3,7 +3,7 @@
 > A log analysis platform based on AI and Dify.
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg "License")](#license)
-[![Python](https://img.shields.io/badge/python-3.11+-blue.svg "Python")]()
+[![Python](https://img.shields.io/badge/python-3.12+-blue.svg "Python")]()
 [![Docker](https://img.shields.io/badge/docker-supported-blue.svg "Docker")]()
 
 English | [简体中文](README.zh-CN.md)
@@ -89,7 +89,8 @@ AuditWeaver/
 │   ├── riskAssessment/  # Risk assessment module
 │   └── website/         # Web platform (Django + Next.js)
 ├── .env.example         # Environment variable template
-├── start.py             # One-click startup script (Python)
+├── dev.py               # Unified start / stop / status / logs / checks
+├── start.py             # Compatibility wrapper for dev.py start
 ├── start.bat            # One-click startup script (Windows)
 ├── stop.bat             # Stop script (Windows)
 ├── requirements.txt
@@ -105,9 +106,9 @@ AuditWeaver/
 
 Before you start, please ensure that you have the following dependencies installed:
 
-- Python 3.11+
-- Node.js 18+ (for Next.js frontend)
-- Docker & Docker Compose
+- Python 3.12+ (3.13 recommended; see `.python-version`)
+- Node.js 22.13+ in the 22 LTS line, or 24+ (22 LTS recommended; see `.nvmrc`), npm 10+
+- Docker with Compose v2 supporting `up --wait` (2.20+ recommended)
 - A running Dify platform (or Ollama for local LLM)
 
 ### 2. Clone the repository
@@ -120,16 +121,22 @@ cd AuditWeaver
 ### 3. Install Python dependencies
 
 ```bash
-pip install -r requirements.txt
+python -m venv .venv
+# Windows PowerShell:
+.venv\Scripts\Activate.ps1
+# Linux / WSL: source .venv/bin/activate
+python -m pip install -r requirements.txt
 ```
 
-### 4. Install frontend dependencies (optional, for development)
+Optional Isolation Forest training/evaluation/inference tools: `python -m pip install -r requirements-model.txt`.
+
+### 4. Install frontend dependencies
 
 ```bash
-cd services/website/frontend/v1
-npm install
-cd ../../..
+npm --prefix services/website/frontend/v1 ci
 ```
+
+Use npm and the committed `package-lock.json`; do not create pnpm/yarn lockfiles.
 
 ### 5. Configure Dify platform
 
@@ -148,27 +155,43 @@ cp .env.example .env
 Edit the `.env` file and configure:
 - `DIFY_API_KEY`: Your Dify API Key
 - `DIFY_BASE_URL`: Dify API base URL
+- `DJANGO_SECRET_KEY`: A unique random secret
+- `REDIS_PASSWORD`: Replace `change-me`; update the password in both Redis URLs (URL-encode special characters)
+- `AE_LLM_MODEL`: Required when starting Agent Service; configure its endpoint/key as well
 - Other services ports as needed
 
 ### 7. Start all services
 
 ```bash
-python start.py
+python dev.py doctor
+python dev.py start
 ```
 
 
 
 The startup script will automatically:
-1. Start all Docker Compose services (Kafka, Elasticsearch, Kibana, Logstash, Kafka Connect)
-2. Wait for Elasticsearch and Kafka to be ready
-3. Initialize Kafka topics and Elasticsearch indexes
-4. Initialize Kafka Connect connectors
-5. Start Rule Engine, Agent module, Django backend, and Next.js frontend
+1. Start infrastructure with Compose health checks (Kibana is optional: `--tools`)
+2. Check dependencies, initialize topics, indexes and connectors
+3. Check Django configuration and apply database migrations before any business process starts
+4. Start Rule Engine, Agent Service, analysis worker, Django and Next.js; fail on startup errors
+
+`start.py` and the Windows `.bat` files use this same entry point. No terminal windows or `xterm` are needed.
+
+```bash
+python dev.py status
+python dev.py logs agent_service --tail 100 --follow
+python dev.py stop
+python dev.py check --build
+```
+
+To debug a service in your editor, start only the others, for example:
+`python dev.py start rule_engine agent_service agent frontend` (Django remains yours to start).
+Use `--no-docker` to keep infrastructure under your own control. See [Development Guide](docs/development.md) for lifecycle semantics, limitations and WSL setup.
 
 Once started, access:
 - Dashboard Frontend: http://localhost:3000
 - Django Backend API: http://localhost:8000
-- Kibana: http://localhost:5601
+- Kibana (with `--tools`): http://localhost:5601
 
 ***
 
@@ -181,6 +204,8 @@ Once started, access:
 | DJANGO_SECRET_KEY         | Django secret key                    | -           |
 | DJANGO_DEBUG              | Django debug mode                    | True        |
 | DJANGO_PORT               | Django backend port                  | 8000        |
+| FRONTEND_PORT             | Next.js dev server port              | 3000        |
+| DJANGO_API_BASE           | Server-side Next.js proxy target (empty: follows DJANGO_PORT) | - |
 | ES_HOST                   | Elasticsearch host                   | localhost   |
 | ES_PORT                   | Elasticsearch port                   | 19200       |
 | KAFKA_BROKERS             | Kafka brokers                        | localhost:29092 |

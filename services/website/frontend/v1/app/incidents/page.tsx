@@ -197,7 +197,7 @@ export default function IncidentsPage() {
               </Button>
             </CardHeader>
             <div className="px-4 pb-3">
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value ?? "all")}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="筛选状态" />
                 </SelectTrigger>

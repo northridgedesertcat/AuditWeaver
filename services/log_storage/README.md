@@ -20,7 +20,18 @@ python docker/config/kafka/topics/create-init-topics.py --apply-configs
 
 ## 影子写入与启停
 
-设置 `STORAGE_ENABLED=true`，保持 `LOG_QUERY_MODE=es_legacy`、`ES_CLEANUP_ENABLED=false`。`start.py` 会在 Django 迁移后隐藏启动存储管理进程；也可单独运行：
+Set `STORAGE_ENABLED=true`, keeping `LOG_QUERY_MODE=es_legacy` and `ES_CLEANUP_ENABLED=false`. The unified development entry point initializes storage after Django migrations and manages the supervisor and its worker processes:
+
+```powershell
+python dev.py start log_storage
+python dev.py status log_storage --no-docker
+python dev.py logs log_storage --tail 100
+python dev.py stop log_storage --no-docker
+```
+
+`python start.py` and `python dev.py start` also include storage when enabled. It stays disabled by default. Full shutdown includes the optional ClickHouse container without deleting its data volume. The development entry point is intended for local environments; production connector handoff remains an explicit deployment step.
+
+For standalone operation outside the unified process manager:
 
 ```powershell
 python -m services.log_storage supervise
@@ -28,7 +39,7 @@ python -m services.log_storage status
 python -m services.log_storage stop
 ```
 
-管理进程启动四个独立 worker，CK/ES、原始日志/事件分别使用不同 group。日志位于 `logs/log-storage/`。失败后延迟重启，未提交批次重放。也可逐个调试：
+The supervisor starts four independent workers, using separate groups for CK/ES and raw logs/events. Managed supervisor output is in `logs/services/log_storage.log`; individual worker logs remain in `logs/log-storage/`. Failed workers restart after a delay and replay uncommitted batches. Workers can also run individually:
 
 ```powershell
 python -m services.log_storage worker --sink ck --kind raw
