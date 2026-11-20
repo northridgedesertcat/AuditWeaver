@@ -74,7 +74,13 @@ Thumbs.db
 
 #datas
 isolationForest/datas/nginx/*
-document/
+# Private notes, drafts, reviews, and local documentation artifacts
+/document/
+
+# Generated evaluations stay local; publish reviewed snapshots under docs/evaluation/reports/
+/services/agent_service/evals/report_*.md
+/services/agent_service/evals/results_*.jsonl
+/services/isolationForest/trainer/evaluation_results/
 services/rulesMatching/temporaryDatas/*
 services/temporaryDatas/*
 

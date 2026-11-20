@@ -1,0 +1,66 @@
+---
+title: AuditWeaver - Hot / Cold Storage Data Flow
+---
+%% Implemented behavior from main 51508a3, not a claim about deployment state.
+%% Sources: services/log_storage/{worker,hot,clickhouse,metadata,archive}.py
+%%          common/log_query/service.py and .env.example.
+flowchart TB
+    subgraph INPUT["DURABLE KAFKA INPUT"]
+        RAW(["log.structured<br/>Raw logs"])
+        EVENTS(["rule.event.save<br/>Rule events"])
+    end
+
+    subgraph WRITE["SUPERVISOR - FOUR INDEPENDENT WORKERS / CONSUMER GROUPS"]
+        CKRAW["CK / raw"]
+        CKEVENTS["CK / events"]
+        ESRAW["ES / raw"]
+        ESEVENTS["ES / events"]
+        QUARANTINE(["log.storage.quarantine<br/>Invalid input: record gap and stop<br/>No failed-offset commit"])
+        CKRAW & CKEVENTS & ESRAW & ESEVENTS -->|"Invalid input"| QUARANTINE
+    end
+
+    subgraph STORES["PERSIST SINK BATCH, THEN MYSQL METADATA, THEN COMMIT KAFKA OFFSETS"]
+        CK[("ClickHouse full archive<br/>Raw payloads + rule events + source versions<br/>All event times; no automatic TTL")]
+        ES[("Elasticsearch hot search copies<br/>auditweaver-raw-hot / auditweaver-events-hot<br/>Daily indexes; recent 168 hours by event time")]
+        META[("MySQL storage metadata<br/>Checkpoints / gaps / manifests / certifications<br/>CK event outbox stored with checkpoint")]
+    end
+
+    RAW --> CKRAW & ESRAW
+    EVENTS --> CKEVENTS & ESEVENTS
+    CKRAW & CKEVENTS -->|"Every event, including late arrivals"| CK
+    ESRAW & ESEVENTS -->|"Skip events older than hot boundary"| ES
+    CKRAW & CKEVENTS & ESRAW & ESEVENTS -.->|"Durable progress"| META
+
+    subgraph QUERY["SHARED QUERY LAYER - LOG_QUERY_MODE=hybrid"]
+        CLIENTS["Django logs / dashboard / report originals<br/>MCP log and event tools"]
+        READER["LogQueryService<br/>Coverage + freshness checks<br/>Cursor pins time range and boundary"]
+        CLIENTS --> READER
+        READER -->|"Recent details: hot segment"| ES
+        READER -->|"Older details: cold segment<br/>Exact aggregates: full requested range"| CK
+        READER -.->|"Missing coverage / gap / lag: unavailable"| META
+    end
+
+    subgraph MIGRATION["EXPLICIT MIGRATION AND RETENTION CONTROLS"]
+        LEGACY[("Legacy ES<br/>nginx-log-raw / matched_logs")]
+        BACKFILL["Connector handoff + sealed legacy indexes<br/>Backfill and certify coverage"]
+        CLEANUP["ES cleanup - disabled / dry-run by default<br/>Verify archive content, versions, checkpoints<br/>Require backup and restore-test evidence"]
+        LEGACY --> BACKFILL --> CK
+        BACKFILL -.->|"Optional recent copy"| ES
+        BACKFILL -.->|"Certifications"| META
+        CLEANUP -.->|"Verify archive"| CK
+        CLEANUP -.->|"Check coverage"| META
+        CLEANUP -.->|"Delete only eligible expired daily indexes"| ES
+    end
+
+    classDef pipe fill:#eef2fb,stroke:#526eab,color:#263653
+    classDef hot fill:#fff0d6,stroke:#b27619,color:#59421d
+    classDef cold fill:#e0f4f7,stroke:#16788c,color:#164451
+    classDef meta fill:#f7e8ec,stroke:#a34c67,color:#572a3b
+    classDef app fill:#e6f4ef,stroke:#19775c,color:#123d31
+    classDef control fill:#f2f3f5,stroke:#6b7280,color:#303743
+    class RAW,EVENTS pipe
+    class ESRAW,ESEVENTS,ES hot
+    class CKRAW,CKEVENTS,CK cold
+    class META meta
+    class CLIENTS,READER app
+    class QUARANTINE,LEGACY,BACKFILL,CLEANUP control

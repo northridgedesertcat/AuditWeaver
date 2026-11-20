@@ -1,0 +1,89 @@
+---
+title: AuditWeaver - Complete System Architecture (Logical View)
+---
+%% Presentation source: system.drawio. This companion models relationships.
+%% Render under system-logical.*; never overwrite system.svg / system.png.
+%% Hybrid capability verified against main 51508a3.
+flowchart TB
+    subgraph STREAM["01 COLLECTION AND STREAM PROCESSING"]
+        direction LR
+        SOURCE["Distributed Nginx servers<br/>External collectors"]
+        RAW["Kafka | log.raw"]
+        LOGSTASH["Logstash<br/>Grok / normalization / event_id"]
+        STRUCTURED["Kafka | log.structured"]
+        RULE["RuleEngine<br/>YAML / regex attack detection"]
+        EVENTS["Kafka | rule.event.save"]
+        ANALYSIS["Kafka | log.analysis"]
+        ZK["ZooKeeper"]
+        SOURCE --> RAW --> LOGSTASH --> STRUCTURED --> RULE
+        RULE --> EVENTS
+        RULE --> ANALYSIS
+        ZK -.-> RAW
+    end
+
+    subgraph PROCESS["02 PERSISTENCE AND AI ANALYSIS"]
+        STORE["Log storage service<br/>4 independent Kafka consumer groups<br/>Durable batches + MySQL checkpoints"]
+        WORKER["Dify analysis worker<br/>services/agent"]
+        DIFY["External Dify workflows"]
+        DLQ["Kafka | log.dlq"]
+        CONNECT["Kafka Connect<br/>Dead-letter sink"]
+        WORKER <-->|Workflow API| DIFY
+        DLQ --> CONNECT
+    end
+    STRUCTURED -->|Raw logs| STORE
+    EVENTS -->|Rule events| STORE
+    ANALYSIS -->|Suspicious logs| WORKER
+    LOGSTASH -.-> DLQ
+    RULE -.-> DLQ
+    WORKER -.-> DLQ
+
+    subgraph DATA["03 DATA PLATFORM"]
+        ES[("Elasticsearch<br/>Recent 7-day log/event copies<br/>Derived RAG corpus / dead letters")]
+        CK[("ClickHouse<br/>Full log/event archive from arrival<br/>History + exact statistics")]
+        MYSQL[("MySQL<br/>Reports / users / incidents<br/>Checkpoints / coverage / outbox")]
+        REDIS[("Redis<br/>Application cache<br/>Optional Agent checkpoints")]
+    end
+    STORE -->|Recent copies| ES
+    STORE -->|All records immediately| CK
+    STORE -.->|Metadata| MYSQL
+    WORKER -->|AI reports| MYSQL
+    CONNECT -->|Failed pipeline records| ES
+
+    subgraph APP["04 ANALYST WORKSPACE AND APPLICATIONS"]
+        direction LR
+        QUERY["Shared log query layer<br/>common/log_query | LogQueryService"]
+        AGENT["Agent microservice<br/>FastAPI + LangGraph<br/>MCP / RAG / case sync"]
+        API["Django backend<br/>REST / JWT / Agent streaming proxy"]
+        WEB["Next.js frontend<br/>Dashboard / search / reports / chat"]
+        USER["Security analyst"]
+        LLM["OpenAI-compatible LLM"]
+        KIBANA["Kibana<br/>Optional ES inspection"]
+        USER <--> WEB <--> API <--> AGENT
+        API <-->|Logs / dashboard| QUERY
+        AGENT <-->|MCP log/event tools| QUERY
+        AGENT <-->|AI calls| LLM
+    end
+    QUERY <-->|Hot details| ES
+    QUERY <-->|History / full-range exact statistics| CK
+    AGENT <-->|RAG evidence / derived corpus sync| ES
+    AGENT <-->|MCP reports / case sync| MYSQL
+    AGENT -.->|Latest events for case sync| CK
+    AGENT -.->|Optional session memory| REDIS
+    API <-->|Application records| MYSQL
+    API <-->|Cache| REDIS
+    KIBANA -.-> ES
+
+    classDef stream fill:#eef3fb,stroke:#376ca5,color:#20313f
+    classDef service fill:#edf5ee,stroke:#568366,color:#20313f
+    classDef ai fill:#fbf2e5,stroke:#a9712c,color:#20313f
+    classDef hot fill:#fff7e8,stroke:#b58b35,color:#20313f
+    classDef cold fill:#e9f5f7,stroke:#368b9b,color:#20313f
+    classDef sql fill:#eef2f8,stroke:#657fa4,color:#20313f
+    classDef cache fill:#faeff0,stroke:#ad6970,color:#20313f
+    class SOURCE,RAW,LOGSTASH,STRUCTURED,RULE,EVENTS,ANALYSIS stream
+    class STORE,QUERY,AGENT,API,WEB service
+    class WORKER,DIFY,LLM ai
+    class ES hot
+    class CK cold
+    class MYSQL sql
+    class REDIS cache

@@ -8,6 +8,8 @@
 
 [English](README.md) | 简体中文
 
+[Documentation](docs/README.md) | [Development reference](docs/development/README.md) | [Documentation policy](docs/contributing.md)
+
 ***
 
 ## 📖 概述
@@ -25,6 +27,7 @@ AuditWeaver 是一个基于 AI 的日志分析系统，专为分布式集群环�
 - 🧠 使用 LLM（Dify Workflow）分析可疑日志
 - 📄 生成结构化安全报告
 - 🔄 基于 Kafka + Kafka Connect 的实时数据管道
+- 冷热日志存储：ClickHouse 全量归档，Elasticsearch 保留最近七天的检索副本
 - 🐳 支持 Docker 部署，一键启动
 - 🔐 通过环境变量管理配置
 
@@ -32,17 +35,15 @@ AuditWeaver 是一个基于 AI 的日志分析系统，专为分布式集群环�
 
 ## 🏗 架构
 
-当前版本 V1.0.0  
-当前架构：
-![Architecture](docs/images/Current.png "Architecture")
+AuditWeaver 将分布式 Nginx 日志转化为可检索的安全事件、AI 分析报告和交互式调查。下面的整体架构图将日志采集、处理流水线、数据底座、Agent 微服务、后端和分析工作台连接起来。
 
-当前简化架构：
-![Architecture](docs/images/Current_simple.png "Architecture")
+![AuditWeaver 整体架构](docs/architecture/diagrams/system.png "AuditWeaver end-to-end architecture")
 
+[可缩放架构图](docs/architecture/diagrams/system.svg) | [可编辑 draw.io 源文件](docs/architecture/diagrams/system.drawio) | [架构说明](docs/architecture/README.md)
 
-***
-V2 架构：
-![Architecture](docs/images/version.png "Architecture")
+从顶层依次看日志源、Kafka、Logstash 和规则检测，再向下看存储和 AI 分析。ClickHouse 在日志和规则事件到达时全量归档，Elasticsearch 额外保留最近七天的检索副本；MySQL 保存业务记录和 AI 报告，Redis 提供缓存和可选的 Agent 会话持久化。底层展示 Next.js、Django、FastAPI/LangGraph Agent 怎样使用这些数据。
+
+旧版本和未实现的 V2 草案统一保存在[架构归档](docs/archive/README.md)。
 
 
 ***
@@ -57,9 +58,9 @@ V2 架构：
 | 规则引擎 | Python Regex + YAML 规则配置 |
 | 异常检测 | Isolation Forest (scikit-learn) |
 | 消息队列 | Apache Kafka |
-| 数据集成 | Kafka Connect (Elasticsearch Sink) |
+| 数据集成 | 独立 Kafka 存储消费者；Kafka Connect 用于死信与旧链路迁移 |
 | 日志管道 | Logstash |
-| 搜索与存储 | Elasticsearch |
+| 搜索与存储 | Elasticsearch（热检索）+ ClickHouse（全量归档） |
 | 可视化 | Kibana |
 | 容器化 | Docker Compose |
 
@@ -230,19 +231,21 @@ python dev.py check --build
 | log.structured        | 结构化/解析后的日志（通过 Logstash）           |
 | log.audit             | 待规则引擎处理的日志                        |
 | log.analysis          | 规则引擎分析结果                           |
-| rule.event.save       | 规则引擎事件（ES Sink 目标）            |
+| rule.event.save       | 规则事件，由 ClickHouse 和 Elasticsearch 存储消费者分别处理 |
 
 > Topics 通过 `docker/config/kafka/topics/topics.yaml` 和 `create-init-topics.py` 自动初始化。
 > Agent AI 分析报告直接写入 MySQL `analysis_report` 表，不再经 Kafka/ES 中转。
 
-### Elasticsearch 索引说明
+### 日志存储
 
-| 索引 | 描述 |
-| :----------------------- | :--------------------------------------- |
-| nginx-log-raw            | 原始 Nginx 日志                           |
-| matched_logs             | 规则匹配的日志                    |
+| 存储 / 索引 | 用途 |
+| :--- | :--- |
+| ClickHouse | 原始日志和规则事件的完整归档，消息到达即写入 |
+| ES `auditweaver-raw-hot` / `auditweaver-events-hot` | 日索引的读取别名，服务近期事件时间窗口 |
+| ES `nginx-log-raw` / `matched_logs` | 迁移前及迁移期间使用的旧固定索引 |
+| ES `auditweaver-rag-corpus` | 派生 RAG 语料，保留策略独立 |
 
-> AI 生成的分析报告存于 MySQL `analysis_report` 表（Django `reports` 应用）；报告详情页的"原始日志行"（event.original）仍查 `nginx-log-raw`。
+> hybrid 模式下，近期明细查 ES，历史明细与完整范围的精确统计查 ClickHouse。报告主体仍存于 MySQL `analysis_report`，原文通过统一查询服务读取。存储和清理默认关闭，查询默认使用 `es_legacy`。图示依据 `main` 的 `51508a3`，认证要求与文档分支来源见[架构说明](docs/architecture/README.md)。
 
 ***
 
@@ -250,12 +253,12 @@ python dev.py check --build
 
 仪表盘
 
-![Dashboard](docs/images/dashboard.png "Dashboard")
+![Dashboard](docs/assets/screenshots/dashboard.png "Dashboard")
 
 分析报告
 
-![Report](docs/images/report1.png "Report")
-![Report](docs/images/report2.png "Report")
+![Report](docs/assets/screenshots/report-1.png "Report")
+![Report](docs/assets/screenshots/report-2.png "Report")
 
 ***
 

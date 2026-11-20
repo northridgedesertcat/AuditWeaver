@@ -1,0 +1,296 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2300" height="1580" viewBox="0 0 2300 1580" role="img" aria-labelledby="title description"><title id="title">AuditWeaver - AI-powered log security platform</title><desc id="description">Distributed Nginx logs pass through Kafka and Logstash to rule detection, independent hot and archive storage workers, and Dify analysis. Elasticsearch, ClickHouse, MySQL and Redis support the shared log query layer, FastAPI LangGraph Agent, Django backend and Next.js analyst workspace.</desc><defs>
+<marker id="end-flow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M 1 1 L 9 5 L 1 9 Z" fill="#376ca5"/></marker>
+<marker id="start-flow" viewBox="0 0 10 10" refX="1" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M 9 1 L 1 5 L 9 9 Z" fill="#376ca5"/></marker>
+<marker id="end-query" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M 1 1 L 9 5 L 1 9 Z" fill="#278476"/></marker>
+<marker id="start-query" viewBox="0 0 10 10" refX="1" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M 9 1 L 1 5 L 9 9 Z" fill="#278476"/></marker>
+<marker id="end-ai" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M 1 1 L 9 5 L 1 9 Z" fill="#a9712c"/></marker>
+<marker id="start-ai" viewBox="0 0 10 10" refX="1" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M 9 1 L 1 5 L 9 9 Z" fill="#a9712c"/></marker>
+<marker id="end-support" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M 1 1 L 9 5 L 1 9 Z" fill="#7c8792"/></marker>
+<marker id="start-support" viewBox="0 0 10 10" refX="1" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M 9 1 L 1 5 L 9 9 Z" fill="#7c8792"/></marker>
+</defs><rect width="2300" height="1580" fill="#ffffff"/><g font-family="Arial, sans-serif">
+<text x="65" y="65" font-size="38" font-weight="700" fill="#20313f" text-anchor="start">AUDITWEAVER</text>
+<text x="65" y="104" font-size="24" font-weight="400" fill="#596b79" text-anchor="start">AI-powered log analysis and security investigation</text>
+<text x="1425" y="62" font-size="20" font-weight="700" fill="#20313f" text-anchor="start">COLLECT  /  DETECT  /  ARCHIVE  /  INVESTIGATE</text>
+<path d="M 1215 109 h 40" fill="none" stroke="#376ca5" stroke-width="2.5"/>
+<text x="1267" y="115" font-size="18" font-weight="400" fill="#596b79" text-anchor="start">Stream / write</text>
+<path d="M 1470 109 h 40" fill="none" stroke="#278476" stroke-width="2.5" stroke-dasharray="7 5"/>
+<text x="1522" y="115" font-size="18" font-weight="400" fill="#596b79" text-anchor="start">Read / write / API</text>
+<path d="M 1780 109 h 40" fill="none" stroke="#a9712c" stroke-width="2.5" stroke-dasharray="7 5"/>
+<text x="1832" y="115" font-size="18" font-weight="400" fill="#596b79" text-anchor="start">AI call</text>
+<path d="M 1975 109 h 40" fill="none" stroke="#7c8792" stroke-width="2.5" stroke-dasharray="3 5"/>
+<text x="2027" y="115" font-size="18" font-weight="400" fill="#596b79" text-anchor="start">Support / optional</text>
+<rect x="48" y="180" width="2204" height="290" rx="5" fill="#fafbfd" stroke="#ced8df" stroke-width="1.2"/>
+<text x="72" y="212" font-size="21" font-weight="700" fill="#20313f" text-anchor="start">01  COLLECTION &amp; STREAM PROCESSING</text>
+<text x="2225" y="211" font-size="18" font-weight="400" fill="#596b79" text-anchor="end">Collect logs, normalize fields and detect known attacks</text>
+<rect x="48" y="510" width="2204" height="240" rx="5" fill="#fafbfd" stroke="#ced8df" stroke-width="1.2"/>
+<text x="72" y="542" font-size="21" font-weight="700" fill="#20313f" text-anchor="start">02  PERSISTENCE &amp; AI ANALYSIS</text>
+<rect x="48" y="800" width="2204" height="260" rx="5" fill="#fafbfd" stroke="#ced8df" stroke-width="1.2"/>
+<text x="72" y="832" font-size="21" font-weight="700" fill="#20313f" text-anchor="start">03  DATA PLATFORM</text>
+<text x="2225" y="831" font-size="18" font-weight="400" fill="#596b79" text-anchor="end">Log archive, hot search, application records and cache</text>
+<rect x="48" y="1150" width="2204" height="375" rx="5" fill="#fafbfd" stroke="#ced8df" stroke-width="1.2"/>
+<text x="2225" y="1182" font-size="21" font-weight="700" fill="#20313f" text-anchor="end">04  ANALYST WORKSPACE &amp; APPLICATIONS</text>
+<path d="M 315 311 L 385 311" fill="none" stroke="#ffffff" stroke-width="7" stroke-linejoin="round"/>
+<path d="M 315 311 L 385 311" fill="none" stroke="#376ca5" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#end-flow)"/>
+<path d="M 635 311 L 705 311" fill="none" stroke="#ffffff" stroke-width="7" stroke-linejoin="round"/>
+<path d="M 635 311 L 705 311" fill="none" stroke="#376ca5" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#end-flow)"/>
+<path d="M 965 311 L 1045 311" fill="none" stroke="#ffffff" stroke-width="7" stroke-linejoin="round"/>
+<path d="M 965 311 L 1045 311" fill="none" stroke="#376ca5" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#end-flow)"/>
+<path d="M 1345 311 L 1445 311" fill="none" stroke="#ffffff" stroke-width="7" stroke-linejoin="round"/>
+<path d="M 1345 311 L 1445 311" fill="none" stroke="#376ca5" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#end-flow)"/>
+<path d="M 1745 311 L 1845 311" fill="none" stroke="#ffffff" stroke-width="7" stroke-linejoin="round"/>
+<path d="M 1745 311 L 1845 311" fill="none" stroke="#376ca5" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#end-flow)"/>
+<path d="M 510 408 L 510 370" fill="none" stroke="#ffffff" stroke-width="7" stroke-linejoin="round"/>
+<path d="M 510 408 L 510 370" fill="none" stroke="#7c8792" stroke-width="1.8" stroke-linejoin="round" stroke-dasharray="3 5" marker-end="url(#end-support)"/>
+<path d="M 780 370 L 780 465 L 575 465 L 575 578" fill="none" stroke="#ffffff" stroke-width="7" stroke-linejoin="round"/>
+<path d="M 780 370 L 780 465 L 575 465 L 575 578" fill="none" stroke="#7c8792" stroke-width="1.8" stroke-linejoin="round" stroke-dasharray="3 5" marker-end="url(#end-support)"/>
+<path d="M 1550 370 L 1550 465 L 575 465 L 575 578" fill="none" stroke="#ffffff" stroke-width="7" stroke-linejoin="round"/>
+<path d="M 1550 370 L 1550 465 L 575 465 L 575 578" fill="none" stroke="#7c8792" stroke-width="1.8" stroke-linejoin="round" stroke-dasharray="3 5" marker-end="url(#end-support)"/>
+<path d="M 445 646 L 355 646" fill="none" stroke="#ffffff" stroke-width="7" stroke-linejoin="round"/>
+<path d="M 445 646 L 355 646" fill="none" stroke="#7c8792" stroke-width="1.8" stroke-linejoin="round" stroke-dasharray="3 5" marker-end="url(#end-support)"/>
+<path d="M 1120 370 L 1120 496 L 980 496 L 980 578" fill="none" stroke="#ffffff" stroke-width="7" stroke-linejoin="round"/>
+<path d="M 1120 370 L 1120 496 L 980 496 L 980 578" fill="none" stroke="#376ca5" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#end-flow)"/>
+<path d="M 1960 370 L 1960 482 L 1170 482 L 1170 578" fill="none" stroke="#ffffff" stroke-width="7" stroke-linejoin="round"/>
+<path d="M 1960 370 L 1960 482 L 1170 482 L 1170 578" fill="none" stroke="#376ca5" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#end-flow)"/>
+<path d="M 2110 370 L 2110 536 L 1655 536 L 1655 578" fill="none" stroke="#ffffff" stroke-width="7" stroke-linejoin="round"/>
+<path d="M 2110 370 L 2110 536 L 1655 536 L 1655 578" fill="none" stroke="#376ca5" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#end-flow)"/>
+<path d="M 1815 646 L 1890 646" fill="none" stroke="#ffffff" stroke-width="7" stroke-linejoin="round"/>
+<path d="M 1815 646 L 1890 646" fill="none" stroke="#a9712c" stroke-width="2.5" stroke-linejoin="round" stroke-dasharray="8 5" marker-end="url(#end-ai)" marker-start="url(#start-ai)"/>
+<path d="M 1720 714 L 1720 735 L 575 735 L 575 714" fill="none" stroke="#ffffff" stroke-width="7" stroke-linejoin="round"/>
+<path d="M 1720 714 L 1720 735 L 575 735 L 575 714" fill="none" stroke="#7c8792" stroke-width="1.8" stroke-linejoin="round" stroke-dasharray="3 5" marker-end="url(#end-support)"/>
+<path d="M 220 714 L 220 786 L 300 786 L 300 872" fill="none" stroke="#ffffff" stroke-width="7" stroke-linejoin="round"/>
+<path d="M 220 714 L 220 786 L 300 786 L 300 872" fill="none" stroke="#7c8792" stroke-width="1.8" stroke-linejoin="round" stroke-dasharray="3 5" marker-end="url(#end-support)"/>
+<path d="M 870 714 L 870 768 L 500 768 L 500 872" fill="none" stroke="#ffffff" stroke-width="7" stroke-linejoin="round"/>
+<path d="M 870 714 L 870 768 L 500 768 L 500 872" fill="none" stroke="#376ca5" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#end-flow)"/>
+<path d="M 1030 714 L 1030 800 L 890 800 L 890 872" fill="none" stroke="#ffffff" stroke-width="7" stroke-linejoin="round"/>
+<path d="M 1030 714 L 1030 800 L 890 800 L 890 872" fill="none" stroke="#376ca5" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#end-flow)"/>
+<path d="M 1190 714 L 1190 786 L 1330 786 L 1330 872" fill="none" stroke="#ffffff" stroke-width="7" stroke-linejoin="round"/>
+<path d="M 1190 714 L 1190 786 L 1330 786 L 1330 872" fill="none" stroke="#7c8792" stroke-width="1.8" stroke-linejoin="round" stroke-dasharray="3 5" marker-end="url(#end-support)"/>
+<path d="M 1655 714 L 1655 768 L 1550 768 L 1550 872" fill="none" stroke="#ffffff" stroke-width="7" stroke-linejoin="round"/>
+<path d="M 1655 714 L 1655 768 L 1550 768 L 1550 872" fill="none" stroke="#376ca5" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#end-flow)"/>
+<path d="M 245 1220 L 245 1110 L 245 1032" fill="none" stroke="#ffffff" stroke-width="7" stroke-linejoin="round"/>
+<path d="M 245 1220 L 245 1110 L 245 1032" fill="none" stroke="#278476" stroke-width="2.5" stroke-linejoin="round" stroke-dasharray="8 5" marker-end="url(#end-query)" marker-start="url(#start-query)"/>
+<path d="M 510 1220 L 510 1090 L 890 1090 L 890 1032" fill="none" stroke="#ffffff" stroke-width="7" stroke-linejoin="round"/>
+<path d="M 510 1220 L 510 1090 L 890 1090 L 890 1032" fill="none" stroke="#278476" stroke-width="2.5" stroke-linejoin="round" stroke-dasharray="8 5" marker-end="url(#end-query)" marker-start="url(#start-query)"/>
+<path d="M 810 1220 L 810 1130 L 425 1130 L 425 1032" fill="none" stroke="#ffffff" stroke-width="7" stroke-linejoin="round"/>
+<path d="M 810 1220 L 810 1130 L 425 1130 L 425 1032" fill="none" stroke="#278476" stroke-width="2.5" stroke-linejoin="round" stroke-dasharray="8 5" marker-end="url(#end-query)" marker-start="url(#start-query)"/>
+<path d="M 1135 1220 L 1135 1108 L 1330 1108 L 1330 1032" fill="none" stroke="#ffffff" stroke-width="7" stroke-linejoin="round"/>
+<path d="M 1135 1220 L 1135 1108 L 1330 1108 L 1330 1032" fill="none" stroke="#278476" stroke-width="2.5" stroke-linejoin="round" stroke-dasharray="8 5" marker-end="url(#end-query)" marker-start="url(#start-query)"/>
+<path d="M 1470 1220 L 1470 1110 L 1470 1032" fill="none" stroke="#ffffff" stroke-width="7" stroke-linejoin="round"/>
+<path d="M 1470 1220 L 1470 1110 L 1470 1032" fill="none" stroke="#278476" stroke-width="2.5" stroke-linejoin="round" stroke-dasharray="8 5" marker-end="url(#end-query)" marker-start="url(#start-query)"/>
+<path d="M 1630 1220 L 1630 1140 L 1980 1140 L 1980 1032" fill="none" stroke="#ffffff" stroke-width="7" stroke-linejoin="round"/>
+<path d="M 1630 1220 L 1630 1140 L 1980 1140 L 1980 1032" fill="none" stroke="#278476" stroke-width="2.5" stroke-linejoin="round" stroke-dasharray="8 5" marker-end="url(#end-query)" marker-start="url(#start-query)"/>
+<path d="M 1060 1220 L 1060 1070 L 1870 1070 L 1870 1032" fill="none" stroke="#ffffff" stroke-width="7" stroke-linejoin="round"/>
+<path d="M 1060 1220 L 1060 1070 L 1870 1070 L 1870 1032" fill="none" stroke="#7c8792" stroke-width="1.8" stroke-linejoin="round" stroke-dasharray="3 5" marker-end="url(#end-support)" marker-start="url(#start-support)"/>
+<path d="M 695 1297 L 555 1297" fill="none" stroke="#ffffff" stroke-width="7" stroke-linejoin="round"/>
+<path d="M 695 1297 L 555 1297" fill="none" stroke="#278476" stroke-width="2.5" stroke-linejoin="round" stroke-dasharray="8 5" marker-end="url(#end-query)" marker-start="url(#start-query)"/>
+<path d="M 1305 1297 L 1165 1297" fill="none" stroke="#ffffff" stroke-width="7" stroke-linejoin="round"/>
+<path d="M 1305 1297 L 1165 1297" fill="none" stroke="#278476" stroke-width="2.5" stroke-linejoin="round" stroke-dasharray="8 5" marker-end="url(#end-query)" marker-start="url(#start-query)"/>
+<path d="M 1815 1297 L 1675 1297" fill="none" stroke="#ffffff" stroke-width="7" stroke-linejoin="round"/>
+<path d="M 1815 1297 L 1675 1297" fill="none" stroke="#278476" stroke-width="2.5" stroke-linejoin="round" stroke-dasharray="8 5" marker-end="url(#end-query)" marker-start="url(#start-query)"/>
+<path d="M 1490 1375 L 1490 1520 L 610 1520 L 610 1348 L 555 1348" fill="none" stroke="#ffffff" stroke-width="7" stroke-linejoin="round"/>
+<path d="M 1490 1375 L 1490 1520 L 610 1520 L 610 1348 L 555 1348" fill="none" stroke="#278476" stroke-width="2.5" stroke-linejoin="round" stroke-dasharray="8 5" marker-end="url(#end-query)" marker-start="url(#start-query)"/>
+<path d="M 930 1375 L 930 1435" fill="none" stroke="#ffffff" stroke-width="7" stroke-linejoin="round"/>
+<path d="M 930 1375 L 930 1435" fill="none" stroke="#a9712c" stroke-width="2.5" stroke-linejoin="round" stroke-dasharray="8 5" marker-end="url(#end-ai)" marker-start="url(#start-ai)"/>
+<path d="M 1995 1435 L 1995 1375" fill="none" stroke="#ffffff" stroke-width="7" stroke-linejoin="round"/>
+<path d="M 1995 1435 L 1995 1375" fill="none" stroke="#278476" stroke-width="2.5" stroke-linejoin="round" stroke-dasharray="8 5" marker-end="url(#end-query)" marker-start="url(#start-query)"/>
+<path d="M 125 1467 L 80 1467 L 80 962 L 125 962" fill="none" stroke="#ffffff" stroke-width="7" stroke-linejoin="round"/>
+<path d="M 125 1467 L 80 1467 L 80 962 L 125 962" fill="none" stroke="#7c8792" stroke-width="1.8" stroke-linejoin="round" stroke-dasharray="3 5" marker-end="url(#end-support)"/>
+<g data-node="source" data-x="85" data-y="252" data-width="230" data-height="118">
+<rect x="85" y="252" width="230" height="118" rx="5" fill="#f4f6f8" stroke="#738494" stroke-width="1.4"/>
+<rect x="85" y="257" width="4" height="108" fill="#738494"/>
+<text x="200" y="287" font-size="25" font-weight="700" fill="#20313f" text-anchor="middle">Log sources</text>
+<text x="200" y="316" font-size="19" font-weight="400" fill="#596b79" text-anchor="middle">Distributed Nginx servers</text>
+<text x="200" y="341" font-size="19" font-weight="400" fill="#596b79" text-anchor="middle">External log collectors</text>
+</g>
+<g data-node="kafkaRaw" data-x="385" data-y="252" data-width="250" data-height="118">
+<rect x="385" y="252" width="250" height="118" rx="5" fill="#eef3fb" stroke="#376ca5" stroke-width="1.4"/>
+<rect x="385" y="257" width="4" height="108" fill="#376ca5"/>
+<text x="510" y="287" font-size="25" font-weight="700" fill="#20313f" text-anchor="middle">Kafka</text>
+<text x="510" y="316" font-size="19" font-weight="400" fill="#596b79" text-anchor="middle">log.raw</text>
+<text x="510" y="341" font-size="19" font-weight="400" fill="#596b79" text-anchor="middle">Durable ingestion buffer</text>
+</g>
+<g data-node="logstash" data-x="705" data-y="252" data-width="260" data-height="118">
+<rect x="705" y="252" width="260" height="118" rx="5" fill="#eef3fb" stroke="#376ca5" stroke-width="1.4"/>
+<rect x="705" y="257" width="4" height="108" fill="#376ca5"/>
+<text x="835" y="287" font-size="25" font-weight="700" fill="#20313f" text-anchor="middle">Logstash</text>
+<text x="835" y="316" font-size="19" font-weight="400" fill="#596b79" text-anchor="middle">Grok parsing</text>
+<text x="835" y="341" font-size="19" font-weight="400" fill="#596b79" text-anchor="middle">Field normalization / event_id</text>
+</g>
+<g data-node="structured" data-x="1045" data-y="252" data-width="300" data-height="118">
+<rect x="1045" y="252" width="300" height="118" rx="5" fill="#eef3fb" stroke="#376ca5" stroke-width="1.4"/>
+<rect x="1045" y="257" width="4" height="108" fill="#376ca5"/>
+<text x="1195" y="287" font-size="25" font-weight="700" fill="#20313f" text-anchor="middle">Kafka</text>
+<text x="1195" y="316" font-size="19" font-weight="400" fill="#596b79" text-anchor="middle">log.structured</text>
+<text x="1195" y="341" font-size="19" font-weight="400" fill="#596b79" text-anchor="middle">Normalized log stream</text>
+</g>
+<g data-node="rules" data-x="1445" data-y="252" data-width="300" data-height="118">
+<rect x="1445" y="252" width="300" height="118" rx="5" fill="#eef3fb" stroke="#376ca5" stroke-width="1.4"/>
+<rect x="1445" y="257" width="4" height="108" fill="#376ca5"/>
+<text x="1595" y="287" font-size="25" font-weight="700" fill="#20313f" text-anchor="middle">RuleEngine</text>
+<text x="1595" y="316" font-size="19" font-weight="400" fill="#596b79" text-anchor="middle">YAML / regex attack detection</text>
+<text x="1595" y="341" font-size="19" font-weight="400" fill="#596b79" text-anchor="middle">SQLi / XSS / injection / traversal</text>
+</g>
+<g data-node="topics" data-x="1845" data-y="252" data-width="335" data-height="118">
+<rect x="1845" y="252" width="335" height="118" rx="5" fill="#eef3fb" stroke="#376ca5" stroke-width="1.4"/>
+<rect x="1845" y="257" width="4" height="108" fill="#376ca5"/>
+<text x="2012.5" y="287" font-size="25" font-weight="700" fill="#20313f" text-anchor="middle">Kafka</text>
+<text x="2012.5" y="316" font-size="19" font-weight="400" fill="#596b79" text-anchor="middle">rule.event.save  |  Rule events</text>
+<text x="2012.5" y="341" font-size="19" font-weight="400" fill="#596b79" text-anchor="middle">log.analysis  |  Suspicious logs</text>
+</g>
+<g data-node="zookeeper" data-x="385" data-y="408" data-width="250" data-height="44">
+<rect x="385" y="408" width="250" height="44" rx="5" fill="#f5f6f7" stroke="#7c8792" stroke-width="1.4"/>
+<text x="510" y="437" font-size="21" font-weight="700" fill="#20313f" text-anchor="middle">ZooKeeper</text>
+</g>
+<g data-node="connect" data-x="85" data-y="578" data-width="270" data-height="136">
+<rect x="85" y="578" width="270" height="136" rx="5" fill="#f5f6f7" stroke="#7c8792" stroke-width="1.4"/>
+<rect x="85" y="583" width="4" height="126" fill="#7c8792"/>
+<text x="220" y="613" font-size="25" font-weight="700" fill="#20313f" text-anchor="middle">Kafka Connect</text>
+<text x="220" y="642" font-size="19" font-weight="400" fill="#596b79" text-anchor="middle">Dead-letter sink</text>
+<text x="220" y="667" font-size="19" font-weight="400" fill="#596b79" text-anchor="middle">Retain failed pipeline records</text>
+</g>
+<g data-node="dlq" data-x="445" data-y="578" data-width="265" data-height="136">
+<rect x="445" y="578" width="265" height="136" rx="5" fill="#f5f6f7" stroke="#7c8792" stroke-width="1.4"/>
+<rect x="445" y="583" width="4" height="126" fill="#7c8792"/>
+<text x="577.5" y="613" font-size="25" font-weight="700" fill="#20313f" text-anchor="middle">Kafka | log.dlq</text>
+<text x="577.5" y="642" font-size="19" font-weight="400" fill="#596b79" text-anchor="middle">Parse / detection / AI failures</text>
+<text x="577.5" y="667" font-size="19" font-weight="400" fill="#596b79" text-anchor="middle">Payload + error context</text>
+</g>
+<g data-node="storage" data-x="815" data-y="578" data-width="435" data-height="136">
+<rect x="815" y="578" width="435" height="136" rx="5" fill="#eaf5f4" stroke="#278476" stroke-width="1.4"/>
+<rect x="815" y="583" width="4" height="126" fill="#278476"/>
+<text x="1032.5" y="613" font-size="25" font-weight="700" fill="#20313f" text-anchor="middle">Log storage service</text>
+<text x="1032.5" y="642" font-size="19" font-weight="400" fill="#596b79" text-anchor="middle">4 independent Kafka consumer groups</text>
+<text x="1032.5" y="667" font-size="19" font-weight="400" fill="#596b79" text-anchor="middle">Raw logs + rule events -&gt; ES / CK</text>
+<text x="1032.5" y="692" font-size="19" font-weight="400" fill="#596b79" text-anchor="middle">Durable batches + MySQL checkpoints</text>
+</g>
+<g data-node="difyWorker" data-x="1495" data-y="578" data-width="320" data-height="136">
+<rect x="1495" y="578" width="320" height="136" rx="5" fill="#fbf2e5" stroke="#a9712c" stroke-width="1.4"/>
+<rect x="1495" y="583" width="4" height="126" fill="#a9712c"/>
+<text x="1655" y="613" font-size="25" font-weight="700" fill="#20313f" text-anchor="middle">Dify analysis worker</text>
+<text x="1655" y="642" font-size="19" font-weight="400" fill="#596b79" text-anchor="middle">services/agent</text>
+<text x="1655" y="667" font-size="19" font-weight="400" fill="#596b79" text-anchor="middle">Generate security analysis reports</text>
+<text x="1655" y="692" font-size="19" font-weight="400" fill="#596b79" text-anchor="middle">Retries / circuit breaker / DLQ</text>
+</g>
+<g data-node="dify" data-x="1890" data-y="578" data-width="290" data-height="136">
+<rect x="1890" y="578" width="290" height="136" rx="5" fill="#fbf2e5" stroke="#a9712c" stroke-width="1.4"/>
+<rect x="1890" y="583" width="4" height="126" fill="#a9712c"/>
+<text x="2035" y="613" font-size="25" font-weight="700" fill="#20313f" text-anchor="middle">Dify platform</text>
+<text x="2035" y="642" font-size="19" font-weight="400" fill="#596b79" text-anchor="middle">External workflow execution</text>
+<text x="2035" y="667" font-size="19" font-weight="400" fill="#596b79" text-anchor="middle">LLM-based log analysis</text>
+</g>
+<g data-node="es" data-x="125" data-y="872" data-width="430" data-height="160">
+<path d="M 125 890 A 215 18 0 0 1 555 890 V 1014 A 215 18 0 0 1 125 1014 Z" fill="#fff7e8" stroke="#b58b35" stroke-width="1.7"/><ellipse cx="340" cy="890" rx="215" ry="18" fill="#fff7e8" stroke="#b58b35" stroke-width="1.7"/>
+<text x="340" y="933" font-size="25" font-weight="700" fill="#20313f" text-anchor="middle">Elasticsearch</text>
+<text x="340" y="962" font-size="19" font-weight="400" fill="#596b79" text-anchor="middle">HOT: recent 7-day log / event copies</text>
+<text x="340" y="987" font-size="19" font-weight="400" fill="#596b79" text-anchor="middle">Derived RAG evidence corpus</text>
+<text x="340" y="1012" font-size="19" font-weight="400" fill="#596b79" text-anchor="middle">Dead-letter index / Kibana</text>
+</g>
+<g data-node="ck" data-x="675" data-y="872" data-width="430" data-height="160">
+<path d="M 675 890 A 215 18 0 0 1 1105 890 V 1014 A 215 18 0 0 1 675 1014 Z" fill="#e9f5f7" stroke="#368b9b" stroke-width="1.7"/><ellipse cx="890" cy="890" rx="215" ry="18" fill="#e9f5f7" stroke="#368b9b" stroke-width="1.7"/>
+<text x="890" y="933" font-size="25" font-weight="700" fill="#20313f" text-anchor="middle">ClickHouse</text>
+<text x="890" y="962" font-size="19" font-weight="400" fill="#596b79" text-anchor="middle">FULL ARCHIVE: raw logs + rule events</text>
+<text x="890" y="987" font-size="19" font-weight="400" fill="#596b79" text-anchor="middle">Every record is archived on arrival</text>
+<text x="890" y="1012" font-size="19" font-weight="400" fill="#596b79" text-anchor="middle">Historical details / exact statistics</text>
+</g>
+<g data-node="mysql" data-x="1225" data-y="872" data-width="430" data-height="160">
+<path d="M 1225 890 A 215 18 0 0 1 1655 890 V 1014 A 215 18 0 0 1 1225 1014 Z" fill="#eef2f8" stroke="#657fa4" stroke-width="1.7"/><ellipse cx="1440" cy="890" rx="215" ry="18" fill="#eef2f8" stroke="#657fa4" stroke-width="1.7"/>
+<text x="1440" y="933" font-size="25" font-weight="700" fill="#20313f" text-anchor="middle">MySQL</text>
+<text x="1440" y="962" font-size="19" font-weight="400" fill="#596b79" text-anchor="middle">AI reports / users / incidents</text>
+<text x="1440" y="987" font-size="19" font-weight="400" fill="#596b79" text-anchor="middle">Storage checkpoints / coverage</text>
+<text x="1440" y="1012" font-size="19" font-weight="400" fill="#596b79" text-anchor="middle">Event outbox / migration metadata</text>
+</g>
+<g data-node="redis" data-x="1775" data-y="872" data-width="400" data-height="160">
+<path d="M 1775 890 A 200 18 0 0 1 2175 890 V 1014 A 200 18 0 0 1 1775 1014 Z" fill="#faeff0" stroke="#ad6970" stroke-width="1.7"/><ellipse cx="1975" cy="890" rx="200" ry="18" fill="#faeff0" stroke="#ad6970" stroke-width="1.7"/>
+<text x="1975" y="933" font-size="25" font-weight="700" fill="#20313f" text-anchor="middle">Redis</text>
+<text x="1975" y="962" font-size="19" font-weight="400" fill="#596b79" text-anchor="middle">Django application cache</text>
+<text x="1975" y="987" font-size="19" font-weight="400" fill="#596b79" text-anchor="middle">Optional Agent session memory</text>
+<text x="1975" y="1012" font-size="19" font-weight="400" fill="#596b79" text-anchor="middle">LangGraph checkpointer</text>
+</g>
+<g data-node="query" data-x="125" data-y="1220" data-width="430" data-height="155">
+<rect x="125" y="1220" width="430" height="155" rx="5" fill="#eaf5f4" stroke="#278476" stroke-width="1.4"/>
+<rect x="125" y="1225" width="4" height="145" fill="#278476"/>
+<text x="340" y="1255" font-size="25" font-weight="700" fill="#20313f" text-anchor="middle">Shared log query layer</text>
+<text x="340" y="1284" font-size="19" font-weight="400" fill="#596b79" text-anchor="middle">common/log_query  |  LogQueryService</text>
+<text x="340" y="1309" font-size="19" font-weight="400" fill="#596b79" text-anchor="middle">Hot / cold routing + coverage checks</text>
+<text x="340" y="1334" font-size="19" font-weight="400" fill="#596b79" text-anchor="middle">Shared by Django and MCP tools</text>
+</g>
+<g data-node="agent" data-x="695" data-y="1220" data-width="470" data-height="155">
+<rect x="695" y="1220" width="470" height="155" rx="5" fill="#edf5ee" stroke="#568366" stroke-width="1.4"/>
+<rect x="695" y="1225" width="4" height="145" fill="#568366"/>
+<text x="930" y="1255" font-size="25" font-weight="700" fill="#20313f" text-anchor="middle">Agent microservice</text>
+<text x="930" y="1284" font-size="19" font-weight="400" fill="#596b79" text-anchor="middle">FastAPI + LangGraph</text>
+<text x="930" y="1309" font-size="19" font-weight="400" fill="#596b79" text-anchor="middle">Explorer / evidence-based workflow</text>
+<text x="930" y="1334" font-size="19" font-weight="400" fill="#596b79" text-anchor="middle">MCP tools / RAG retrieval + case sync</text>
+</g>
+<g data-node="backend" data-x="1305" data-y="1220" data-width="370" data-height="155">
+<rect x="1305" y="1220" width="370" height="155" rx="5" fill="#edf5ee" stroke="#568366" stroke-width="1.4"/>
+<rect x="1305" y="1225" width="4" height="145" fill="#568366"/>
+<text x="1490" y="1255" font-size="25" font-weight="700" fill="#20313f" text-anchor="middle">Django backend</text>
+<text x="1490" y="1284" font-size="19" font-weight="400" fill="#596b79" text-anchor="middle">REST APIs / JWT authentication</text>
+<text x="1490" y="1309" font-size="19" font-weight="400" fill="#596b79" text-anchor="middle">Logs / reports / incident handling</text>
+<text x="1490" y="1334" font-size="19" font-weight="400" fill="#596b79" text-anchor="middle">Agent streaming proxy</text>
+</g>
+<g data-node="frontend" data-x="1815" data-y="1220" data-width="360" data-height="155">
+<rect x="1815" y="1220" width="360" height="155" rx="5" fill="#edf5ee" stroke="#568366" stroke-width="1.4"/>
+<rect x="1815" y="1225" width="4" height="145" fill="#568366"/>
+<text x="1995" y="1255" font-size="25" font-weight="700" fill="#20313f" text-anchor="middle">Next.js frontend</text>
+<text x="1995" y="1284" font-size="19" font-weight="400" fill="#596b79" text-anchor="middle">Dashboard / log search</text>
+<text x="1995" y="1309" font-size="19" font-weight="400" fill="#596b79" text-anchor="middle">Security reports / incidents</text>
+<text x="1995" y="1334" font-size="19" font-weight="400" fill="#596b79" text-anchor="middle">Interactive AI investigation</text>
+</g>
+<g data-node="kibana" data-x="125" data-y="1435" data-width="300" data-height="65">
+<rect x="125" y="1435" width="300" height="65" rx="5" fill="#f5f6f7" stroke="#7c8792" stroke-width="1.4"/>
+<text x="275" y="1460" font-size="21" font-weight="700" fill="#20313f" text-anchor="middle">Kibana</text>
+<text x="275" y="1484" font-size="18" font-weight="400" fill="#596b79" text-anchor="middle">Optional ES inspection</text>
+</g>
+<g data-node="llm" data-x="695" data-y="1435" data-width="470" data-height="65">
+<rect x="695" y="1435" width="470" height="65" rx="5" fill="#fbf2e5" stroke="#a9712c" stroke-width="1.4"/>
+<text x="930" y="1460" font-size="21" font-weight="700" fill="#20313f" text-anchor="middle">LLM provider</text>
+<text x="930" y="1484" font-size="18" font-weight="400" fill="#596b79" text-anchor="middle">OpenAI-compatible API</text>
+</g>
+<g data-node="user" data-x="1870" data-y="1435" data-width="250" data-height="65">
+<rect x="1870" y="1435" width="250" height="65" rx="5" fill="#f5f6f7" stroke="#738494" stroke-width="1.4"/>
+<text x="1995" y="1474.5" font-size="21" font-weight="700" fill="#20313f" text-anchor="middle">Security analyst</text>
+</g>
+<rect x="748.85" y="449" width="202.29999999999998" height="28" rx="3" fill="#ffffff"/>
+<text x="850" y="470" font-size="18" font-weight="400" fill="#7c8792" text-anchor="middle">Processing failures</text>
+<rect x="922.2" y="514" width="95.6" height="28" rx="3" fill="#ffffff"/>
+<text x="970" y="535" font-size="18" font-weight="400" fill="#376ca5" text-anchor="middle">Raw logs</text>
+<rect x="1387.65" y="466" width="124.69999999999999" height="28" rx="3" fill="#ffffff"/>
+<text x="1450" y="487" font-size="18" font-weight="400" fill="#376ca5" text-anchor="middle">Rule events</text>
+<rect x="1708.25" y="520" width="163.5" height="28" rx="3" fill="#ffffff"/>
+<text x="1790" y="541" font-size="18" font-weight="400" fill="#376ca5" text-anchor="middle">Suspicious logs</text>
+<rect x="236.45" y="770" width="47.099999999999994" height="28" rx="3" fill="#ffffff"/>
+<text x="260" y="791" font-size="18" font-weight="400" fill="#7c8792" text-anchor="middle">DLQ</text>
+<rect x="554" y="752" width="212" height="28" rx="3" fill="#ffffff"/>
+<text x="660" y="773" font-size="18" font-weight="400" fill="#376ca5" text-anchor="middle">Recent search copies</text>
+<rect x="864.6" y="814" width="250.79999999999998" height="28" rx="3" fill="#ffffff"/>
+<text x="990" y="835" font-size="18" font-weight="400" fill="#376ca5" text-anchor="middle">All records, immediately</text>
+<rect x="1197.65" y="770" width="124.69999999999999" height="28" rx="3" fill="#ffffff"/>
+<text x="1260" y="791" font-size="18" font-weight="400" fill="#7c8792" text-anchor="middle">Checkpoints</text>
+<rect x="1512.5" y="789" width="115" height="28" rx="3" fill="#ffffff"/>
+<text x="1570" y="810" font-size="18" font-weight="400" fill="#376ca5" text-anchor="middle">AI reports</text>
+<rect x="182.65" y="1094" width="124.69999999999999" height="28" rx="3" fill="#ffffff"/>
+<text x="245" y="1115" font-size="18" font-weight="400" fill="#278476" text-anchor="middle">Hot details</text>
+<rect x="594" y="1074" width="212" height="28" rx="3" fill="#ffffff"/>
+<text x="700" y="1095" font-size="18" font-weight="400" fill="#278476" text-anchor="middle">History / statistics</text>
+<rect x="582.8" y="1114" width="134.39999999999998" height="28" rx="3" fill="#ffffff"/>
+<text x="650" y="1135" font-size="18" font-weight="400" fill="#278476" text-anchor="middle">RAG evidence</text>
+<rect x="1157.65" y="1092" width="124.69999999999999" height="28" rx="3" fill="#ffffff"/>
+<text x="1220" y="1113" font-size="18" font-weight="400" fill="#278476" text-anchor="middle">MCP reports</text>
+<rect x="1388.25" y="1094" width="163.5" height="28" rx="3" fill="#ffffff"/>
+<text x="1470" y="1115" font-size="18" font-weight="400" fill="#278476" text-anchor="middle">Reports / users</text>
+<rect x="1796.75" y="1124" width="66.5" height="28" rx="3" fill="#ffffff"/>
+<text x="1830" y="1145" font-size="18" font-weight="400" fill="#278476" text-anchor="middle">Cache</text>
+<rect x="1619.45" y="1054" width="241.1" height="28" rx="3" fill="#ffffff"/>
+<text x="1740" y="1075" font-size="18" font-weight="400" fill="#7c8792" text-anchor="middle">Optional session memory</text>
+<rect x="572.35" y="1259" width="105.3" height="28" rx="3" fill="#ffffff"/>
+<text x="625" y="1280" font-size="18" font-weight="400" fill="#278476" text-anchor="middle">MCP tools</text>
+<rect x="1177.5" y="1259" width="115" height="28" rx="3" fill="#ffffff"/>
+<text x="1235" y="1280" font-size="18" font-weight="400" fill="#278476" text-anchor="middle">Chat / SSE</text>
+<rect x="1687.5" y="1259" width="115" height="28" rx="3" fill="#ffffff"/>
+<text x="1745" y="1280" font-size="18" font-weight="400" fill="#278476" text-anchor="middle">REST / SSE</text>
+<rect x="904.3" y="1504" width="231.39999999999998" height="28" rx="3" fill="#ffffff"/>
+<text x="1020" y="1525" font-size="18" font-weight="400" fill="#278476" text-anchor="middle">Log search / dashboard</text>
+<text x="65" y="1558" font-size="17" font-weight="400" fill="#596b79" text-anchor="start">Hybrid capability shown. ES hot window: 168 hours by event time. ClickHouse archives all records immediately.</text>
+</g></svg>

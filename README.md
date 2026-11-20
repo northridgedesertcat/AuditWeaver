@@ -8,6 +8,8 @@
 
 English | [简体中文](README.zh-CN.md)
 
+[Documentation](docs/README.md) | [Development reference](docs/development/README.md) | [Documentation policy](docs/contributing.md)
+
 ***
 
 ## 📖 Overview
@@ -25,23 +27,23 @@ AuditWeaver is an AI-powered log analysis system designed for distributed cluste
 - 🧠 Analyze suspicious logs with LLMs (Dify Workflow)
 - 📄 Generate structured security reports
 - 🔄 Real-time data pipeline based on Kafka + Kafka Connect
+- Hot/cold log storage: a full ClickHouse archive and a seven-day Elasticsearch search copy
 - 🐳 Support Docker deployment with one-click startup
 - 🔐 Manage configuration through environment variables
 
 ***
 
 ## 🏗 Architecture
-current verion V1.0.0  
-current architecture:
-![Architecture](docs/images/Current.png  "Architecture")
 
-current simple architecture:
-![Architecture](docs/images/Current_simple.png "Architecture")
+AuditWeaver turns distributed Nginx logs into searchable security events, AI analysis reports, and interactive investigations. The complete architecture below connects ingestion and processing to the data platform, Agent microservice, backend, and analyst workspace.
 
+![AuditWeaver system architecture](docs/architecture/diagrams/system.png "AuditWeaver end-to-end architecture")
 
-***
-V2 architecture:
-![Architecture](docs/images/version.png "Architecture")
+[Scalable diagram](docs/architecture/diagrams/system.svg) | [Editable draw.io source](docs/architecture/diagrams/system.drawio) | [Architecture guide](docs/architecture/README.md)
+
+Follow the top row from log sources through Kafka, Logstash, and rule detection, then down through storage and AI analysis. ClickHouse archives all logs and rule events on arrival; Elasticsearch adds a recent seven-day search copy. MySQL holds application records and AI reports; Redis supports caching and optional Agent memory. The bottom row connects Next.js, Django, and the FastAPI/LangGraph Agent to this data platform.
+
+Previous versions and the unimplemented V2 proposal are kept in the [architecture archive](docs/archive/README.md).
 
 
 ## 🛠 Tech Stack
@@ -54,9 +56,9 @@ V2 architecture:
 | Rule Engine   | Python Regex + YAML-based rules |
 | Anomaly Detection | Isolation Forest (scikit-learn) |
 | Message Queue | Apache Kafka |
-| Data Integration | Kafka Connect (Elasticsearch Sink) |
+| Data Integration | Independent Kafka storage workers; Kafka Connect for DLQ and legacy migration |
 | Log Pipeline  | Logstash |
-| Search & Storage | Elasticsearch |
+| Search & Storage | Elasticsearch (hot search) + ClickHouse (full archive) |
 | Visualization | Kibana |
 | Container     | Docker Compose |
 
@@ -229,19 +231,21 @@ Once started, access:
 | log.structured        | Structured/parsed logs (via Logstash)           |
 | log.audit             | Logs to be processed by the Rule Engine        |
 | log.analysis          | Analysis results from the Rule Engine           |
-| rule.event.save       | Rule Engine events (ES sink target)            |
+| rule.event.save       | Rule events consumed by ClickHouse and Elasticsearch storage workers |
 
 > Topics are auto-initialized via `docker/config/kafka/topics/topics.yaml` and `create-init-topics.py`.
 > Agent AI analysis reports are written directly to the MySQL `analysis_report` table (no Kafka/ES hop).
 
-### Elasticsearch Indexes
+### Log Storage
 
-| Index                    | Description                              |
-| :----------------------- | :--------------------------------------- |
-| nginx-log-raw            | Raw Nginx logs                           |
-| matched_logs             | Logs matched by rules                    |
+| Store / Index | Purpose |
+| :--- | :--- |
+| ClickHouse | Complete raw-log and rule-event archive, written immediately |
+| ES `auditweaver-raw-hot` / `auditweaver-events-hot` | Read aliases over daily indexes for the recent event-time window |
+| ES `nginx-log-raw` / `matched_logs` | Legacy fixed indexes used before and during migration |
+| ES `auditweaver-rag-corpus` | Derived RAG evidence, retained separately |
 
-> AI-generated analysis reports are stored in MySQL table `analysis_report` (Django app `reports`). The report detail view still reads the raw log line (`event.original`) from `nginx-log-raw`.
+> Hybrid mode routes recent details to ES, older details to ClickHouse, and exact full-range aggregates to ClickHouse. Report bodies stay in MySQL `analysis_report`; original logs are read through the shared query service. Storage and cleanup are disabled by default, and reads default to `es_legacy`. The diagrams reflect `main` at `51508a3`; see the [architecture guide](docs/architecture/README.md) for certification and branch provenance.
 
 ***
 
@@ -249,12 +253,12 @@ Once started, access:
 
 Dashboard
 
-![Dashboard](docs/images/dashboard.png "Dashboard")
+![Dashboard](docs/assets/screenshots/dashboard.png "Dashboard")
 
 Analysis Report
 
-![Report](docs/images/report1.png "Report")
-![Report](docs/images/report2.png "Report")
+![Report](docs/assets/screenshots/report-1.png "Report")
+![Report](docs/assets/screenshots/report-2.png "Report")
 
 ***
 
