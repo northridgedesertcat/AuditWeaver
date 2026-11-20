@@ -97,7 +97,8 @@ class AgentProxyView(APIView):
         body = request.body or b""
         headers = {"Content-Type": request.content_type or "application/json"}
 
-        client = httpx.Client(timeout=None)
+        # This is an internal hop, not an outbound model request.
+        client = httpx.Client(trust_env=False, timeout=httpx.Timeout(None, connect=5.0))
         try:
             req = httpx.Request("POST", target, content=body, headers=headers)
             upstream = client.send(req, stream=True)
@@ -128,9 +129,9 @@ class AgentProxyView(APIView):
     def get(self, request, *args, **kwargs):
         target = self._build_target(request)
         try:
-            r = httpx.get(target, timeout=10)
+            r = httpx.get(target, timeout=10, trust_env=False)
             return JsonResponse(r.json(), status=r.status_code, safe=False)
-        except httpx.HTTPError:
+        except (httpx.HTTPError, ValueError):
             return JsonResponse(
                 {"error": "agent service unavailable"},
                 status=status.HTTP_502_BAD_GATEWAY,
