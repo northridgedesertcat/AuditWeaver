@@ -1,0 +1,70 @@
+<mxfile host="Electron">
+  <diagram name="第 1 页" id="kHVsEn1LFUBkz_AWJMth">
+    <mxGraphModel dx="1201" dy="828" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="do5v42SlamTNu-ygX9uB-3" edge="1" parent="1" source="do5v42SlamTNu-ygX9uB-1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="do5v42SlamTNu-ygX9uB-2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="do5v42SlamTNu-ygX9uB-1" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="数据库" vertex="1">
+          <mxGeometry height="60" width="120" x="160" y="210" as="geometry" />
+        </mxCell>
+        <mxCell id="do5v42SlamTNu-ygX9uB-8" edge="1" parent="1" source="do5v42SlamTNu-ygX9uB-2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="do5v42SlamTNu-ygX9uB-7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="do5v42SlamTNu-ygX9uB-14" edge="1" parent="1" source="do5v42SlamTNu-ygX9uB-2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="do5v42SlamTNu-ygX9uB-13">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="do5v42SlamTNu-ygX9uB-2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="数据库监控" vertex="1">
+          <mxGeometry height="60" width="120" x="410" y="210" as="geometry" />
+        </mxCell>
+        <mxCell id="do5v42SlamTNu-ygX9uB-11" edge="1" parent="1" source="do5v42SlamTNu-ygX9uB-4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="do5v42SlamTNu-ygX9uB-10">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="do5v42SlamTNu-ygX9uB-4" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="agent&lt;br&gt;根据具体的情况选择执行操作" vertex="1">
+          <mxGeometry height="60" width="120" x="410" y="760" as="geometry" />
+        </mxCell>
+        <mxCell id="do5v42SlamTNu-ygX9uB-23" edge="1" parent="1" source="do5v42SlamTNu-ygX9uB-7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="do5v42SlamTNu-ygX9uB-22">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="do5v42SlamTNu-ygX9uB-7" parent="1" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;shapeInside=1;fixedSize=1;" value="出现图片" vertex="1">
+          <mxGeometry height="80" width="120" x="410" y="350" as="geometry" />
+        </mxCell>
+        <mxCell id="do5v42SlamTNu-ygX9uB-10" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="ERP下单" vertex="1">
+          <mxGeometry height="60" width="120" x="410" y="1010" as="geometry" />
+        </mxCell>
+        <mxCell id="do5v42SlamTNu-ygX9uB-17" edge="1" parent="1" source="do5v42SlamTNu-ygX9uB-12" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="do5v42SlamTNu-ygX9uB-16">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="do5v42SlamTNu-ygX9uB-12" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="llm分析" vertex="1">
+          <mxGeometry height="60" width="120" x="840" y="210" as="geometry" />
+        </mxCell>
+        <mxCell id="do5v42SlamTNu-ygX9uB-15" edge="1" parent="1" source="do5v42SlamTNu-ygX9uB-13" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="do5v42SlamTNu-ygX9uB-12">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="do5v42SlamTNu-ygX9uB-13" parent="1" style="shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;shapeInside=1;fixedSize=1;" value="消息更新" vertex="1">
+          <mxGeometry height="80" width="120" x="610" y="200" as="geometry" />
+        </mxCell>
+        <mxCell id="do5v42SlamTNu-ygX9uB-16" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="人工处理" vertex="1">
+          <mxGeometry height="60" width="120" x="1070" y="210" as="geometry" />
+        </mxCell>
+        <mxCell id="do5v42SlamTNu-ygX9uB-18" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="" vertex="1">
+          <mxGeometry height="600" width="760" x="730" y="460" as="geometry" />
+        </mxCell>
+        <mxCell id="do5v42SlamTNu-ygX9uB-19" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="react" vertex="1">
+          <mxGeometry height="60" width="120" x="890" y="660" as="geometry" />
+        </mxCell>
+        <mxCell id="do5v42SlamTNu-ygX9uB-20" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="skill&lt;div&gt;调用最近记录&lt;/div&gt;" vertex="1">
+          <mxGeometry height="110" width="210" x="1140" y="500" as="geometry" />
+        </mxCell>
+        <mxCell id="do5v42SlamTNu-ygX9uB-24" edge="1" parent="1" source="do5v42SlamTNu-ygX9uB-22" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="do5v42SlamTNu-ygX9uB-4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="do5v42SlamTNu-ygX9uB-22" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="识别" vertex="1">
+          <mxGeometry height="60" width="120" x="410" y="540" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -1,0 +1,22 @@
+---
+title: AuditWeaver - Six Functional Areas
+---
+%% A functional map, not a sequence: the numbers identify areas.
+%% Main relationships are intentionally separated into system-architecture.mmd.
+%% Hybrid capability verified against main 51508a3.
+block-beta
+    columns 3
+    INTAKE["<b>01  COLLECT AND NORMALIZE</b><br/><br/>External log collectors<br/>Kafka: receive and buffer logs<br/>Logstash: parse log fields<br/><br/>Output: structured logs"]
+    DETECT["<b>02  DETECT AND ANALYZE</b><br/><br/>RuleEngine: match attack rules<br/>Dify worker: analyze suspicious logs<br/>Dify platform: run AI workflows<br/><br/>Output: rule events and AI reports"]
+    STORAGE["<b>03  STORE LOGS</b><br/><br/>Log storage service: Kafka workers<br/>Elasticsearch: recent 7-day copy<br/>ClickHouse: full archive from arrival<br/><br/>MySQL: checkpoints and coverage"]
+
+    WEB["<b>04  WEB WORKSPACE</b><br/><br/>Next.js: dashboard and investigation UI<br/>Django: authentication and APIs<br/>Reports, log search, incident handling<br/><br/>MySQL: users, incidents, AI reports"]
+    QUERY["<b>05  QUERY LOGS</b><br/><br/>Shared LogQueryService<br/>Recent details: Elasticsearch<br/>Older details + all exact stats: CK<br/><br/>Used by Web APIs and AI tools"]
+    AGENT["<b>06  INTERACTIVE INVESTIGATION</b><br/><br/>FastAPI + LangGraph: agent runtime<br/>MCP: log, event, and report tools<br/>RAG: retrieve evidence from ES corpus<br/><br/>OpenAI-compatible LLM"]
+
+    classDef pipeline fill:#edf3fc,stroke:#6484b3,color:#203a5a
+    classDef storage fill:#e6f5f4,stroke:#4e9892,color:#164b48
+    classDef app fill:#edf5ed,stroke:#6c9875,color:#254c30
+    class INTAKE,DETECT pipeline
+    class STORAGE,QUERY storage
+    class WEB,AGENT app

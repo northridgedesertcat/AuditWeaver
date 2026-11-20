@@ -1,0 +1,89 @@
+---
+title: AuditWeaver - Agent Architecture and Hybrid Evidence Access
+---
+%% Graph routing: services/agent_service/agents/{react,workflow}/*/graph.py.
+%% Storage access: common/log_query, skills/log_search.py, shared/rag/case_sync.py.
+%% Verified against main 51508a3; hybrid access requires certified coverage.
+flowchart TB
+    subgraph REQUEST["STREAMING REQUEST PATH"]
+        UI["Browser / Next.js<br/>Investigation UI"]
+        DJANGO["Django<br/>JWT auth and streaming proxy"]
+        FASTAPI["FastAPI Agent Service<br/>Chat / synchronous chat"]
+        STREAM["LangGraph event stream<br/>SSE tokens, status, tools, errors, done"]
+        UI --> DJANGO --> FASTAPI --> STREAM
+    end
+
+    subgraph GRAPHS["LANGGRAPH AGENTS"]
+        subgraph EXPLORER["analysis_explorer - conversational investigation"]
+            PLAN["Plan"] --> REACT["Agent / ReAct"]
+            REACT -->|"Tool calls"| TOOLS["Tools"]
+            REACT -->|"Conclusion"| END(("End"))
+            TOOLS --> GATE{"Deterministic gate"}
+            GATE -->|"No trigger"| REACT
+            GATE -->|"Trigger"| DECISION["Decision LLM"]
+            DECISION -->|"Continue"| REACT
+            DECISION -->|"Replan"| PLAN
+            DECISION -->|"Compact"| COMPACT["Compress context"]
+            COMPACT --> REACT
+            DECISION -->|"Finish"| END
+        end
+        subgraph WORKFLOW["analysis_workflow - evidence-based analysis"]
+            RETRIEVE["Retrieve evidence"] --> ANALYZE["Analyze"]
+            ANALYZE --> VALIDATE{"Validate"}
+            VALIDATE -->|"Pass / retry limit / missing validation"| REPORT["Report"]
+            VALIDATE -->|"Insufficient evidence; retries left"| ENRICH["Enrich evidence"]
+            ENRICH --> ANALYZE
+        end
+    end
+
+    subgraph SKILLS["SHARED MCP SKILLS - STDIO"]
+        MCP["MCP client / tool wrapper<br/>Timeouts, retries, audit"]
+        LOGS["query_ip_logs"]
+        EVENTS["query_security_events"]
+        REPORTS["query_analysis_results"]
+        MCP --> LOGS & EVENTS & REPORTS
+    end
+
+    subgraph EVIDENCE["LOGS AND DERIVED EVIDENCE - HYBRID MODE"]
+        QUERY["LogQueryService<br/>Signed cursor, fixed hot/cold boundary<br/>Coverage failure returns unavailable"]
+        HOT[("Elasticsearch hot aliases<br/>Recent 7-day log / event details")]
+        CK[("ClickHouse<br/>Older details + exact full-range aggregates<br/>Full raw logs and rule events")]
+        META[("MySQL storage metadata<br/>Coverage / checkpoints / event outbox")]
+        SYNC["RAG case sync<br/>Bootstrap window via shared reader<br/>Then outbox + latest CK events"]
+        CORPUS[("Elasticsearch RAG corpus<br/>Derived cases and knowledge")]
+        RAG["RAG retrieval<br/>BM25 + kNN + RRF"]
+        QUERY --> HOT
+        QUERY --> CK
+        QUERY -.->|"Verify coverage"| META
+        SYNC -->|"Bootstrap scan"| QUERY
+        SYNC -->|"Read latest source event"| CK
+        META -.->|"Durable notifications"| SYNC
+        SYNC -->|"Embed / upsert / expire derived cases"| CORPUS
+        RAG --> CORPUS
+    end
+
+    MYSQL[("MySQL application data<br/>analysis_report")]
+    LLM["Shared LLM gateway<br/>Analysis / light / report roles<br/>OpenAI-compatible provider"]
+    MEMORY["Checkpointer<br/>In-process memory or optional Redis"]
+
+    STREAM --> EXPLORER
+    STREAM --> WORKFLOW
+    TOOLS --> MCP
+    LOGS & EVENTS --> QUERY
+    REPORTS --> MYSQL
+    RETRIEVE & ENRICH --> RAG
+    PLAN & REACT & DECISION & COMPACT & ANALYZE & REPORT --> LLM
+    EXPLORER -.->|"Session state"| MEMORY
+
+    classDef app fill:#e6f4ef,stroke:#19775c,color:#123d31
+    classDef gate fill:#fff5d9,stroke:#aa7c1d,color:#59421d
+    classDef tool fill:#eef2fb,stroke:#526eab,color:#263653
+    classDef hot fill:#fff0d6,stroke:#b27619,color:#59421d
+    classDef cold fill:#e0f4f7,stroke:#16788c,color:#164451
+    classDef meta fill:#f7e8ec,stroke:#a34c67,color:#572a3b
+    class UI,DJANGO,FASTAPI,STREAM,PLAN,REACT,TOOLS,DECISION,COMPACT,END,RETRIEVE,ANALYZE,ENRICH,REPORT,QUERY,SYNC,RAG app
+    class GATE,VALIDATE gate
+    class MCP,LOGS,EVENTS,REPORTS,LLM tool
+    class HOT,CORPUS hot
+    class CK cold
+    class META,MYSQL,MEMORY meta
