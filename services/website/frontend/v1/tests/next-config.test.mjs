@@ -48,6 +48,10 @@ test('explicit Django base takes priority over the legacy preview origin', async
   assert.equal((await config.rewrites())[0].destination, 'http://django:8000/api/v1/:path*')
 })
 
+test('dev server allows resources from the loopback IP used by the launcher', () => {
+  assert.deepEqual(config.allowedDevOrigins, ['127.0.0.1'])
+})
+
 test('build type checking and streaming-compatible settings stay enabled', () => {
   assert.notEqual(config.typescript?.ignoreBuildErrors, true)
   assert.equal(config.trailingSlash, true)

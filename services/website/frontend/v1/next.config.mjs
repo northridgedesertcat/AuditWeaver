@@ -1,5 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // The local service launcher also accesses the dev server via this loopback host.
+  allowedDevOrigins: ['127.0.0.1'],
   // 保留 URL 尾斜杠,避免 rewrites 转发给 Django 时丢斜杠触发 APPEND_SLASH 500
   trailingSlash: true,
   // 关闭 Next.js 压缩中间件:默认 compress=true 会用 compression 中间件缓冲整个
